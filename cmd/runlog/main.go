@@ -5045,6 +5045,7 @@ USAGE
   runlog inspect [flags] <run-id>       full inspector dump of a run (all events + details)
   runlog analyze [flags] <run-id>       LLM analysis of a run with full conversation trace
   runlog trace [flags] <run-id>         show stored analysis trace for a run (no LLM call)
+  runlog skills install [flags]         install agent skills into tool directories
   runlog clear [--db <path>]            delete runs.db and all per-run log files
   runlog version                        print version and exit
 
@@ -5243,16 +5244,29 @@ func main() {
 		dbPath = resolveDBPath(*dbOut)
 		since = parseSince(*sinceOut, subcommand)
 
+	case "skills":
+		// skills subcommand manages agent skill installation; does not need DB.
+		dbPath = resolveDBPath(*globalDB)
+		since = parseSince(*globalSince, "")
+
 	default:
 		// Unknown subcommand or help — handle below without DB.
 		dbPath = resolveDBPath(*globalDB)
 		since = parseSince(*globalSince, "")
 	}
 
-	// "clear" deletes the DB, so it must not open it first.
+	// "clear" and "skills" do not need the DB — handle before opening it.
 	if subcommand == "clear" {
 		if err := cmdClear(dbPath); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog clear: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if subcommand == "skills" {
+		if err := cmdSkills(subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog skills: %v\n", err)
 			os.Exit(1)
 		}
 		return

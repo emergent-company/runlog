@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -1276,8 +1275,10 @@ func SharedDB() (*RunDB, error) {
 //
 // Resolution order:
 //  1. TEST_RUNS_DB env var            — explicit override (absolute path)
-//  2. runtime.Caller(0)              — <repo_root>/logs/runs.db
-//  3. $TMPDIR/.../runs.db            — last-resort fallback
+//  2. .runlog.yaml db: field          — from config file in working directory
+//  3. ./logs/runs.db                  — relative to working directory
+//  4. ./runs.db                       — working directory itself
+//  5. $TMPDIR/.../runs.db             — last-resort fallback
 //
 // NOTE: TEST_LOG_DIR is intentionally NOT consulted here.  Flat log files
 // (run.log, session-*.log) live under TEST_LOG_DIR, but the DB is always
@@ -1286,12 +1287,22 @@ func dbPath() string {
 	if d := os.Getenv("TEST_RUNS_DB"); d != "" {
 		return d
 	}
-	// Use Caller(0) to get db.go's own source path, then go up one level
-	// (out of framework/) so runs.db lands alongside the flat-file logs/ dir
-	// at the repo root — the same place NewRunLog writes flat logs.
-	_, srcFile, _, ok := runtime.Caller(0)
-	if ok {
-		return filepath.Join(filepath.Dir(srcFile), "..", "logs", "runs.db")
+	// Check .runlog.yaml for an explicit db: field.
+	if cfg, err := LoadConfig(""); err == nil && cfg.DBPath != "" {
+		return cfg.DBPath
+	}
+	// Check common paths relative to the working directory.
+	if wd, err := os.Getwd(); err == nil {
+		candidate := filepath.Join(wd, "logs", "runs.db")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		candidate = filepath.Join(wd, "runs.db")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		// Default: create in logs/ under working directory.
+		return filepath.Join(wd, "logs", "runs.db")
 	}
 	return filepath.Join(os.TempDir(), "memory-cli-docker-tests", "runs.db")
 }
