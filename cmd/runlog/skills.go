@@ -1,17 +1,15 @@
 // cmd/runlog/skills.go — "runlog skills" subcommand implementation.
 //
-// Provides `runlog skills install` which detects configured AI agent tools in
-// the current project directory, discovers available skill directories from
-// canonical source paths, and copies them into each tool's required install
-// directory.
+// Skills are embedded in the binary via go:embed. The install command copies
+// them from the embedded filesystem to each target tool's install directory.
+// Only skills with the "runlog-" prefix are included.
 package main
 
 import (
 	"bufio"
-	"errors"
+	"embed"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -19,6 +17,9 @@ import (
 	"strconv"
 	"strings"
 )
+
+//go:embed skills/*
+var embeddedSkills embed.FS
 
 // toolEntry describes one registered AI agent tool.
 type toolEntry struct {
@@ -30,7 +31,6 @@ type toolEntry struct {
 }
 
 // toolRegistry is the static map of tool ID → detection marker + install path.
-// Consistent with the OpenSpec supported-tools table.
 var toolRegistry = map[string]toolEntry{
 	"opencode": {MarkerPath: ".opencode", InstallDir: ".opencode/skills"},
 	"claude":   {MarkerPath: ".claude", InstallDir: ".claude/skills"},
@@ -58,53 +58,33 @@ func detectTools(projectRoot string) []string {
 	return detected
 }
 
-// skillEntry represents one installable skill discovered from a source dir.
+// skillEntry represents one installable skill from the embedded filesystem.
 type skillEntry struct {
-	Name    string
-	SrcPath string
+	Name string
 }
 
-// discoverSkills scans .agents/skills/ then .opencode/skills/ under
-// projectRoot, returning one skillEntry per skill name (first-found wins,
-// so .agents/skills/ takes precedence). Returns an error if no source
-// directories exist.
-func discoverSkills(projectRoot string) ([]skillEntry, error) {
-	sources := []string{
-		filepath.Join(projectRoot, ".agents", "skills"),
-		filepath.Join(projectRoot, ".opencode", "skills"),
+// discoverEmbeddedSkills reads the embedded skills/ directory and returns one
+// skillEntry per subdirectory that has the "runlog-" prefix.
+func discoverEmbeddedSkills() ([]skillEntry, error) {
+	entries, err := fs.ReadDir(embeddedSkills, "skills")
+	if err != nil {
+		return nil, fmt.Errorf("reading embedded skills: %w", err)
 	}
 
-	seen := make(map[string]bool)
 	var skills []skillEntry
-	foundAny := false
-
-	for _, src := range sources {
-		entries, err := os.ReadDir(src)
-		if errors.Is(err, os.ErrNotExist) {
+	for _, e := range entries {
+		if !e.IsDir() {
 			continue
 		}
-		if err != nil {
-			return nil, fmt.Errorf("reading %s: %w", src, err)
+		name := e.Name()
+		if !strings.HasPrefix(name, "runlog-") {
+			continue
 		}
-		foundAny = true
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			name := e.Name()
-			if seen[name] {
-				continue // dedup: first source wins
-			}
-			seen[name] = true
-			skills = append(skills, skillEntry{
-				Name:    name,
-				SrcPath: filepath.Join(src, name),
-			})
-		}
+		skills = append(skills, skillEntry{Name: name})
 	}
 
-	if !foundAny {
-		return nil, errors.New("no skill sources found")
+	if len(skills) == 0 {
+		return nil, fmt.Errorf("no embedded runlog skills found")
 	}
 	return skills, nil
 }
@@ -149,13 +129,13 @@ func selectTools(detected []string) ([]string, error) {
 	return selected, nil
 }
 
-// installSkill copies srcDir to dstDir. Returns true if the install was
-// performed (false means skipped due to existing install without --force).
-func installSkill(srcDir, dstDir string, force bool, dryRun bool) (bool, error) {
+// installEmbeddedSkill copies an embedded skill directory to dstDir on disk.
+// Returns true if the install was performed (false means skipped due to
+// existing install without --force).
+func installEmbeddedSkill(skillName, dstDir string, force bool, dryRun bool) (bool, error) {
 	if _, err := os.Stat(dstDir); err == nil {
-		// dstDir already exists.
 		if !force {
-			fmt.Printf("skipped: %s (already exists; use --force to overwrite)\n", filepath.Base(dstDir))
+			fmt.Printf("skipped: %s (already exists; use --force to overwrite)\n", skillName)
 			return false, nil
 		}
 		if !dryRun {
@@ -166,56 +146,43 @@ func installSkill(srcDir, dstDir string, force bool, dryRun bool) (bool, error) 
 	}
 
 	if dryRun {
-		fmt.Printf("would install: %s → %s\n", filepath.Base(srcDir), dstDir)
+		fmt.Printf("would install: %s → %s\n", skillName, dstDir)
 		return true, nil
 	}
 
-	if err := copyDir(srcDir, dstDir); err != nil {
-		return false, err
-	}
-	return true, nil
-}
+	// Walk the embedded skill directory and write each file to disk.
+	srcRoot := "skills/" + skillName
+	err := fs.WalkDir(embeddedSkills, srcRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		// Compute relative path from the skill root.
+		rel, err := filepath.Rel(srcRoot, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dstDir, rel)
 
-// copyDir recursively copies the directory tree rooted at src to dst.
-func copyDir(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		dstPath := filepath.Join(dst, rel)
 		if d.IsDir() {
 			return os.MkdirAll(dstPath, 0755)
 		}
-		return copyFile(path, dstPath)
+
+		// Read from embedded FS.
+		data, err := fs.ReadFile(embeddedSkills, path)
+		if err != nil {
+			return fmt.Errorf("reading embedded %s: %w", path, err)
+		}
+
+		// Write to disk.
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return err
+		}
+		return os.WriteFile(dstPath, data, 0644)
 	})
-}
-
-// copyFile copies a single file from src to dst, creating parent directories
-// as needed.
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
 	if err != nil {
-		return err
+		return false, fmt.Errorf("installing %s: %w", skillName, err)
 	}
-	defer in.Close()
-
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return err
-	}
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return err
-	}
-	return out.Close()
+	return true, nil
 }
 
 // cmdSkills dispatches the "skills" subcommand.
@@ -227,12 +194,27 @@ func cmdSkills(args []string) error {
 	switch args[0] {
 	case "install":
 		return cmdSkillsInstall(args[1:])
+	case "list":
+		return cmdSkillsList()
 	case "help", "--help", "-h":
 		skillsUsage()
 		return nil
 	default:
-		return fmt.Errorf("unknown skills action %q; try \"runlog skills install --help\"", args[0])
+		return fmt.Errorf("unknown skills action %q; try \"runlog skills --help\"", args[0])
 	}
+}
+
+// cmdSkillsList prints all embedded skills.
+func cmdSkillsList() error {
+	skills, err := discoverEmbeddedSkills()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Embedded skills (%d):\n", len(skills))
+	for _, s := range skills {
+		fmt.Printf("  %s\n", s.Name)
+	}
+	return nil
 }
 
 // cmdSkillsInstall implements "runlog skills install".
@@ -255,8 +237,8 @@ func cmdSkillsInstall(args []string) error {
 		return fmt.Errorf("getting working directory: %w", err)
 	}
 
-	// Discover available skills from source directories.
-	skills, err := discoverSkills(projectRoot)
+	// Discover embedded skills.
+	skills, err := discoverEmbeddedSkills()
 	if err != nil {
 		return err
 	}
@@ -264,7 +246,6 @@ func cmdSkillsInstall(args []string) error {
 	// Determine target tools.
 	var targetTools []string
 	if *tools != "" {
-		// --tools flag: validate each ID against the registry.
 		for _, id := range strings.Split(*tools, ",") {
 			id = strings.TrimSpace(id)
 			if id == "" {
@@ -300,7 +281,7 @@ func cmdSkillsInstall(args []string) error {
 		}
 	}
 
-	// Install each skill for each selected tool.
+	// Install each embedded skill for each selected tool.
 	totalInstalled := 0
 	for _, toolID := range targetTools {
 		entry := toolRegistry[toolID]
@@ -308,7 +289,7 @@ func cmdSkillsInstall(args []string) error {
 
 		for _, skill := range skills {
 			dstDir := filepath.Join(installBase, skill.Name)
-			ok, err := installSkill(skill.SrcPath, dstDir, *force, *dryRun)
+			ok, err := installEmbeddedSkill(skill.Name, dstDir, *force, *dryRun)
 			if err != nil {
 				return fmt.Errorf("installing %s for %s: %w", skill.Name, toolID, err)
 			}
@@ -330,14 +311,18 @@ func skillsUsage() {
 	fmt.Fprint(os.Stderr, `runlog skills — manage AI agent skills
 
 USAGE
-  runlog skills install [flags]   install skills into configured agent tool directories
+  runlog skills install [flags]   install embedded skills into agent tool directories
+  runlog skills list              list all embedded skills
 
 Run "runlog skills install --help" for details.
 `)
 }
 
 func skillsInstallUsage() {
-	fmt.Fprint(os.Stderr, `runlog skills install — copy skill directories into agent tool install paths
+	fmt.Fprint(os.Stderr, `runlog skills install — copy embedded skills into agent tool install paths
+
+Skills are bundled inside the runlog binary. Only runlog-* prefixed skills
+are included — no external skill source directories are needed.
 
 USAGE
   runlog skills install [flags]

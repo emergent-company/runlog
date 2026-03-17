@@ -1,25 +1,19 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// setupSkillsTestDir creates a temporary project root with skill source dirs
-// and returns the root path. The caller is responsible for cleanup.
+// setupSkillsTestDir creates a temporary project root with an opencode marker
+// directory and returns the root path. Skills come from the embedded FS, so no
+// source directories are needed.
 func setupSkillsTestDir(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-
-	// Create source skill dirs.
-	srcSkill := filepath.Join(root, ".agents", "skills", "my-skill")
-	if err := os.MkdirAll(srcSkill, 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(srcSkill, "SKILL.md"), []byte("---\nname: my-skill\ndescription: test\n---\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
 
 	// Create opencode marker dir so detectTools finds it.
 	if err := os.MkdirAll(filepath.Join(root, ".opencode"), 0755); err != nil {
@@ -29,21 +23,91 @@ func setupSkillsTestDir(t *testing.T) string {
 	return root
 }
 
-// TestSkillsInstall_HappyPath verifies a clean install copies skill dirs.
+// TestDiscoverEmbeddedSkills verifies that the embedded skills are discoverable.
+func TestDiscoverEmbeddedSkills(t *testing.T) {
+	skills, err := discoverEmbeddedSkills()
+	if err != nil {
+		t.Fatalf("discoverEmbeddedSkills: %v", err)
+	}
+	if len(skills) != 5 {
+		t.Errorf("expected 5 embedded skills, got %d", len(skills))
+	}
+
+	// All skills must have runlog- prefix.
+	for _, s := range skills {
+		if !strings.HasPrefix(s.Name, "runlog-") {
+			t.Errorf("skill %q does not have runlog- prefix", s.Name)
+		}
+	}
+
+	// Check for expected skill names.
+	expected := map[string]bool{
+		"runlog-test-designer":      false,
+		"runlog-verify-e2e-changes": false,
+		"runlog-verify-runs":        false,
+		"runlog-clear":              false,
+		"runlog-install-skills":     false,
+	}
+	for _, s := range skills {
+		if _, ok := expected[s.Name]; ok {
+			expected[s.Name] = true
+		}
+	}
+	for name, found := range expected {
+		if !found {
+			t.Errorf("expected embedded skill %q not found", name)
+		}
+	}
+}
+
+// TestEmbeddedSkillsHaveSKILLMD verifies each embedded skill directory
+// contains a SKILL.md file.
+func TestEmbeddedSkillsHaveSKILLMD(t *testing.T) {
+	skills, err := discoverEmbeddedSkills()
+	if err != nil {
+		t.Fatalf("discoverEmbeddedSkills: %v", err)
+	}
+
+	for _, s := range skills {
+		path := "skills/" + s.Name + "/SKILL.md"
+		data, err := fs.ReadFile(embeddedSkills, path)
+		if err != nil {
+			t.Errorf("skill %s: missing SKILL.md: %v", s.Name, err)
+			continue
+		}
+		if len(data) == 0 {
+			t.Errorf("skill %s: SKILL.md is empty", s.Name)
+			continue
+		}
+		// Verify frontmatter contains the skill name.
+		content := string(data)
+		if !strings.Contains(content, "name: "+s.Name) {
+			t.Errorf("skill %s: SKILL.md frontmatter missing 'name: %s'", s.Name, s.Name)
+		}
+	}
+}
+
+// TestSkillsInstall_HappyPath verifies a clean install copies embedded skills.
 func TestSkillsInstall_HappyPath(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
+	origDir, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chdir(origDir) })
 
 	if err := cmdSkillsInstall([]string{"--tools", "opencode"}); err != nil {
 		t.Fatalf("cmdSkillsInstall: %v", err)
 	}
 
-	dst := filepath.Join(root, ".opencode", "skills", "my-skill", "SKILL.md")
-	if _, err := os.Stat(dst); err != nil {
-		t.Errorf("expected installed file %s, got: %v", dst, err)
+	// Verify all 5 skills were installed.
+	skills, _ := discoverEmbeddedSkills()
+	for _, s := range skills {
+		dst := filepath.Join(root, ".opencode", "skills", s.Name, "SKILL.md")
+		if _, err := os.Stat(dst); err != nil {
+			t.Errorf("expected installed file %s, got: %v", dst, err)
+		}
 	}
 }
 
@@ -52,16 +116,17 @@ func TestSkillsInstall_HappyPath(t *testing.T) {
 func TestSkillsInstall_SkipExisting(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
+	origDir, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chdir(origDir) })
 
-	// Pre-create the destination.
-	dst := filepath.Join(root, ".opencode", "skills", "my-skill")
+	// Pre-create one destination skill with a sentinel file.
+	dst := filepath.Join(root, ".opencode", "skills", "runlog-clear")
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		t.Fatal(err)
 	}
-	// Write a sentinel file that should NOT be overwritten.
 	sentinel := filepath.Join(dst, "sentinel.txt")
 	if err := os.WriteFile(sentinel, []byte("original"), 0644); err != nil {
 		t.Fatal(err)
@@ -86,12 +151,14 @@ func TestSkillsInstall_SkipExisting(t *testing.T) {
 func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
+	origDir, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chdir(origDir) })
 
 	// Pre-create a destination with a stale file.
-	dst := filepath.Join(root, ".opencode", "skills", "my-skill")
+	dst := filepath.Join(root, ".opencode", "skills", "runlog-clear")
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +175,7 @@ func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Errorf("stale file still exists after --force install")
 	}
-	// The actual SKILL.md from the source should be present.
+	// The actual SKILL.md from the embedded source should be present.
 	installed := filepath.Join(dst, "SKILL.md")
 	if _, err := os.Stat(installed); err != nil {
 		t.Errorf("SKILL.md not installed after --force: %v", err)
@@ -120,18 +187,23 @@ func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 func TestSkillsInstall_DryRun(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
+	origDir, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chdir(origDir) })
 
 	if err := cmdSkillsInstall([]string{"--tools", "opencode", "--dry-run"}); err != nil {
 		t.Fatalf("cmdSkillsInstall --dry-run: %v", err)
 	}
 
-	// Nothing should have been written.
-	dst := filepath.Join(root, ".opencode", "skills", "my-skill")
-	if _, err := os.Stat(dst); !os.IsNotExist(err) {
-		t.Errorf("--dry-run should not have created %s", dst)
+	// No skill directories should have been created.
+	skills, _ := discoverEmbeddedSkills()
+	for _, s := range skills {
+		dst := filepath.Join(root, ".opencode", "skills", s.Name)
+		if _, err := os.Stat(dst); !os.IsNotExist(err) {
+			t.Errorf("--dry-run should not have created %s", dst)
+		}
 	}
 }
 
@@ -140,28 +212,56 @@ func TestSkillsInstall_DryRun(t *testing.T) {
 func TestSkillsInstall_UnknownTool(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
+	origDir, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chdir(origDir) })
 
 	err := cmdSkillsInstall([]string{"--tools", "notarealtool"})
 	if err == nil {
 		t.Fatal("expected error for unknown tool, got nil")
 	}
-	if !containsStr(err.Error(), "unknown tool ID") {
+	if !strings.Contains(err.Error(), "unknown tool ID") {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
-func containsStr(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && containsStrHelper(s, sub))
+// TestSkillsList verifies the list subcommand runs without error.
+func TestSkillsList(t *testing.T) {
+	err := cmdSkillsList()
+	if err != nil {
+		t.Fatalf("cmdSkillsList: %v", err)
+	}
 }
 
-func containsStrHelper(s, sub string) bool {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
+// TestSkillsInstall_MultipleTools verifies installing to multiple tools at once.
+func TestSkillsInstall_MultipleTools(t *testing.T) {
+	root := setupSkillsTestDir(t)
+
+	// Also create agents marker.
+	if err := os.MkdirAll(filepath.Join(root, ".agents"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	if err := cmdSkillsInstall([]string{"--tools", "opencode,agents"}); err != nil {
+		t.Fatalf("cmdSkillsInstall: %v", err)
+	}
+
+	// Verify skills installed to both directories.
+	skills, _ := discoverEmbeddedSkills()
+	for _, s := range skills {
+		for _, dir := range []string{".opencode/skills", ".agents/skills"} {
+			dst := filepath.Join(root, dir, s.Name, "SKILL.md")
+			if _, err := os.Stat(dst); err != nil {
+				t.Errorf("expected installed file %s, got: %v", dst, err)
+			}
 		}
 	}
-	return false
 }

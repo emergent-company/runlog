@@ -5045,7 +5045,8 @@ USAGE
   runlog inspect [flags] <run-id>       full inspector dump of a run (all events + details)
   runlog analyze [flags] <run-id>       LLM analysis of a run with full conversation trace
   runlog trace [flags] <run-id>         show stored analysis trace for a run (no LLM call)
-  runlog skills install [flags]         install agent skills into tool directories
+  runlog skills install [flags]         install embedded skills into tool directories
+  runlog skills list                    list all embedded skills
   runlog clear [--db <path>]            delete runs.db and all per-run log files
   runlog version                        print version and exit
 
