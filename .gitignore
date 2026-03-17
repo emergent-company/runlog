@@ -1,0 +1,21 @@
+# Build artifacts
+/runlog
+/dist/
+
+# Databases
+*.db
+
+# Log files
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

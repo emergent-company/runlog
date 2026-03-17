@@ -1,0 +1,1297 @@
+// Package e2eframework — db.go
+//
+// RunDB: a SQLite-backed structured event log for test runs.
+//
+// Every test that creates a RunLog automatically gets its events persisted to
+// logs/runs.db (or $TEST_RUNS_DB if set).  Both Docker and host runs share
+// the same database so `runlog` shows a unified view.  The schema is
+// intentionally minimal: one row per test run, one row per event.  All
+// event-specific structure lives in the `details` TEXT column as a JSON blob
+// so that new event kinds never require a schema migration.
+//
+// Schema versioning uses a schema_migrations table; migrations are applied
+// once at DB open time and are idempotent.
+package runlog
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+
+	_ "modernc.org/sqlite" // register "sqlite" driver
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migrations
+// ─────────────────────────────────────────────────────────────────────────────
+
+// migration is a single versioned SQL statement.
+type migration struct {
+	version int
+	sql     string
+}
+
+var migrations = []migration{
+	{
+		version: 1,
+		sql: `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version    INTEGER PRIMARY KEY,
+    applied_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS test_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    test_name   TEXT NOT NULL,
+    started_at  TEXT NOT NULL,
+    finished_at TEXT,
+    passed      INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS run_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id      INTEGER NOT NULL REFERENCES test_runs(id),
+    seq         INTEGER NOT NULL,
+    occurred_at TEXT NOT NULL,
+    elapsed_s   REAL NOT NULL,
+    kind        TEXT NOT NULL,
+    message     TEXT,
+    details     TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_run_events_run_id ON run_events(run_id);
+CREATE INDEX IF NOT EXISTS idx_test_runs_started_at ON test_runs(started_at);
+`,
+	},
+	{
+		version: 2,
+		sql: `
+-- parent_id links a child event to its parent group event.
+-- children stores a JSON array of {elapsed_s, kind, message, details} objects
+-- on the parent row so the TUI never needs a second query.
+ALTER TABLE run_events ADD COLUMN parent_id INTEGER REFERENCES run_events(id);
+ALTER TABLE run_events ADD COLUMN children  TEXT;
+CREATE INDEX IF NOT EXISTS idx_run_events_parent_id ON run_events(parent_id);
+`,
+	},
+	{
+		version: 3,
+		sql: `
+-- description stores a JSON object {"summary":"...","bullets":["...",...]} set
+-- by RunLog.Describe() so the TUI can display it in the run-list inspector.
+ALTER TABLE test_runs ADD COLUMN description TEXT;
+`,
+	},
+	{
+		version: 4,
+		sql: `
+-- tags stores a JSON array of "key:value" strings set by RunLog.Tag() so that
+-- test runs that override settings (model, blueprint, etc.) can be compared.
+-- experiment stores an optional experiment name/id set by RunLog.SetExperiment()
+-- or automatically from the EXPERIMENT env var.
+ALTER TABLE test_runs ADD COLUMN tags       TEXT;
+ALTER TABLE test_runs ADD COLUMN experiment TEXT;
+`,
+	},
+	{
+		version: 5,
+		sql: `
+-- experiment_suggestions holds LLM-generated improvement suggestions for a
+-- named experiment.  Each row is one suggestion with a priority, category,
+-- title, body, and an optional list of run IDs that are most relevant.
+CREATE TABLE IF NOT EXISTS experiment_suggestions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    experiment     TEXT    NOT NULL,
+    generated_at   TEXT    NOT NULL,
+    category       TEXT    NOT NULL,
+    priority       TEXT    NOT NULL,
+    title          TEXT    NOT NULL,
+    body           TEXT    NOT NULL,
+    run_ids        TEXT    NOT NULL DEFAULT '[]'
+);
+
+CREATE INDEX IF NOT EXISTS idx_exp_suggestions_experiment
+    ON experiment_suggestions(experiment);
+`,
+	},
+	{
+		version: 6,
+		sql: `
+-- test_launchers tracks processes started by the runlog TUI via ./test.
+-- launcher_pid is the OS PID of the go test process (bash execs into it).
+-- finished_at is set when the process exits or is killed via the TUI.
+-- Rows are never deleted so the TUI can show historical launch info.
+CREATE TABLE IF NOT EXISTS test_launchers (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    test_name    TEXT    NOT NULL,
+    env          TEXT    NOT NULL,
+    launched_at  TEXT    NOT NULL,
+    launcher_pid INTEGER NOT NULL,
+    finished_at  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_test_launchers_test_name
+    ON test_launchers(test_name);
+`,
+	},
+	{
+		version: 7,
+		sql: `
+-- runner records the execution environment: "host" (./test), "docker"
+-- (docker-compose / run_tests.sh), or empty for older rows.
+ALTER TABLE test_runs ADD COLUMN runner TEXT;
+`,
+	},
+	{
+		version: 8,
+		sql: `
+-- analyzer_traces stores one row per analysis run so we can replay
+-- the full LLM conversation later without re-running the agent.
+CREATE TABLE IF NOT EXISTS analyzer_traces (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    suggestion_key TEXT    NOT NULL,
+    run_id         INTEGER,
+    started_at     TEXT    NOT NULL,
+    finished_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_analyzer_traces_run_id
+    ON analyzer_traces(run_id);
+
+-- analyzer_trace_events stores the individual conversation events
+-- (system prompt, user message, thoughts, tool calls, etc.).
+CREATE TABLE IF NOT EXISTS analyzer_trace_events (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    trace_id  INTEGER NOT NULL REFERENCES analyzer_traces(id),
+    seq       INTEGER NOT NULL,
+    kind      TEXT    NOT NULL,
+    author    TEXT,
+    content   TEXT,
+    details   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_analyzer_trace_events_trace_id
+    ON analyzer_trace_events(trace_id);
+`,
+	},
+	{
+		version: 9,
+		sql: `
+-- reason stores a human-readable explanation of why the test was skipped or
+-- failed.  For skips the message comes from rl.Skipf(); for failures it comes
+-- from the last rl.Failf() event.  NULL for passes and older rows.
+ALTER TABLE test_runs ADD COLUMN reason TEXT;
+`,
+	},
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RunDB
+// ─────────────────────────────────────────────────────────────────────────────
+
+// RunDB is a handle to the SQLite runs database.
+// All methods are safe for concurrent use from multiple goroutines.
+type RunDB struct {
+	db   *sql.DB
+	mu   sync.Mutex
+	path string
+}
+
+// Path returns the filesystem path to the SQLite database file.
+func (rdb *RunDB) Path() string {
+	return rdb.path
+}
+
+// OpenDB opens (or creates) the SQLite database at path and applies any
+// pending migrations.  The caller is responsible for closing it.
+func OpenDB(path string) (*RunDB, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, fmt.Errorf("rundb: mkdir %s: %w", filepath.Dir(path), err)
+	}
+	db, err := sql.Open("sqlite", path+"?_journal=WAL&_timeout=5000")
+	if err != nil {
+		return nil, fmt.Errorf("rundb: open %s: %w", path, err)
+	}
+	// SQLite performs best with a single writer connection.
+	db.SetMaxOpenConns(1)
+
+	rdb := &RunDB{db: db, path: path}
+	if err := rdb.applyMigrations(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return rdb, nil
+}
+
+// Close releases the database connection.
+func (rdb *RunDB) Close() error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	return rdb.db.Close()
+}
+
+// applyMigrations runs any migrations whose version is not yet in
+// schema_migrations.  Each migration is applied in a single transaction.
+func (rdb *RunDB) applyMigrations() error {
+	// Bootstrap: create schema_migrations if it doesn't exist yet.
+	_, err := rdb.db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        version    INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+    )`)
+	if err != nil {
+		return fmt.Errorf("rundb: bootstrap migrations table: %w", err)
+	}
+
+	for _, m := range migrations {
+		var exists int
+		row := rdb.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, m.version)
+		if err := row.Scan(&exists); err != nil {
+			return fmt.Errorf("rundb: check migration %d: %w", m.version, err)
+		}
+		if exists > 0 {
+			continue
+		}
+		tx, err := rdb.db.Begin()
+		if err != nil {
+			return fmt.Errorf("rundb: begin migration %d: %w", m.version, err)
+		}
+		if _, err := tx.Exec(m.sql); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("rundb: apply migration %d: %w", m.version, err)
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)`,
+			m.version, time.Now().UTC().Format(time.RFC3339),
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("rundb: record migration %d: %w", m.version, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("rundb: commit migration %d: %w", m.version, err)
+		}
+	}
+	return nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Write helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// InsertRun inserts a new test_runs row and returns its auto-assigned ID.
+// runner identifies the execution environment (e.g. "host", "docker").
+// Pass "" to leave the runner column NULL.
+func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	var runnerVal any
+	if runner != "" {
+		runnerVal = runner
+	}
+	res, err := rdb.db.Exec(
+		`INSERT INTO test_runs(test_name, started_at, runner) VALUES (?, ?, ?)`,
+		testName, startedAt.UTC().Format(time.RFC3339), runnerVal,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertRun: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// RunDescription is the structured description stored on a test_runs row.
+type RunDescription struct {
+	Summary string   `json:"summary"`
+	Bullets []string `json:"bullets,omitempty"`
+}
+
+// UpdateRunDescription serialises desc as JSON and stores it on the test_runs
+// row identified by id.  Best-effort: callers should log but not fail on error.
+func (rdb *RunDB) UpdateRunDescription(id int64, desc RunDescription) error {
+	b, err := json.Marshal(desc)
+	if err != nil {
+		return fmt.Errorf("rundb: UpdateRunDescription marshal: %w", err)
+	}
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err = rdb.db.Exec(
+		`UPDATE test_runs SET description = ? WHERE id = ?`, string(b), id,
+	)
+	return err
+}
+
+// UpdateRunTags serialises tags as a JSON array and stores it on the
+// test_runs row identified by id.  Best-effort: callers should log but not
+// fail on error.
+func (rdb *RunDB) UpdateRunTags(id int64, tags []string) error {
+	b, err := json.Marshal(tags)
+	if err != nil {
+		return fmt.Errorf("rundb: UpdateRunTags marshal: %w", err)
+	}
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err = rdb.db.Exec(
+		`UPDATE test_runs SET tags = ? WHERE id = ?`, string(b), id,
+	)
+	return err
+}
+
+// UpdateRunExperiment stores experiment on the test_runs row identified by id.
+// Best-effort: callers should log but not fail on error.
+func (rdb *RunDB) UpdateRunExperiment(id int64, experiment string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET experiment = ? WHERE id = ?`, experiment, id,
+	)
+	return err
+}
+
+// RunOutcome represents the final state of a test run.
+type RunOutcome int
+
+const (
+	OutcomeFail RunOutcome = 0 // test failed
+	OutcomePass RunOutcome = 1 // test passed
+	OutcomeSkip RunOutcome = 2 // test was skipped (t.Skip)
+)
+
+// FinishRun sets finished_at, passed, and optionally reason on an existing
+// test_runs row.  outcome encodes the result: 0=fail, 1=pass, 2=skip.
+// reason is a human-readable explanation (e.g. skip reason or last failure
+// message); pass "" to leave the column NULL.
+func (rdb *RunDB) FinishRun(id int64, finishedAt time.Time, outcome RunOutcome, reason string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	var reasonVal any
+	if reason != "" {
+		reasonVal = reason
+	}
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET finished_at = ?, passed = ?, reason = ? WHERE id = ?`,
+		finishedAt.UTC().Format(time.RFC3339), int(outcome), reasonVal, id,
+	)
+	return err
+}
+
+// InsertEvent appends one run_events row.
+// details may be any JSON-serialisable value (struct, map, nil).
+// If details is already a []byte or string it is stored verbatim as JSON.
+func (rdb *RunDB) InsertEvent(
+	runID int64,
+	seq int,
+	occurredAt time.Time,
+	elapsedS float64,
+	kind, message string,
+	details any,
+) error {
+	return rdb.insertEvent(runID, seq, occurredAt, elapsedS, kind, message, details, nil)
+}
+
+// insertEvent is the internal implementation shared by InsertEvent and
+// InsertChildEvent.
+func (rdb *RunDB) insertEvent(
+	runID int64,
+	seq int,
+	occurredAt time.Time,
+	elapsedS float64,
+	kind, message string,
+	details any,
+	parentID *int64,
+) error {
+	var detailsJSON *string
+	if details != nil {
+		var b []byte
+		var err error
+		switch v := details.(type) {
+		case []byte:
+			b = v
+		case string:
+			b = []byte(v)
+		default:
+			b, err = json.Marshal(details)
+			if err != nil {
+				return fmt.Errorf("rundb: InsertEvent marshal details: %w", err)
+			}
+		}
+		s := string(b)
+		detailsJSON = &s
+	}
+
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message, details, parent_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		runID,
+		seq,
+		occurredAt.UTC().Format(time.RFC3339Nano),
+		elapsedS,
+		kind,
+		message,
+		detailsJSON,
+		parentID,
+	)
+	return err
+}
+
+// InsertGroupEvent inserts a parent "group" event and returns its row ID.
+// Callers call AppendGroupChildren once all children have been collected.
+func (rdb *RunDB) InsertGroupEvent(
+	runID int64,
+	seq int,
+	occurredAt time.Time,
+	elapsedS float64,
+	kind, message string,
+) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	res, err := rdb.db.Exec(
+		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+		runID, seq,
+		occurredAt.UTC().Format(time.RFC3339Nano),
+		elapsedS, kind, message,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertGroupEvent: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// AppendGroupChildren serialises children as a JSON array into the parent's
+// `children` column.  children is a []ChildEvent value.
+func (rdb *RunDB) AppendGroupChildren(parentID int64, children []ChildEvent) error {
+	if len(children) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(children)
+	if err != nil {
+		return fmt.Errorf("rundb: AppendGroupChildren marshal: %w", err)
+	}
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err = rdb.db.Exec(
+		`UPDATE run_events SET children = ? WHERE id = ?`, string(b), parentID,
+	)
+	return err
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read helpers (used by the TUI browser)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// RunTokenSummary holds aggregated token usage for a test run, derived from
+// the most recent "token_summary" event emitted by PrintTokenSummary.
+type RunTokenSummary struct {
+	TotalRuns    int
+	InputTokens  int64
+	OutputTokens int64
+	CostUSD      float64
+}
+
+// RunRow is a single row from test_runs.
+type RunRow struct {
+	ID           int64
+	TestName     string
+	StartedAt    time.Time
+	FinishedAt   *time.Time // nil if still running
+	Passed       *bool      // nil if not yet determined
+	Skipped      bool       // true when the test called t.Skip() (passed column = 2)
+	EventCount   int
+	Description  *RunDescription  // nil if not set
+	TokenSummary *RunTokenSummary // nil if PrintTokenSummary was never called
+	Tags         []string         // nil if no tags set; decoded from JSON array
+	Experiment   *string          // nil if not set
+	Runner       *string          // nil for older rows; "host" or "docker"
+	Reason       *string          // nil for passes and older rows; skip/fail reason
+}
+
+// ChildEvent is one entry in the `children` JSON array stored on a group event.
+type ChildEvent struct {
+	ElapsedS float64 `json:"elapsed_s"`
+	Kind     string  `json:"kind"`
+	Message  string  `json:"message"`
+	Details  string  `json:"details,omitempty"` // raw JSON, empty if absent
+}
+
+// EventRow is a single row from run_events.
+type EventRow struct {
+	ID         int64
+	RunID      int64
+	Seq        int
+	OccurredAt time.Time
+	ElapsedS   float64
+	Kind       string
+	Message    string
+	Details    *string      // raw JSON, nil if absent
+	ParentID   *int64       // non-nil for child events
+	Children   []ChildEvent // populated for group events
+}
+
+// ListRuns returns test_runs rows with started_at >= since, newest first.
+// It also populates EventCount via a JOIN.
+func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	rows, err := rdb.db.Query(`
+        SELECT
+            r.id,
+            r.test_name,
+            r.started_at,
+            r.finished_at,
+            r.passed,
+            COUNT(e.id) AS event_count,
+            r.description,
+            r.tags,
+            r.experiment,
+            r.runner,
+            r.reason
+        FROM test_runs r
+        LEFT JOIN run_events e ON e.run_id = r.id
+        WHERE r.started_at >= ?
+        GROUP BY r.id
+        ORDER BY r.started_at DESC
+    `, since.UTC().Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListRuns: %w", err)
+	}
+	defer rows.Close()
+
+	var result []RunRow
+	for rows.Next() {
+		var row RunRow
+		var startedStr string
+		var finishedStr *string
+		var passedInt *int
+		var descJSON *string
+		var tagsJSON *string
+		var experiment *string
+		var runner *string
+		var reason *string
+		if err := rows.Scan(
+			&row.ID,
+			&row.TestName,
+			&startedStr,
+			&finishedStr,
+			&passedInt,
+			&row.EventCount,
+			&descJSON,
+			&tagsJSON,
+			&experiment,
+			&runner,
+			&reason,
+		); err != nil {
+			return nil, fmt.Errorf("rundb: ListRuns scan: %w", err)
+		}
+		row.StartedAt, _ = time.Parse(time.RFC3339, startedStr)
+		if finishedStr != nil {
+			t, _ := time.Parse(time.RFC3339, *finishedStr)
+			row.FinishedAt = &t
+		}
+		if passedInt != nil {
+			if *passedInt == 2 {
+				// skip: Passed stays nil (not determined as pass/fail), Skipped=true
+				row.Skipped = true
+			} else {
+				p := *passedInt == 1
+				row.Passed = &p
+			}
+		}
+		if descJSON != nil && *descJSON != "" {
+			var d RunDescription
+			if json.Unmarshal([]byte(*descJSON), &d) == nil {
+				row.Description = &d
+			}
+		}
+		if tagsJSON != nil && *tagsJSON != "" {
+			var tags []string
+			if json.Unmarshal([]byte(*tagsJSON), &tags) == nil {
+				row.Tags = tags
+			}
+		}
+		row.Experiment = experiment
+		row.Runner = runner
+		row.Reason = reason
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+
+	// Second pass: fetch the latest token_summary event details for each run.
+	if len(result) > 0 {
+		// Build a placeholder list for the IN clause.
+		ids := make([]any, len(result))
+		for i, r := range result {
+			ids[i] = r.ID
+		}
+		placeholders := strings.Repeat("?,", len(ids))
+		placeholders = placeholders[:len(placeholders)-1] // trim trailing comma
+
+		tsRows, err := rdb.db.Query(
+			`SELECT run_id, details
+			 FROM run_events
+			 WHERE kind = 'token_summary'
+			   AND run_id IN (`+placeholders+`)
+			 ORDER BY run_id, seq DESC`,
+			ids...,
+		)
+		if err == nil {
+			// Keep only the first (latest by DESC) row per run_id.
+			seen := map[int64]bool{}
+			for tsRows.Next() {
+				var runID int64
+				var detailsJSON *string
+				if tsRows.Scan(&runID, &detailsJSON) == nil && !seen[runID] && detailsJSON != nil {
+					seen[runID] = true
+					var payload struct {
+						TotalRuns    int     `json:"total_runs"`
+						InputTokens  int64   `json:"input_tokens"`
+						OutputTokens int64   `json:"output_tokens"`
+						CostUSD      float64 `json:"cost_usd"`
+					}
+					if json.Unmarshal([]byte(*detailsJSON), &payload) == nil {
+						ts := &RunTokenSummary{
+							TotalRuns:    payload.TotalRuns,
+							InputTokens:  payload.InputTokens,
+							OutputTokens: payload.OutputTokens,
+							CostUSD:      payload.CostUSD,
+						}
+						for i := range result {
+							if result[i].ID == runID {
+								result[i].TokenSummary = ts
+								break
+							}
+						}
+					}
+				}
+			}
+			tsRows.Close()
+		}
+	}
+
+	return result, nil
+}
+
+// ExperimentSummary holds aggregated information about one experiment.
+type ExperimentSummary struct {
+	Name         string    // experiment name
+	RunCount     int       // total number of runs in this experiment
+	PassCount    int       // number of passed runs
+	FailCount    int       // number of failed runs
+	SkipCount    int       // number of skipped runs
+	LastRunAt    time.Time // most recent started_at across all runs
+	Tags         []string  // union of all distinct tags across runs (sorted)
+	Runs         []RunRow  // all runs belonging to this experiment (newest first)
+	TotalCostUSD float64   // sum of TokenSummary.CostUSD across all runs
+}
+
+// DiscoverTests returns all distinct test names from the database, ordered
+// alphabetically. This is used by the TUI to auto-populate the test list
+// without requiring a hardcoded registry.
+func (rdb *RunDB) DiscoverTests() ([]string, error) {
+	rows, err := rdb.db.Query(`SELECT DISTINCT test_name FROM test_runs ORDER BY test_name`)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: DiscoverTests: %w", err)
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("rundb: DiscoverTests scan: %w", err)
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+}
+
+// ListExperiments returns one ExperimentSummary per distinct non-null
+// experiment value across all test_runs rows, sorted newest-first by LastRunAt.
+// It re-uses ListRuns with a zero time to get every run, then groups in memory.
+func (rdb *RunDB) ListExperiments() ([]ExperimentSummary, error) {
+	rows, err := rdb.ListRuns(time.Time{})
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListExperiments: %w", err)
+	}
+
+	// group by experiment name, preserving insertion (newest-first) order for
+	// the first occurrence of each name.
+	order := []string{}
+	byName := map[string]*ExperimentSummary{}
+	for _, r := range rows {
+		if r.Experiment == nil {
+			continue
+		}
+		name := *r.Experiment
+		if _, exists := byName[name]; !exists {
+			byName[name] = &ExperimentSummary{Name: name}
+			order = append(order, name)
+		}
+		s := byName[name]
+		s.RunCount++
+		if r.Skipped {
+			s.SkipCount++
+		} else if r.Passed != nil {
+			if *r.Passed {
+				s.PassCount++
+			} else {
+				s.FailCount++
+			}
+		}
+		if r.StartedAt.After(s.LastRunAt) {
+			s.LastRunAt = r.StartedAt
+		}
+		s.Runs = append(s.Runs, r)
+		if r.TokenSummary != nil {
+			s.TotalCostUSD += r.TokenSummary.CostUSD
+		}
+		// collect distinct tags
+		for _, t := range r.Tags {
+			found := false
+			for _, existing := range s.Tags {
+				if existing == t {
+					found = true
+					break
+				}
+			}
+			if !found {
+				s.Tags = append(s.Tags, t)
+			}
+		}
+	}
+
+	result := make([]ExperimentSummary, 0, len(order))
+	for _, name := range order {
+		result = append(result, *byName[name])
+	}
+	return result, nil
+}
+
+// SuggestionRow is a single row from experiment_suggestions.
+type SuggestionRow struct {
+	ID          int64
+	Experiment  string
+	GeneratedAt time.Time
+	Category    string
+	Priority    string
+	Title       string
+	Body        string
+	RunIDs      []int64
+}
+
+// InsertSuggestion appends one suggestion row for the given experiment and
+// returns its auto-assigned ID.  runIDs is serialised as a JSON array.
+func (rdb *RunDB) InsertSuggestion(experiment, title, body, category, priority string, runIDs []int64) (int64, error) {
+	if runIDs == nil {
+		runIDs = []int64{}
+	}
+	runIDsJSON, err := json.Marshal(runIDs)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertSuggestion marshal run_ids: %w", err)
+	}
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	res, err := rdb.db.Exec(
+		`INSERT INTO experiment_suggestions(experiment, generated_at, category, priority, title, body, run_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		experiment,
+		time.Now().UTC().Format(time.RFC3339),
+		category,
+		priority,
+		title,
+		body,
+		string(runIDsJSON),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertSuggestion: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// ListSuggestions returns all suggestion rows for the given experiment,
+// ordered by id ASC (insertion order).
+func (rdb *RunDB) ListSuggestions(experiment string) ([]SuggestionRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	rows, err := rdb.db.Query(`
+		SELECT id, experiment, generated_at, category, priority, title, body, run_ids
+		FROM experiment_suggestions
+		WHERE experiment = ?
+		ORDER BY id ASC
+	`, experiment)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListSuggestions: %w", err)
+	}
+	defer rows.Close()
+
+	var result []SuggestionRow
+	for rows.Next() {
+		var row SuggestionRow
+		var generatedStr string
+		var runIDsJSON string
+		if err := rows.Scan(
+			&row.ID,
+			&row.Experiment,
+			&generatedStr,
+			&row.Category,
+			&row.Priority,
+			&row.Title,
+			&row.Body,
+			&runIDsJSON,
+		); err != nil {
+			return nil, fmt.Errorf("rundb: ListSuggestions scan: %w", err)
+		}
+		row.GeneratedAt, _ = time.Parse(time.RFC3339, generatedStr)
+		_ = json.Unmarshal([]byte(runIDsJSON), &row.RunIDs)
+		if row.RunIDs == nil {
+			row.RunIDs = []int64{}
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+// DeleteSuggestions removes all suggestion rows for the given experiment.
+func (rdb *RunDB) DeleteSuggestions(experiment string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(`DELETE FROM experiment_suggestions WHERE experiment = ?`, experiment)
+	if err != nil {
+		return fmt.Errorf("rundb: DeleteSuggestions: %w", err)
+	}
+	return nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Analyzer trace persistence
+// ─────────────────────────────────────────────────────────────────────────────
+
+// AnalyzerTraceRow is a single row from analyzer_traces.
+type AnalyzerTraceRow struct {
+	ID            int64
+	SuggestionKey string
+	RunID         *int64
+	StartedAt     time.Time
+	FinishedAt    *time.Time
+}
+
+// InsertAnalyzerTrace creates a new trace row and returns its ID.
+func (rdb *RunDB) InsertAnalyzerTrace(suggestionKey string, runID *int64) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	var runIDVal interface{}
+	if runID != nil {
+		runIDVal = *runID
+	}
+	res, err := rdb.db.Exec(
+		`INSERT INTO analyzer_traces(suggestion_key, run_id, started_at) VALUES (?, ?, ?)`,
+		suggestionKey, runIDVal, time.Now().UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertAnalyzerTrace: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// FinishAnalyzerTrace sets the finished_at timestamp on a trace row.
+func (rdb *RunDB) FinishAnalyzerTrace(traceID int64) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE analyzer_traces SET finished_at = ? WHERE id = ?`,
+		time.Now().UTC().Format(time.RFC3339), traceID,
+	)
+	if err != nil {
+		return fmt.Errorf("rundb: FinishAnalyzerTrace: %w", err)
+	}
+	return nil
+}
+
+// traceEventDetails is the JSON blob stored in the details column.
+type traceEventDetails struct {
+	ToolName      string         `json:"tool_name,omitempty"`
+	ToolArgs      map[string]any `json:"tool_args,omitempty"`
+	ToolResponse  map[string]any `json:"tool_response,omitempty"`
+	PromptTokens  int32          `json:"prompt_tokens,omitempty"`
+	OutputTokens  int32          `json:"output_tokens,omitempty"`
+	ThoughtTokens int32          `json:"thought_tokens,omitempty"`
+	TotalTokens   int32          `json:"total_tokens,omitempty"`
+	ErrorCode     string         `json:"error_code,omitempty"`
+	ErrorMessage  string         `json:"error_message,omitempty"`
+}
+
+// InsertAnalyzerTraceEvent appends one event to a trace.
+func (rdb *RunDB) InsertAnalyzerTraceEvent(traceID int64, seq int, ev AnalyzerEvent) error {
+	det := traceEventDetails{
+		ToolName:      ev.ToolName,
+		ToolArgs:      ev.ToolArgs,
+		ToolResponse:  ev.ToolResponse,
+		PromptTokens:  ev.PromptTokens,
+		OutputTokens:  ev.OutputTokens,
+		ThoughtTokens: ev.ThoughtTokens,
+		TotalTokens:   ev.TotalTokens,
+		ErrorCode:     ev.ErrorCode,
+		ErrorMessage:  ev.ErrorMessage,
+	}
+	detJSON, err := json.Marshal(det)
+	if err != nil {
+		return fmt.Errorf("rundb: InsertAnalyzerTraceEvent marshal: %w", err)
+	}
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err = rdb.db.Exec(
+		`INSERT INTO analyzer_trace_events(trace_id, seq, kind, author, content, details) VALUES (?, ?, ?, ?, ?, ?)`,
+		traceID, seq, string(ev.Kind), ev.Author, ev.Content, string(detJSON),
+	)
+	if err != nil {
+		return fmt.Errorf("rundb: InsertAnalyzerTraceEvent: %w", err)
+	}
+	return nil
+}
+
+// GetLatestTraceForRun returns the most recent trace ID for a given run ID,
+// or 0 if none exists.
+func (rdb *RunDB) GetLatestTraceForRun(runID int64) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	var traceID int64
+	err := rdb.db.QueryRow(
+		`SELECT id FROM analyzer_traces WHERE run_id = ? ORDER BY id DESC LIMIT 1`,
+		runID,
+	).Scan(&traceID)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("rundb: GetLatestTraceForRun: %w", err)
+	}
+	return traceID, nil
+}
+
+// ListTracesForRun returns all traces for a given run ID, ordered newest first.
+func (rdb *RunDB) ListTracesForRun(runID int64) ([]AnalyzerTraceRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	rows, err := rdb.db.Query(`
+		SELECT id, suggestion_key, run_id, started_at, finished_at
+		FROM analyzer_traces
+		WHERE run_id = ?
+		ORDER BY id DESC
+	`, runID)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListTracesForRun: %w", err)
+	}
+	defer rows.Close()
+
+	var result []AnalyzerTraceRow
+	for rows.Next() {
+		var tr AnalyzerTraceRow
+		var startedStr string
+		var finishedStr *string
+		if err := rows.Scan(&tr.ID, &tr.SuggestionKey, &tr.RunID, &startedStr, &finishedStr); err != nil {
+			return nil, fmt.Errorf("rundb: ListTracesForRun scan: %w", err)
+		}
+		if t, err := time.Parse(time.RFC3339, startedStr); err == nil {
+			tr.StartedAt = t
+		}
+		if finishedStr != nil {
+			if t, err := time.Parse(time.RFC3339, *finishedStr); err == nil {
+				tr.FinishedAt = &t
+			}
+		}
+		result = append(result, tr)
+	}
+	return result, rows.Err()
+}
+
+// ListAnalyzerTraceEvents returns all events for a trace, ordered by seq.
+func (rdb *RunDB) ListAnalyzerTraceEvents(traceID int64) ([]AnalyzerEvent, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	rows, err := rdb.db.Query(`
+		SELECT kind, author, content, details
+		FROM analyzer_trace_events
+		WHERE trace_id = ?
+		ORDER BY seq ASC
+	`, traceID)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListAnalyzerTraceEvents: %w", err)
+	}
+	defer rows.Close()
+
+	var result []AnalyzerEvent
+	for rows.Next() {
+		var kindStr, author, content, detailsJSON string
+		if err := rows.Scan(&kindStr, &author, &content, &detailsJSON); err != nil {
+			return nil, fmt.Errorf("rundb: ListAnalyzerTraceEvents scan: %w", err)
+		}
+		ev := AnalyzerEvent{
+			Kind:    AnalyzerEventKind(kindStr),
+			Author:  author,
+			Content: content,
+		}
+		if detailsJSON != "" {
+			var det traceEventDetails
+			if err := json.Unmarshal([]byte(detailsJSON), &det); err == nil {
+				ev.ToolName = det.ToolName
+				ev.ToolArgs = det.ToolArgs
+				ev.ToolResponse = det.ToolResponse
+				ev.PromptTokens = det.PromptTokens
+				ev.OutputTokens = det.OutputTokens
+				ev.ThoughtTokens = det.ThoughtTokens
+				ev.TotalTokens = det.TotalTokens
+				ev.ErrorCode = det.ErrorCode
+				ev.ErrorMessage = det.ErrorMessage
+			}
+		}
+		result = append(result, ev)
+	}
+	return result, rows.Err()
+}
+
+// DeleteAnalyzerTraces removes all traces and their events for a given
+// suggestion key (e.g. "run:42").
+func (rdb *RunDB) DeleteAnalyzerTraces(suggestionKey string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	// Delete events first (foreign key).
+	_, err := rdb.db.Exec(`
+		DELETE FROM analyzer_trace_events
+		WHERE trace_id IN (SELECT id FROM analyzer_traces WHERE suggestion_key = ?)
+	`, suggestionKey)
+	if err != nil {
+		return fmt.Errorf("rundb: DeleteAnalyzerTraces events: %w", err)
+	}
+	_, err = rdb.db.Exec(`DELETE FROM analyzer_traces WHERE suggestion_key = ?`, suggestionKey)
+	if err != nil {
+		return fmt.Errorf("rundb: DeleteAnalyzerTraces: %w", err)
+	}
+	return nil
+}
+
+// ListEvents returns top-level run_events for a given run (parent_id IS NULL),
+// ordered by seq.  Children are decoded from the parent's `children` column.
+func (rdb *RunDB) ListEvents(runID int64) ([]EventRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	rows, err := rdb.db.Query(`
+        SELECT id, run_id, seq, occurred_at, elapsed_s, kind, message, details, parent_id, children
+        FROM run_events
+        WHERE run_id = ? AND parent_id IS NULL
+        ORDER BY seq
+    `, runID)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListEvents: %w", err)
+	}
+	defer rows.Close()
+
+	var result []EventRow
+	for rows.Next() {
+		var row EventRow
+		var occurredStr string
+		var childrenJSON *string
+		if err := rows.Scan(
+			&row.ID,
+			&row.RunID,
+			&row.Seq,
+			&occurredStr,
+			&row.ElapsedS,
+			&row.Kind,
+			&row.Message,
+			&row.Details,
+			&row.ParentID,
+			&childrenJSON,
+		); err != nil {
+			return nil, fmt.Errorf("rundb: ListEvents scan: %w", err)
+		}
+		row.OccurredAt, _ = time.Parse(time.RFC3339Nano, occurredStr)
+		if childrenJSON != nil && *childrenJSON != "" {
+			_ = json.Unmarshal([]byte(*childrenJSON), &row.Children)
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Launcher helpers (test_launchers table)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// LauncherRow is a single row from test_launchers.
+type LauncherRow struct {
+	ID          int64
+	TestName    string
+	Env         string
+	LaunchedAt  time.Time
+	LauncherPID int
+	FinishedAt  *time.Time // nil if the process has not yet finished
+}
+
+// InsertLauncher records a newly-started ./test process and returns its row ID.
+func (rdb *RunDB) InsertLauncher(testName, env string, launchedAt time.Time, pid int) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	res, err := rdb.db.Exec(
+		`INSERT INTO test_launchers(test_name, env, launched_at, launcher_pid)
+		 VALUES (?, ?, ?, ?)`,
+		testName, env,
+		launchedAt.UTC().Format(time.RFC3339Nano),
+		pid,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertLauncher: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// FinishLauncher marks a launcher row as finished (process exited or was killed).
+func (rdb *RunDB) FinishLauncher(id int64, finishedAt time.Time) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_launchers SET finished_at = ? WHERE id = ?`,
+		finishedAt.UTC().Format(time.RFC3339Nano), id,
+	)
+	return err
+}
+
+// ListLaunchers returns launcher rows for the given test name, most-recent first.
+// If testName is empty, all rows are returned.
+func (rdb *RunDB) ListLaunchers(testName string) ([]LauncherRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	var (
+		q    string
+		args []any
+	)
+	if testName == "" {
+		q = `SELECT id, test_name, env, launched_at, launcher_pid, finished_at
+		     FROM test_launchers ORDER BY launched_at DESC`
+	} else {
+		q = `SELECT id, test_name, env, launched_at, launcher_pid, finished_at
+		     FROM test_launchers WHERE test_name = ? ORDER BY launched_at DESC`
+		args = []any{testName}
+	}
+
+	rows, err := rdb.db.Query(q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListLaunchers: %w", err)
+	}
+	defer rows.Close()
+
+	var result []LauncherRow
+	for rows.Next() {
+		var r LauncherRow
+		var launchedStr string
+		var finishedStr *string
+		if err := rows.Scan(&r.ID, &r.TestName, &r.Env, &launchedStr, &r.LauncherPID, &finishedStr); err != nil {
+			return nil, fmt.Errorf("rundb: ListLaunchers scan: %w", err)
+		}
+		r.LaunchedAt, _ = time.Parse(time.RFC3339Nano, launchedStr)
+		if finishedStr != nil && *finishedStr != "" {
+			t, _ := time.Parse(time.RFC3339Nano, *finishedStr)
+			r.FinishedAt = &t
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Runner detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Runner returns the test execution environment label.
+// Resolution:
+//  1. $TEST_RUNNER env var (e.g. "docker", "ci")
+//  2. "docker" if running inside Docker (CI=true && /test-logs exists)
+//  3. "host"
+func Runner() string {
+	if r := os.Getenv("TEST_RUNNER"); r != "" {
+		return r
+	}
+	// Heuristic: inside Docker the Dockerfile creates /test-logs and sets CI=true.
+	if os.Getenv("CI") == "true" {
+		if _, err := os.Stat("/test-logs"); err == nil {
+			return "docker"
+		}
+	}
+	return "host"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Process-wide singleton
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	globalDBOnce sync.Once
+	globalDB     *RunDB
+	globalDBErr  error
+	globalDBMu   sync.Mutex // protects reset
+)
+
+// resetSharedDB resets the singleton so the next SharedDB() call re-opens the
+// DB.  Only intended for use in tests that need to redirect the DB path via
+// TEST_RUNS_DB between calls.
+func resetSharedDB() {
+	globalDBMu.Lock()
+	defer globalDBMu.Unlock()
+	if globalDB != nil {
+		_ = globalDB.Close()
+		globalDB = nil
+	}
+	globalDBErr = nil
+	globalDBOnce = sync.Once{}
+}
+
+// SharedDB returns the process-wide RunDB, opening it lazily on first call.
+// The path resolves via dbPath():
+//  1. $TEST_RUNS_DB         (explicit override)
+//  2. <repo_root>/logs/runs.db  (via runtime.Caller)
+//  3. $TMPDIR/.../runs.db   (last-resort fallback)
+//
+// If the DB cannot be opened, a nil handle is returned and the error is
+// stored; subsequent calls return the same nil + error.
+func SharedDB() (*RunDB, error) {
+	globalDBOnce.Do(func() {
+		path := dbPath()
+		globalDB, globalDBErr = OpenDB(path)
+	})
+	return globalDB, globalDBErr
+}
+
+// dbPath resolves the path for runs.db.
+//
+// Resolution order:
+//  1. TEST_RUNS_DB env var            — explicit override (absolute path)
+//  2. runtime.Caller(0)              — <repo_root>/logs/runs.db
+//  3. $TMPDIR/.../runs.db            — last-resort fallback
+//
+// NOTE: TEST_LOG_DIR is intentionally NOT consulted here.  Flat log files
+// (run.log, session-*.log) live under TEST_LOG_DIR, but the DB is always
+// at the repo root so Docker and host runs share a single database.
+func dbPath() string {
+	if d := os.Getenv("TEST_RUNS_DB"); d != "" {
+		return d
+	}
+	// Use Caller(0) to get db.go's own source path, then go up one level
+	// (out of framework/) so runs.db lands alongside the flat-file logs/ dir
+	// at the repo root — the same place NewRunLog writes flat logs.
+	_, srcFile, _, ok := runtime.Caller(0)
+	if ok {
+		return filepath.Join(filepath.Dir(srcFile), "..", "logs", "runs.db")
+	}
+	return filepath.Join(os.TempDir(), "memory-cli-docker-tests", "runs.db")
+}
