@@ -44,6 +44,16 @@ var toolRegistry = map[string]toolEntry{
 	"copilot":  {MarkerPath: ".github/copilot-instructions.md", InstallDir: ".github/skills"},
 }
 
+// allToolIDs returns all keys of toolRegistry sorted alphabetically.
+func allToolIDs() []string {
+	ids := make([]string, 0, len(toolRegistry))
+	for id := range toolRegistry {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
 // detectTools iterates toolRegistry, checks each marker path, and returns the
 // IDs of tools whose marker exists under projectRoot.
 func detectTools(projectRoot string) []string {
@@ -56,6 +66,47 @@ func detectTools(projectRoot string) []string {
 	}
 	sort.Strings(detected)
 	return detected
+}
+
+// provisionMarker ensures the tool's marker dir or file exists under projectRoot.
+// If dryRun is true it prints the planned action and returns without writing.
+// If the marker already exists it is a no-op.
+func provisionMarker(projectRoot, toolID string, dryRun bool) error {
+	entry, ok := toolRegistry[toolID]
+	if !ok {
+		return fmt.Errorf("unknown tool ID %q", toolID)
+	}
+	markerPath := filepath.Join(projectRoot, filepath.FromSlash(entry.MarkerPath))
+	if _, err := os.Stat(markerPath); err == nil {
+		return nil // already exists
+	}
+
+	if dryRun {
+		fmt.Printf("would provision: %s\n", entry.MarkerPath)
+		return nil
+	}
+
+	// File marker: base name has an extension that isn't the entire base name
+	// (e.g. "copilot-instructions.md" → ext ".md"; but ".claude" → ext ".claude"
+	// which equals the base, so it is a dir marker).
+	base := filepath.Base(entry.MarkerPath)
+	ext := filepath.Ext(base)
+	isFileMarker := ext != "" && ext != base
+	if isFileMarker {
+		if err := os.MkdirAll(filepath.Dir(markerPath), 0755); err != nil {
+			return fmt.Errorf("provisioning marker dir for %s: %w", toolID, err)
+		}
+		if err := os.WriteFile(markerPath, []byte{}, 0644); err != nil {
+			return fmt.Errorf("provisioning marker file for %s: %w", toolID, err)
+		}
+		return nil
+	}
+
+	// Dir marker.
+	if err := os.MkdirAll(markerPath, 0755); err != nil {
+		return fmt.Errorf("provisioning marker dir for %s: %w", toolID, err)
+	}
+	return nil
 }
 
 // skillEntry represents one installable skill from the embedded filesystem.
@@ -89,15 +140,20 @@ func discoverEmbeddedSkills() ([]skillEntry, error) {
 	return skills, nil
 }
 
-// selectTools presents a numbered list of detected tools and reads a
-// comma-separated selection from stdin. Returns nil, nil if the user cancels.
-func selectTools(detected []string) ([]string, error) {
-	if len(detected) == 0 {
+// selectTools presents a numbered list of all supported tools (annotating
+// detected ones) and reads a comma-separated selection from stdin.
+// Returns nil, nil if the user cancels.
+func selectTools(allIDs []string, detectedSet map[string]bool) ([]string, error) {
+	if len(allIDs) == 0 {
 		return nil, nil
 	}
-	fmt.Println("Detected agent tools:")
-	for i, id := range detected {
-		fmt.Printf("  %d) %s\n", i+1, id)
+	fmt.Println("Supported agent tools:")
+	for i, id := range allIDs {
+		if detectedSet[id] {
+			fmt.Printf("  %d) %s  [detected]\n", i+1, id)
+		} else {
+			fmt.Printf("  %d) %s\n", i+1, id)
+		}
 	}
 	fmt.Print("Select tools (comma-separated numbers, \"all\", or Enter to cancel): ")
 
@@ -111,7 +167,7 @@ func selectTools(detected []string) ([]string, error) {
 	case "", "none":
 		return nil, nil
 	case "all":
-		return detected, nil
+		return allIDs, nil
 	}
 
 	var selected []string
@@ -121,10 +177,10 @@ func selectTools(detected []string) ([]string, error) {
 			continue
 		}
 		n, err := strconv.Atoi(tok)
-		if err != nil || n < 1 || n > len(detected) {
+		if err != nil || n < 1 || n > len(allIDs) {
 			return nil, fmt.Errorf("invalid selection %q", tok)
 		}
-		selected = append(selected, detected[n-1])
+		selected = append(selected, allIDs[n-1])
 	}
 	return selected, nil
 }
@@ -195,7 +251,11 @@ func cmdSkills(args []string) error {
 	case "install":
 		return cmdSkillsInstall(args[1:])
 	case "list":
-		return cmdSkillsList()
+		projectRoot, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("getting working directory: %w", err)
+		}
+		return cmdSkillsList(projectRoot)
 	case "help", "--help", "-h":
 		skillsUsage()
 		return nil
@@ -204,15 +264,23 @@ func cmdSkills(args []string) error {
 	}
 }
 
-// cmdSkillsList prints all embedded skills.
-func cmdSkillsList() error {
-	skills, err := discoverEmbeddedSkills()
-	if err != nil {
-		return err
+// cmdSkillsList prints all supported agent tools with detection status.
+func cmdSkillsList(projectRoot string) error {
+	detected := detectTools(projectRoot)
+	detectedSet := make(map[string]bool, len(detected))
+	for _, id := range detected {
+		detectedSet[id] = true
 	}
-	fmt.Printf("Embedded skills (%d):\n", len(skills))
-	for _, s := range skills {
-		fmt.Printf("  %s\n", s.Name)
+	ids := allToolIDs()
+	fmt.Printf("Supported tools (%d):\n", len(ids))
+	for _, id := range ids {
+		entry := toolRegistry[id]
+		detectedStr := "no"
+		if detectedSet[id] {
+			detectedStr = "yes"
+		}
+		fmt.Printf("  %-10s  marker: %-40s  install: %-30s  detected: %s\n",
+			id, entry.MarkerPath, entry.InstallDir, detectedStr)
 	}
 	return nil
 }
@@ -252,25 +320,20 @@ func cmdSkillsInstall(args []string) error {
 				continue
 			}
 			if _, ok := toolRegistry[id]; !ok {
-				valid := make([]string, 0, len(toolRegistry))
-				for k := range toolRegistry {
-					valid = append(valid, k)
-				}
-				sort.Strings(valid)
-				return fmt.Errorf("unknown tool ID %q; valid IDs: %s", id, strings.Join(valid, ", "))
+				return fmt.Errorf("unknown tool ID %q; valid IDs: %s", id, strings.Join(allToolIDs(), ", "))
 			}
 			targetTools = append(targetTools, id)
 		}
 	} else {
 		detected := detectTools(projectRoot)
-		if len(detected) == 0 {
-			fmt.Println("no agent tools detected; use --tools to specify targets")
-			return nil
+		detectedSet := make(map[string]bool, len(detected))
+		for _, id := range detected {
+			detectedSet[id] = true
 		}
 		if *all {
-			targetTools = detected
+			targetTools = allToolIDs()
 		} else {
-			targetTools, err = selectTools(detected)
+			targetTools, err = selectTools(allToolIDs(), detectedSet)
 			if err != nil {
 				return err
 			}
@@ -284,6 +347,11 @@ func cmdSkillsInstall(args []string) error {
 	// Install each embedded skill for each selected tool.
 	totalInstalled := 0
 	for _, toolID := range targetTools {
+		// Ensure the tool's marker dir/file exists so future detection works.
+		if err := provisionMarker(projectRoot, toolID, *dryRun); err != nil {
+			return fmt.Errorf("provisioning marker for %s: %w", toolID, err)
+		}
+
 		entry := toolRegistry[toolID]
 		installBase := filepath.Join(projectRoot, filepath.FromSlash(entry.InstallDir))
 
@@ -312,7 +380,7 @@ func skillsUsage() {
 
 USAGE
   runlog skills install [flags]   install embedded skills into agent tool directories
-  runlog skills list              list all embedded skills
+  runlog skills list              list all supported agent tools with detection status
 
 Run "runlog skills install --help" for details.
 `)
@@ -328,7 +396,7 @@ USAGE
   runlog skills install [flags]
 
 FLAGS
-  --all            install for all detected agent tools without prompting
+  --all            install for all supported agent tools without prompting
   --tools <ids>    comma-separated tool IDs to target (e.g. opencode,claude)
   --force          overwrite existing skill installs
   --dry-run        print planned actions without modifying the filesystem
