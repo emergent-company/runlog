@@ -439,6 +439,83 @@ func cmdClear(dbPath string) error {
 	return nil
 }
 
+// cmdReap marks stale (orphaned) runs as FAIL.
+// If runID > 0, only that specific run is reaped.
+// If runID == 0, all runs with finished_at IS NULL are reaped.
+// When dryRun is true, it prints what would be reaped without changing anything.
+func cmdReap(db *runlog.RunDB, runID int64, dryRun bool) error {
+	// Collect candidate runs.
+	allRuns, err := db.ListRuns(time.Time{})
+	if err != nil {
+		return err
+	}
+
+	var stale []runlog.RunRow
+	for _, r := range allRuns {
+		if r.FinishedAt != nil {
+			continue // already finished
+		}
+		if r.Skipped {
+			continue
+		}
+		if r.Passed != nil {
+			continue
+		}
+		if runID > 0 && r.ID != runID {
+			continue
+		}
+		stale = append(stale, r)
+	}
+
+	if len(stale) == 0 {
+		if runID > 0 {
+			// Check if the run exists but is already finished.
+			for _, r := range allRuns {
+				if r.ID == runID {
+					fmt.Printf("run %d is already finished (status: %s)\n", runID, passLabel(r))
+					return nil
+				}
+			}
+			return fmt.Errorf("run %d not found", runID)
+		}
+		fmt.Println("no stale runs found")
+		return nil
+	}
+
+	// Print what we found.
+	for _, r := range stale {
+		age := formatAgePlain(r.StartedAt)
+		fmt.Printf("  %d  %-50s  started %s ago  (%d events)\n",
+			r.ID, r.TestName, age, r.EventCount)
+	}
+
+	if dryRun {
+		fmt.Printf("\ndry-run: would reap %d stale run(s)\n", len(stale))
+		return nil
+	}
+
+	// Mark each stale run as FAIL.
+	reason := "reaped: process died without closing run"
+	if runID > 0 {
+		// Single run.
+		if err := db.FinishRun(runID, stale[0].StartedAt, runlog.OutcomeFail, reason); err != nil {
+			return fmt.Errorf("finish run %d: %w", runID, err)
+		}
+	} else {
+		// Batch.
+		n, err := db.ReapStaleRuns(reason)
+		if err != nil {
+			return err
+		}
+		if int(n) != len(stale) {
+			fmt.Fprintf(os.Stderr, "warning: expected to reap %d runs but updated %d\n", len(stale), n)
+		}
+	}
+
+	fmt.Printf("\nreaped %d stale run(s) → FAIL\n", len(stale))
+	return nil
+}
+
 // cmdInspect prints the full inspector view for a run: metadata (same as the
 // run drawer), followed by every event with the same detail content that the
 // TUI inspector panel shows, rendered via buildDetailLines.
@@ -5048,6 +5125,7 @@ USAGE
   runlog skills install [flags]         install embedded skills into tool directories
   runlog skills list                    list all embedded skills
   runlog clear [--db <path>]            delete runs.db and all per-run log files
+  runlog reap [--dry-run] [<run-id>]    mark stale/orphaned runs as FAIL
   runlog version                        print version and exit
 
 FLAGS
@@ -5075,6 +5153,9 @@ EXAMPLES
   runlog trace 42                       # show stored trace from last analysis of run 42
   runlog clear                          # delete runs.db + all log files/dirs in logs/
   runlog clear --db /path/to/runs.db    # clear a specific database location
+  runlog reap                           # mark all stale (orphaned) runs as FAIL
+  runlog reap 527                       # mark only run 527 as FAIL
+  runlog reap --dry-run                 # show stale runs without changing anything
 `)
 }
 
@@ -5144,6 +5225,7 @@ func main() {
 	var dbPath string
 	var since time.Duration
 	var analyzeJSON *bool // set by "analyze" subcommand
+	var reapDryRun *bool  // set by "reap" subcommand
 
 	switch subcommand {
 	case "runs", "tail", "":
@@ -5244,6 +5326,20 @@ func main() {
 		}
 		dbPath = resolveDBPath(*dbOut)
 		since = parseSince(*sinceOut, subcommand)
+
+	case "reap":
+		// reap [--dry-run] [<run-id>]
+		fs, dbOut, sinceOut := subFS(subcommand, *globalDB, *globalSince)
+		reapDryRun = fs.Bool("dry-run", false, "show what would be reaped without changing anything")
+		if err := fs.Parse(subArgs); err != nil {
+			if err == flag.ErrHelp {
+				os.Exit(0)
+			}
+			os.Exit(2)
+		}
+		dbPath = resolveDBPath(*dbOut)
+		since = parseSince(*sinceOut, subcommand)
+		subArgs = fs.Args() // positional args (optional run-id)
 
 	case "skills":
 		// skills subcommand manages agent skill installation; does not need DB.
@@ -5391,6 +5487,21 @@ func main() {
 		}
 		if err := cmdTrace(db, runID); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog trace: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "reap":
+		var runID int64
+		if len(subArgs) > 0 {
+			var err error
+			runID, err = strconv.ParseInt(subArgs[0], 10, 64)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "runlog reap: invalid run-id %q: %v\n", subArgs[0], err)
+				os.Exit(2)
+			}
+		}
+		if err := cmdReap(db, runID, *reapDryRun); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog reap: %v\n", err)
 			os.Exit(1)
 		}
 

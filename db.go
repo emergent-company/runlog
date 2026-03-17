@@ -376,6 +376,31 @@ func (rdb *RunDB) FinishRun(id int64, finishedAt time.Time, outcome RunOutcome, 
 	return err
 }
 
+// ListStaleRuns returns all runs where finished_at IS NULL — i.e. runs that
+// were never properly closed, typically because the test process was killed.
+func (rdb *RunDB) ListStaleRuns() ([]RunRow, error) {
+	return rdb.ListRuns(time.Time{}) // we filter in the caller
+}
+
+// ReapStaleRuns marks all unfinished runs (finished_at IS NULL) as failed with
+// the given reason. It returns the number of rows updated.
+func (rdb *RunDB) ReapStaleRuns(reason string) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	var reasonVal any
+	if reason != "" {
+		reasonVal = reason
+	}
+	res, err := rdb.db.Exec(
+		`UPDATE test_runs SET finished_at = started_at, passed = ?, reason = ? WHERE finished_at IS NULL`,
+		int(OutcomeFail), reasonVal,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // InsertEvent appends one run_events row.
 // details may be any JSON-serialisable value (struct, map, nil).
 // If details is already a []byte or string it is stored verbatim as JSON.
