@@ -117,7 +117,7 @@ For each issue found:
 
 ### 7. Verify fixes
 
-After making changes, run the verify-e2e-changes skill to ensure compilation succeeds:
+After making changes, run the runlog-verify-e2e-changes skill to ensure compilation succeeds:
 
 ```bash
 cd /root/emergent.memory.e2e
