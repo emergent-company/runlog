@@ -38,7 +38,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -3504,12 +3503,8 @@ func (m model) loadActiveLauncher() tea.Cmd {
 			if r.FinishedAt != nil {
 				continue // already finished
 			}
-			// Check if the PID is still alive with signal 0.
-			proc, err := os.FindProcess(r.LauncherPID)
-			if err != nil {
-				continue
-			}
-			if err := proc.Signal(syscall.Signal(0)); err != nil {
+			// Check if the PID is still alive.
+			if !processAlive(r.LauncherPID) {
 				// Process is dead; mark it finished in the DB.
 				_ = db.FinishLauncher(r.ID, time.Now())
 				continue
@@ -4381,7 +4376,7 @@ func (m model) launchTest(testName string) tea.Cmd {
 		now := time.Now()
 		cmd := exec.Command("sh", "-c", expanded)
 		// Run in a new session so the child survives if the TUI is closed.
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		setSysProcAttr(cmd)
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 		cmd.Stdin = nil
@@ -4406,11 +4401,7 @@ func (m model) launchTest(testName string) tea.Cmd {
 func (m model) killTest(launcherID int64, pid int) tea.Cmd {
 	db := m.db
 	return func() tea.Msg {
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			return testKillErrMsg{fmt.Errorf("find process %d: %w", pid, err)}
-		}
-		if err := proc.Signal(syscall.SIGTERM); err != nil {
+		if err := sigterm(pid); err != nil {
 			return testKillErrMsg{fmt.Errorf("kill %d: %w", pid, err)}
 		}
 		if launcherID != 0 {
