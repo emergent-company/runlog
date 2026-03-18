@@ -32,7 +32,51 @@ func LoadDotEnv() {
 		return
 	}
 	dir := filepath.Dir(filename)
+
+	// Check if tests are being run via raw 'go test' instead of 'runlog test'
+	checkRawGoTest()
+
 	loadDotEnvDir(dir)
+}
+
+// checkRawGoTest detects when tests are being run via raw 'go test' and provides
+// a helpful error message with instructions to use 'runlog test' instead.
+func checkRawGoTest() {
+	// If MEMORY_TEST_ENV is not set AND we're in the e2e tests, this is likely
+	// a raw 'go test' invocation. The runlog wrapper always sets MEMORY_TEST_ENV
+	// (even if empty for the base .env).
+	if os.Getenv("MEMORY_TEST_ENV") == "" && os.Getenv("TEST_RUNNER") == "" {
+		// Only warn if we can detect we're in the e2e repository
+		if wd, err := os.Getwd(); err == nil && strings.Contains(wd, "emergent.memory.e2e") {
+			printRawGoTestWarning()
+		}
+	}
+}
+
+func printRawGoTestWarning() {
+	msg := `
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║  ⚠️  Tests should be run via 'runlog test', not 'go test'                 ║
+║                                                                            ║
+║  You are running tests with raw 'go test'. This means:                    ║
+║    • Test runs won't be recorded in the runlog database                   ║
+║    • Environment information won't be tracked                             ║
+║    • Test results won't be visible in 'runlog runs' or 'runlog inspect'   ║
+║                                                                            ║
+║  ✅ Use 'runlog test' instead:                                            ║
+║                                                                            ║
+║    runlog test                                    # all tests              ║
+║    runlog test mcj-emergent                       # with env overlay      ║
+║    runlog test localhost TestCLIInstalled_Version # specific test         ║
+║    runlog test mcj-emergent -- -v                 # with extra go flags    ║
+║                                                                            ║
+║  📖 See README.md for more details on running tests locally               ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+`
+	// Print to stderr so it's visible even if tests fail
+	os.Stderr.WriteString(msg)
 }
 
 // LoadDotEnvFrom loads .env (and optionally .env.<MEMORY_TEST_ENV>) from the
