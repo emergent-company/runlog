@@ -229,7 +229,8 @@ func TestSkillsInstall_UnknownTool(t *testing.T) {
 
 // TestSkillsList verifies the list subcommand runs without error.
 func TestSkillsList(t *testing.T) {
-	err := cmdSkillsList()
+	root := setupSkillsTestDir(t)
+	err := cmdSkillsList(root)
 	if err != nil {
 		t.Fatalf("cmdSkillsList: %v", err)
 	}
