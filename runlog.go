@@ -126,7 +126,8 @@ func NewRunLog(t *testing.T) *RunLog {
 
 	// Wire up the shared DB (best-effort).
 	if db, err := SharedDB(); err == nil && db != nil {
-		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner()); err == nil {
+		envName := os.Getenv("MEMORY_TEST_ENV")
+		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName); err == nil {
 			rl.db = db
 			rl.runID = id
 		} else {

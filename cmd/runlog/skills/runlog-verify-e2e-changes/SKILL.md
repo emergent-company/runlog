@@ -82,6 +82,27 @@ For `inspect`, prefer a **FAIL** run — verify that:
 - At least one `failure` event appears in the event list with a clear human-readable message
 - The failing section is identifiable from the output (the `failure` event is a child of the section that failed)
 
+**Running tests**: Use `runlog test` to run tests with environment profile support:
+
+```bash
+# Run tests with a specific environment profile (loads .env + .env.<profile>)
+runlog test <profile-name> [<filter>] [-- <extra-flags>]
+
+# Examples:
+runlog test localhost TestCLI_Auth                    # run with .env.localhost
+runlog test mcj-emergent TestBlueprints               # run with .env.mcj-emergent  
+runlog test production -- -v                          # run with .env.production in verbose mode
+
+# Without profile (uses .env only)
+runlog test TestCLI_Auth
+```
+
+The `runlog test` command:
+- Loads `.env` from the test directory
+- Overlays `.env.<profile>` if a profile is specified (via `MEMORY_TEST_ENV`)
+- Tracks which environment was used for each run (visible in `runlog runs` and `runlog inspect`)
+- Execs `go test` with the enriched environment
+
 ### 5. Verify failure visibility (the key goal)
 
 If the change involved replacing `t.Fatalf` with `rl.Failf`, confirm the fix works by inspecting a run that previously showed no failure reason:

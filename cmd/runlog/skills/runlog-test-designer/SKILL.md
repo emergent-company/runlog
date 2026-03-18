@@ -689,3 +689,35 @@ Verify: no empty sections, all CLI steps logged, description visible, failure ev
 |---|---|
 | `framework.VerifyCredentialsWritten(t, rl, home)` | Checks credentials.json exists |
 | `framework.VerifySkillInstalled(t, rl, skillsDir, name)` | Checks SKILL.md valid |
+
+---
+
+## Running Tests with Environment Profiles
+
+Use the `runlog test` command to run tests with environment profile support:
+
+```bash
+# Run tests with a specific environment profile
+runlog test <profile-name> [<filter>] [-- <extra-flags>]
+
+# Examples:
+runlog test localhost TestCLI_Auth                    # loads .env.localhost
+runlog test mcj-emergent TestBlueprints               # loads .env.mcj-emergent  
+runlog test production -- -v                          # loads .env.production, verbose mode
+
+# Without profile (uses .env only)
+runlog test TestCLI_Auth
+```
+
+**What it does:**
+1. Loads `.env` from your test directory
+2. Overlays `.env.<profile>` if a profile is specified (sets `MEMORY_TEST_ENV=<profile>`)
+3. Tracks which environment was used for each run (visible in `runlog runs` and `runlog inspect`)
+4. Execs `go test` with the enriched environment
+
+**Environment visibility:**
+- `runlog runs` shows an `ENV` column with the profile name for each run
+- `runlog inspect <run-id>` displays `env: <profile>` in the run metadata
+- `runlog show <run-id>` includes the env field in the output
+
+This makes it easy to distinguish runs executed in different environments when reviewing test results.

@@ -9,6 +9,7 @@
 //	runlog tail                    stream new events as they arrive (like tail -f)
 //	runlog analyze <run-id>        LLM analysis of a run with full conversation trace
 //	runlog trace <run-id>          show stored analysis trace (no LLM call)
+//	runlog test [<profile>] [<filter>]  load .env and exec go test (profile = MEMORY_TEST_ENV)
 //
 // # Global flags (apply to all subcommands)
 //
@@ -118,9 +119,9 @@ func cmdRuns(db *runlog.RunDB, since time.Duration) error {
 		return nil
 	}
 
-	fmt.Printf("%-6s  %-8s  %-6s  %-8s  %-8s  %-7s  %s\n",
-		"ID", "STATUS", "RUNNER", "AGE", "DURATION", "EVENTS", "TEST NAME")
-	fmt.Println(strings.Repeat("─", 86))
+	fmt.Printf("%-6s  %-8s  %-6s  %-12s  %-8s  %-8s  %-7s  %s\n",
+		"ID", "STATUS", "RUNNER", "ENV", "AGE", "DURATION", "EVENTS", "TEST NAME")
+	fmt.Println(strings.Repeat("─", 102))
 	for _, r := range rows {
 		status := passLabel(r)
 		age := formatAgePlain(r.StartedAt)
@@ -129,8 +130,12 @@ func cmdRuns(db *runlog.RunDB, since time.Duration) error {
 		if r.Runner != nil {
 			runner = *r.Runner
 		}
-		fmt.Printf("%-6d  %-8s  %-6s  %-8s  %-8s  %-7d  %s\n",
-			r.ID, status, runner, age, dur, r.EventCount, r.TestName)
+		env := "—"
+		if r.EnvName != nil {
+			env = *r.EnvName
+		}
+		fmt.Printf("%-6d  %-8s  %-6s  %-12s  %-8s  %-8s  %-7d  %s\n",
+			r.ID, status, runner, env, age, dur, r.EventCount, r.TestName)
 	}
 	return nil
 }
@@ -200,6 +205,9 @@ func cmdShow(db *runlog.RunDB, runID int64) error {
 	fmt.Printf("events:  %d\n", run.EventCount)
 	if run.Runner != nil {
 		fmt.Printf("runner:  %s\n", *run.Runner)
+	}
+	if run.EnvName != nil {
+		fmt.Printf("env:     %s\n", *run.EnvName)
 	}
 	fmt.Println(strings.Repeat("─", 80))
 
@@ -2059,6 +2067,9 @@ func (m model) viewRuns() string {
 		if r.Runner != nil {
 			add("runner", *r.Runner)
 		}
+		if r.EnvName != nil {
+			add("env", *r.EnvName)
+		}
 		drawerRows = append(drawerRows, "")
 		drawerRows = append(drawerRows, "  "+styleDetailKey.Render("test:"))
 		for _, chunk := range wrapText(r.TestName, dw-4) {
@@ -2687,6 +2698,9 @@ func (m model) viewExpRuns() string {
 		add("events", fmt.Sprintf("%d", r.EventCount))
 		if r.Runner != nil {
 			add("runner", *r.Runner)
+		}
+		if r.EnvName != nil {
+			add("env", *r.EnvName)
 		}
 		drawerRows = append(drawerRows, "")
 		drawerRows = append(drawerRows, "  "+styleDetailKey.Render("test:"))
@@ -3488,6 +3502,9 @@ func (m model) viewTestRuns() string {
 		add("events", fmt.Sprintf("%d", r.EventCount))
 		if r.Runner != nil {
 			add("runner", *r.Runner)
+		}
+		if r.EnvName != nil {
+			add("env", *r.EnvName)
 		}
 		if r.Description != nil {
 			drawerRows = append(drawerRows, "")
@@ -5124,6 +5141,7 @@ USAGE
   runlog trace [flags] <run-id>         show stored analysis trace for a run (no LLM call)
   runlog skills install [flags]         install embedded skills into tool directories
   runlog skills list                    list all embedded skills
+  runlog test [<profile>] [<filter>]    load .env and run go test (profile = MEMORY_TEST_ENV)
   runlog clear [--db <path>]            delete runs.db and all per-run log files
   runlog reap [--dry-run] [<run-id>]    mark stale/orphaned runs as FAIL
   runlog version                        print version and exit
@@ -5156,6 +5174,10 @@ EXAMPLES
   runlog reap                           # mark all stale (orphaned) runs as FAIL
   runlog reap 527                       # mark only run 527 as FAIL
   runlog reap --dry-run                 # show stale runs without changing anything
+  runlog test                           # all tests using .env defaults
+  runlog test mcj-emergent              # overlay .env.mcj-emergent on .env
+  runlog test localhost TestCLI_Version # named env + single test filter
+  runlog test -- -count=1 -timeout 5m  # pass raw go test flags
 `)
 }
 
@@ -5346,6 +5368,11 @@ func main() {
 		dbPath = resolveDBPath(*globalDB)
 		since = parseSince(*globalSince, "")
 
+	case "test":
+		// test loads .env and execs go test; does not need DB.
+		dbPath = resolveDBPath(*globalDB)
+		since = parseSince(*globalSince, "")
+
 	default:
 		// Unknown subcommand or help — handle below without DB.
 		dbPath = resolveDBPath(*globalDB)
@@ -5364,6 +5391,14 @@ func main() {
 	if subcommand == "skills" {
 		if err := cmdSkills(subArgs); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog skills: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if subcommand == "test" {
+		if err := cmdTest(subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog test: %v\n", err)
 			os.Exit(1)
 		}
 		return

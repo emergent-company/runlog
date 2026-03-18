@@ -186,6 +186,15 @@ CREATE INDEX IF NOT EXISTS idx_analyzer_trace_events_trace_id
 ALTER TABLE test_runs ADD COLUMN reason TEXT;
 `,
 	},
+	{
+		version: 10,
+		sql: `
+-- env_name stores the test environment profile name from MEMORY_TEST_ENV.
+-- Used to distinguish runs executed in different environments (e.g. localhost,
+-- mcj-emergent, etc.).  NULL for older rows.
+ALTER TABLE test_runs ADD COLUMN env_name TEXT;
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -283,7 +292,7 @@ func (rdb *RunDB) applyMigrations() error {
 // InsertRun inserts a new test_runs row and returns its auto-assigned ID.
 // runner identifies the execution environment (e.g. "host", "docker").
 // Pass "" to leave the runner column NULL.
-func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string) (int64, error) {
+func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string, envName string) (int64, error) {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 
@@ -291,9 +300,13 @@ func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string)
 	if runner != "" {
 		runnerVal = runner
 	}
+	var envNameVal any
+	if envName != "" {
+		envNameVal = envName
+	}
 	res, err := rdb.db.Exec(
-		`INSERT INTO test_runs(test_name, started_at, runner) VALUES (?, ?, ?)`,
-		testName, startedAt.UTC().Format(time.RFC3339), runnerVal,
+		`INSERT INTO test_runs(test_name, started_at, runner, env_name) VALUES (?, ?, ?, ?)`,
+		testName, startedAt.UTC().Format(time.RFC3339), runnerVal, envNameVal,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("rundb: InsertRun: %w", err)
@@ -532,6 +545,7 @@ type RunRow struct {
 	Experiment   *string          // nil if not set
 	Runner       *string          // nil for older rows; "host" or "docker"
 	Reason       *string          // nil for passes and older rows; skip/fail reason
+	EnvName      *string          // nil for older rows; environment profile name from MEMORY_TEST_ENV
 }
 
 // ChildEvent is one entry in the `children` JSON array stored on a group event.
@@ -574,7 +588,8 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
             r.tags,
             r.experiment,
             r.runner,
-            r.reason
+            r.reason,
+            r.env_name
         FROM test_runs r
         LEFT JOIN run_events e ON e.run_id = r.id
         WHERE r.started_at >= ?
@@ -597,6 +612,7 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 		var experiment *string
 		var runner *string
 		var reason *string
+		var envName *string
 		if err := rows.Scan(
 			&row.ID,
 			&row.TestName,
@@ -609,6 +625,7 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 			&experiment,
 			&runner,
 			&reason,
+			&envName,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListRuns scan: %w", err)
 		}
@@ -641,6 +658,7 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 		row.Experiment = experiment
 		row.Runner = runner
 		row.Reason = reason
+		row.EnvName = envName
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
