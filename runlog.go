@@ -4,7 +4,7 @@
 // rendering utilities for multi-agent orchestrator tests.
 //
 // Every RunLog also writes structured events to the process-wide SQLite
-// RunDB (logs/runs.db) via SharedDB().  All DB writes are best-effort:
+// RunDB (.runlog/runs.db) via SharedDB().  All DB writes are best-effort:
 // failures are logged via t.Log but never fail the test.
 package runlog
 
@@ -72,6 +72,12 @@ type RunLog struct {
 	skipReason  string
 	lastFailMsg string
 
+	// Token usage and cost tracking.
+	// Updated via RecordTokenUsage() when tests make LLM calls.
+	inputTokens  int64
+	outputTokens int64
+	costUSD      float64
+
 	// TracePoller lifecycle (optional; started via StartTracePoller).
 	tracePoller *TracePoller
 }
@@ -127,7 +133,8 @@ func NewRunLog(t *testing.T) *RunLog {
 	// Wire up the shared DB (best-effort).
 	if db, err := SharedDB(); err == nil && db != nil {
 		envName := os.Getenv("MEMORY_TEST_ENV")
-		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName); err == nil {
+		envVars := captureEnvVars()
+		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars); err == nil {
 			rl.db = db
 			rl.runID = id
 		} else {
@@ -194,8 +201,8 @@ func (rl *RunLog) Close() {
 		default:
 			outcome = OutcomePass
 		}
-		if err := rl.db.FinishRun(rl.runID, now, outcome, reason); err != nil {
-			rl.t.Logf("warn: RunLog: DB FinishRun: %v", err)
+		if err := rl.db.FinishRunWithCost(rl.runID, now, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD); err != nil {
+			rl.t.Logf("warn: RunLog: DB FinishRunWithCost: %v", err)
 		}
 	}
 }
@@ -332,6 +339,34 @@ func (rl *RunLog) SetExperiment(name string) {
 			rl.t.Logf("warn: RunLog.SetExperiment: DB UpdateRunExperiment: %v", err)
 		}
 	}
+}
+
+// RecordTokenUsage accumulates token usage and cost for LLM operations performed
+// during this test run.  Call this after each `memory ask` or agent operation
+// that consumes tokens.  The accumulated totals are written to the DB when the
+// run finishes (in Close).
+//
+// Usage:
+//
+//	inputTok, outputTok, cost := FetchRunTokenUsage(t, srv, token, projectID, runID)
+//	rl.RecordTokenUsage(inputTok, outputTok, cost)
+func (rl *RunLog) RecordTokenUsage(inputTokens, outputTokens int64, costUSD float64) {
+	if inputTokens == 0 && outputTokens == 0 && costUSD == 0 {
+		return
+	}
+
+	rl.mu.Lock()
+	rl.inputTokens += inputTokens
+	rl.outputTokens += outputTokens
+	rl.costUSD += costUSD
+	rl.mu.Unlock()
+
+	// Emit a token_usage event so it appears in the chronological log.
+	rl.Event("token_usage", fmt.Sprintf("%s in / %s out  $%.6f", FormatInt(inputTokens), FormatInt(outputTokens), costUSD), map[string]any{
+		"input_tokens":  inputTokens,
+		"output_tokens": outputTokens,
+		"cost_usd":      costUSD,
+	})
 }
 
 // Section writes a prominent section header to the log file and starts a new
@@ -983,4 +1018,32 @@ func FormatInt(n int64) string {
 		return "-" + string(result)
 	}
 	return string(result)
+}
+
+// captureEnvVars returns a map of important environment variables that should
+// be recorded with the test run.  This includes API keys, server URLs, and
+// other configuration that affects test behavior.
+//
+// The returned map may be empty if no tracked variables are set.
+func captureEnvVars() map[string]string {
+	// List of environment variables to capture.
+	// Add any variable you want to see in runlog output here.
+	trackedVars := []string{
+		"GOOGLE_AI_API_KEY",
+		"MEMORY_TEST_SERVER",
+		"MEMORY_TEST_TOKEN",
+		"MEMORY_AUTH_MODE",
+		"MEMORY_ORG_ID",
+		"BRAVE_SEARCH_API_KEY",
+		"OPENAI_API_KEY",
+		"ANTHROPIC_API_KEY",
+	}
+
+	result := make(map[string]string)
+	for _, key := range trackedVars {
+		if val := os.Getenv(key); val != "" {
+			result[key] = val
+		}
+	}
+	return result
 }

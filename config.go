@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Config holds optional configuration loaded from a .runlog.yaml file.
+// Config holds optional configuration loaded from a .runlog/config.yaml file.
 // All fields are optional — runlog works without any config file.
 type Config struct {
 	// Categories maps category names to lists of test function names.
@@ -26,11 +26,12 @@ type Config struct {
 	DBPath string `yaml:"db"`
 }
 
-// LoadConfig searches for a .runlog.yaml configuration file and returns the
+// LoadConfig searches for a config.yaml configuration file and returns the
 // parsed Config. Search order:
 //  1. $RUNLOG_CONFIG environment variable (exact path)
-//  2. The directory containing runs.db (dbDir), if provided
-//  3. The current working directory
+//  2. .runlog/config.yaml (in the resolved runlog directory)
+//  3. The directory containing runs.db (dbDir), if provided
+//  4. .runlog.yaml in the current working directory (backward compatibility)
 //
 // Returns an empty Config (not an error) if no config file is found.
 // Only returns an error if a file is found but cannot be parsed.
@@ -42,12 +43,16 @@ func LoadConfig(dbDir string) (*Config, error) {
 		searchPaths = append(searchPaths, p)
 	}
 
-	// 2. DB directory
+	// 2. Project .runlog dir
+	searchPaths = append(searchPaths, filepath.Join(RunlogDir(), "config.yaml"))
+
+	// 3. DB directory
 	if dbDir != "" {
+		searchPaths = append(searchPaths, filepath.Join(dbDir, "config.yaml"))
 		searchPaths = append(searchPaths, filepath.Join(dbDir, ".runlog.yaml"))
 	}
 
-	// 3. Current working directory
+	// 4. Current working directory
 	if wd, err := os.Getwd(); err == nil {
 		searchPaths = append(searchPaths, filepath.Join(wd, ".runlog.yaml"))
 	}
@@ -62,7 +67,7 @@ func LoadConfig(dbDir string) (*Config, error) {
 	return &Config{}, nil
 }
 
-// parseConfigFile reads and parses a .runlog.yaml file.
+// parseConfigFile reads and parses a configuration file.
 // We use a simple hand-rolled parser to avoid adding a YAML dependency.
 func parseConfigFile(path string) (*Config, error) {
 	f, err := os.Open(path)

@@ -47,7 +47,7 @@ runlog
 
 ## Configuration
 
-Create a `.runlog.yaml` in your project root to configure the test launcher and categories:
+Create a `.runlog/config.yaml` in your project root to configure the test launcher and categories:
 
 ```yaml
 testCommand: "./test mcj-emergent {name}"
@@ -70,7 +70,7 @@ export RUNLOG_DB=/path/to/runs.db      # new env var
 export TEST_LOG_DIR=/path/to/logs      # still supported for backward compat
 ```
 
-Or configure in `.runlog.yaml`:
+Or configure in `.runlog/config.yaml`:
 
 ```yaml
 db: /path/to/runs.db
@@ -81,7 +81,7 @@ db: /path/to/runs.db
 1. Add the new module: `go get github.com/emergent-company/runlog`
 2. Replace import paths: `framework "github.com/emergent-company/emergent.memory.e2e/framework"` → `"github.com/emergent-company/runlog"`
 3. Replace `framework.` references with `runlog.` in your code
-4. Create `.runlog.yaml` if you want test categories in the TUI
+4. Create `.runlog/config.yaml` if you want test categories in the TUI
 5. Install the standalone TUI: `go install github.com/emergent-company/runlog/cmd/runlog@latest`
 6. Remove the old `cmd/runlog/` directory from your repo
 7. Run `go mod tidy` to clean up

@@ -84,7 +84,7 @@ runlog analyze 42       # LLM analysis of a failure
 
 ## Configuration
 
-Create a `.runlog.yaml` in your project root or next to `runs.db`:
+Create a `.runlog/config.yaml` in your project root or next to `runs.db`:
 
 ```yaml
 # Command template for launching tests from the TUI.
@@ -92,8 +92,8 @@ Create a `.runlog.yaml` in your project root or next to `runs.db`:
 testCommand: "go test -v -run {name} ./..."
 
 # Explicit database path (optional).
-# Default search: $RUNLOG_DB → ./runs.db → ./logs/runs.db
-db: logs/runs.db
+# Default search: $RUNLOG_DB → .runlog/runs.db
+db: .runlog/runs.db
 
 # Group tests by category in the TUI.
 categories:
@@ -133,7 +133,7 @@ Flags:
 | Variable | Description |
 |---|---|
 | `RUNLOG_DB` | Explicit path to `runs.db` |
-| `RUNLOG_CONFIG` | Explicit path to `.runlog.yaml` |
+| `RUNLOG_CONFIG` | Explicit path to `.runlog/config.yaml` |
 | `TEST_LOG_DIR` | Directory for run log files |
 | `GOOGLE_AI_API_KEY` | API key for LLM analyzer (Gemini) |
 

@@ -58,7 +58,7 @@ runlog version
 
 ### 4. Smoke-test runlog CLI against the live DB
 
-Use the DB at `logs/runs.db` (auto-resolved default). Run all subcommands that were added or changed:
+Use the DB at `.runlog/runs.db` (auto-resolved default). Run all subcommands that were added or changed:
 
 ```bash
 # List recent runs — basic sanity

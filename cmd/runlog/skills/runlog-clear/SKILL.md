@@ -6,9 +6,9 @@ metadata:
   version: "1.0"
 ---
 
-Use `runlog clear` to wipe the run log database and all per-run log files under `logs/`. This is the right step after a round of fixes when the existing DB contains only pre-fix runs (e.g. runs that failed silently with no `failure` events before `rl.Failf` instrumentation was added).
+Use `runlog clear` to wipe the run log database and all per-run log files under `.runlog/`. This is the right step after a round of fixes when the existing DB contains only pre-fix runs (e.g. runs that failed silently with no `failure` events before `rl.Failf` instrumentation was added).
 
-**Input**: None required. Optionally pass `--db <path>` if the DB is not at the default `logs/runs.db`.
+**Input**: None required. Optionally pass `--db <path>` if the DB is not at the default `.runlog/runs.db`.
 
 ---
 
@@ -29,7 +29,7 @@ Get a count of current runs so you can confirm the clear worked:
 
 ```bash
 runlog runs --since 8760h 2>&1 | tail -5
-ls logs/ | wc -l
+ls .runlog/ | wc -l
 ```
 
 ### 3. Run the clear
@@ -40,26 +40,26 @@ runlog clear
 
 Expected output:
 ```
-removed: logs/runs.db
-removed: N subdirectories, M files from logs/
+removed: .runlog/runs.db
+removed: N subdirectories, M files from .runlog/
 ```
 
 Or if the DB was already absent:
 ```
-skipped: logs/runs.db (not found)
-nothing else to remove in logs/
+skipped: .runlog/runs.db (not found)
+nothing else to remove in .runlog/
 ```
 
 ### 4. Confirm the slate is clean
 
 ```bash
 runlog runs --since 8760h 2>&1
-ls logs/ 2>&1
+ls .runlog/ 2>&1
 ```
 
 Expected:
 - `runs` reports `no runs found in the last 8760h0m0s`
-- `logs/` is empty (or the directory itself doesn't exist)
+- `.runlog/` is empty (or the directory itself doesn't exist)
 
 ---
 
@@ -68,7 +68,7 @@ Expected:
 - **Safety guard**: sibling-file cleanup only runs when the parent directory of `runs.db` is named `logs` or `test-logs`. If `--db` points to a non-standard path (e.g. `/tmp/foo.db`), only the DB file itself is removed — other files in `/tmp` are left untouched.
 - **Non-destructive on missing files**: if `runs.db` doesn't exist, the command prints a `skipped` message and exits cleanly (exit 0).
 - **Does not open the DB**: `clear` bypasses `OpenDB` entirely, so it works even when the DB is locked or corrupt.
-- **Custom DB path**: `runlog clear --db /path/to/logs/runs.db` — sibling cleanup still applies when the parent dir is named `logs` or `test-logs`.
+- **Custom DB path**: `runlog clear --db /path/to/.runlog/runs.db` — sibling cleanup still applies when the parent dir is named `logs` or `test-logs`.
 
 ---
 

@@ -13,7 +13,7 @@
 //
 // # Global flags (apply to all subcommands)
 //
-//	--db path/to/runs.db           explicit DB path (default: logs/runs.db)
+//	--db path/to/runs.db           explicit DB path (default: .runlog/runs.db)
 //	--since 5m                     time window for "runs" and TUI (default: 5m)
 //
 // # TUI keyboard navigation
@@ -119,9 +119,25 @@ func cmdRuns(db *runlog.RunDB, since time.Duration) error {
 		return nil
 	}
 
-	fmt.Printf("%-6s  %-8s  %-6s  %-12s  %-8s  %-8s  %-7s  %s\n",
-		"ID", "STATUS", "RUNNER", "ENV", "AGE", "DURATION", "EVENTS", "TEST NAME")
-	fmt.Println(strings.Repeat("─", 102))
+	// Check if any runs have cost data to decide whether to show cost column
+	hasCost := false
+	for _, r := range rows {
+		if r.CostUSD != nil && *r.CostUSD > 0 {
+			hasCost = true
+			break
+		}
+	}
+
+	if hasCost {
+		fmt.Printf("%-6s  %-8s  %-6s  %-12s  %-8s  %-8s  %-7s  %-12s  %s\n",
+			"ID", "STATUS", "RUNNER", "ENV", "AGE", "DURATION", "EVENTS", "COST", "TEST NAME")
+		fmt.Println(strings.Repeat("─", 120))
+	} else {
+		fmt.Printf("%-6s  %-8s  %-6s  %-12s  %-8s  %-8s  %-7s  %s\n",
+			"ID", "STATUS", "RUNNER", "ENV", "AGE", "DURATION", "EVENTS", "TEST NAME")
+		fmt.Println(strings.Repeat("─", 102))
+	}
+
 	for _, r := range rows {
 		status := passLabel(r)
 		age := formatAgePlain(r.StartedAt)
@@ -134,8 +150,18 @@ func cmdRuns(db *runlog.RunDB, since time.Duration) error {
 		if r.EnvName != nil {
 			env = *r.EnvName
 		}
-		fmt.Printf("%-6d  %-8s  %-6s  %-12s  %-8s  %-8s  %-7d  %s\n",
-			r.ID, status, runner, env, age, dur, r.EventCount, r.TestName)
+
+		if hasCost {
+			costStr := "—"
+			if r.CostUSD != nil && *r.CostUSD > 0 {
+				costStr = fmt.Sprintf("$%.6f", *r.CostUSD)
+			}
+			fmt.Printf("%-6d  %-8s  %-6s  %-12s  %-8s  %-8s  %-7d  %-12s  %s\n",
+				r.ID, status, runner, env, age, dur, r.EventCount, costStr, r.TestName)
+		} else {
+			fmt.Printf("%-6d  %-8s  %-6s  %-12s  %-8s  %-8s  %-7d  %s\n",
+				r.ID, status, runner, env, age, dur, r.EventCount, r.TestName)
+		}
 	}
 	return nil
 }
@@ -208,6 +234,36 @@ func cmdShow(db *runlog.RunDB, runID int64) error {
 	}
 	if run.EnvName != nil {
 		fmt.Printf("env:     %s\n", *run.EnvName)
+	}
+	if run.InputTokens != nil || run.OutputTokens != nil || run.CostUSD != nil {
+		if run.InputTokens != nil {
+			fmt.Printf("input tokens:  %s\n", runlog.FormatInt(*run.InputTokens))
+		}
+		if run.OutputTokens != nil {
+			fmt.Printf("output tokens: %s\n", runlog.FormatInt(*run.OutputTokens))
+		}
+		if run.CostUSD != nil {
+			fmt.Printf("cost:    $%.6f\n", *run.CostUSD)
+		}
+	}
+	if len(run.EnvVars) > 0 {
+		fmt.Println("\nEnvironment Variables:")
+		// Sort keys for consistent display.
+		keys := make([]string, 0, len(run.EnvVars))
+		for k := range run.EnvVars {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := run.EnvVars[k]
+			// Mask API keys for security (show first 8 chars and "...").
+			if strings.Contains(strings.ToLower(k), "key") || strings.Contains(strings.ToLower(k), "token") {
+				if len(v) > 12 {
+					v = v[:8] + "..." + v[len(v)-4:]
+				}
+			}
+			fmt.Printf("  %s: %s\n", k, v)
+		}
 	}
 	fmt.Println(strings.Repeat("─", 80))
 
@@ -386,7 +442,7 @@ func cmdTestRuns(db *runlog.RunDB, testName string, since time.Duration) error {
 // under the same logs/ directory, then reports what was removed.
 // It does not require the DB to be open; it works directly on the filesystem.
 // For safety, sibling-file cleanup is only performed when the parent directory
-// is named "logs" or "test-logs" (the conventional locations used by this repo).
+// is named "logs", "test-logs", or ".runlog".
 func cmdClear(dbPath string) error {
 	logsDir := filepath.Dir(dbPath)
 
@@ -409,13 +465,13 @@ func cmdClear(dbPath string) error {
 	// This prevents accidentally wiping /tmp or other broad directories when
 	// --db points to a non-standard path.
 	base := filepath.Base(logsDir)
-	if base != "logs" && base != "test-logs" {
-		fmt.Printf("skipped sibling cleanup: parent dir %q is not named 'logs' or 'test-logs'\n", logsDir)
+	if base != "logs" && base != "test-logs" && base != ".runlog" {
+		fmt.Printf("skipped sibling cleanup: parent dir %q is not named 'logs', 'test-logs', or '.runlog'\n", logsDir)
 		return nil
 	}
 
 	// Remove everything directly inside the logs/ directory — subdirectories
-	// (per-run log dirs) and any remaining files (e.g. .log files).
+	// (per-run log dirs) and any remaining files (e.g. .log files) EXCEPT config files.
 	entries, err := os.ReadDir(logsDir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read dir %s: %w", logsDir, err)
@@ -423,6 +479,10 @@ func cmdClear(dbPath string) error {
 
 	var removedDirs, removedFiles int
 	for _, e := range entries {
+		// skip config files
+		if e.Name() == "config.yaml" {
+			continue
+		}
 		p := filepath.Join(logsDir, e.Name())
 		if e.IsDir() {
 			if err := os.RemoveAll(p); err != nil {
@@ -5095,29 +5155,18 @@ func resolveDBPath(explicit string) string {
 		return filepath.Join(d, "runs.db")
 	}
 
-	// 4. .runlog.yaml "db" field (search cwd only — no dbDir yet).
+	// 4. config file "db" field.
 	if cfg, err := runlog.LoadConfig(""); err == nil && cfg.DBPath != "" {
 		return cfg.DBPath
 	}
 
-	// 5. Search common locations relative to the working directory.
-	if wd, err := os.Getwd(); err == nil {
-		candidates := []string{
-			filepath.Join(wd, "runs.db"),
-			filepath.Join(wd, "logs", "runs.db"),
-		}
-		for _, c := range candidates {
-			if _, err := os.Stat(c); err == nil {
-				return c
-			}
-		}
+	// 5. Default write location in .runlog under project root.
+	runlogDir := runlog.RunlogDir()
+	if runlogDir != "" {
+		return filepath.Join(runlogDir, "runs.db")
 	}
 
-	// 6. Default write location.
-	if wd, err := os.Getwd(); err == nil {
-		return filepath.Join(wd, "logs", "runs.db")
-	}
-	return "logs/runs.db"
+	return ".runlog/runs.db"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5147,7 +5196,7 @@ USAGE
   runlog version                        print version and exit
 
 FLAGS
-  --db <path>      path to runs.db  (default: auto-resolved to logs/runs.db)
+  --db <path>      path to runs.db  (default: auto-resolved to .runlog/runs.db)
   --since <dur>    time window for "runs", "tests", and TUI, e.g. 5m, 1h, 24h  (default: 24h)
   --json           (analyze only) output suggestions as JSON instead of text
 
@@ -5169,7 +5218,7 @@ EXAMPLES
   runlog analyze 42                     # LLM analysis of run 42 with full trace
   runlog analyze --json 42              # same but output suggestions as JSON
   runlog trace 42                       # show stored trace from last analysis of run 42
-  runlog clear                          # delete runs.db + all log files/dirs in logs/
+  runlog clear                          # delete runs.db + all log files/dirs in .runlog/
   runlog clear --db /path/to/runs.db    # clear a specific database location
   runlog reap                           # mark all stale (orphaned) runs as FAIL
   runlog reap 527                       # mark only run 527 as FAIL

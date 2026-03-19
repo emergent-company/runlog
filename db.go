@@ -3,7 +3,7 @@
 // RunDB: a SQLite-backed structured event log for test runs.
 //
 // Every test that creates a RunLog automatically gets its events persisted to
-// logs/runs.db (or $TEST_RUNS_DB if set).  Both Docker and host runs share
+// .runlog/runs.db (or $TEST_RUNS_DB if set).  Both Docker and host runs share
 // the same database so `runlog` shows a unified view.  The schema is
 // intentionally minimal: one row per test run, one row per event.  All
 // event-specific structure lives in the `details` TEXT column as a JSON blob
@@ -195,6 +195,27 @@ ALTER TABLE test_runs ADD COLUMN reason TEXT;
 ALTER TABLE test_runs ADD COLUMN env_name TEXT;
 `,
 	},
+	{
+		version: 11,
+		sql: `
+-- Token usage and cost tracking for LLM operations within tests.
+-- These columns store aggregated token counts and estimated costs for all
+-- LLM operations performed during a test run (e.g. memory ask, agent triggers).
+-- NULL for tests that don't make LLM calls or older rows.
+ALTER TABLE test_runs ADD COLUMN input_tokens  INTEGER;
+ALTER TABLE test_runs ADD COLUMN output_tokens INTEGER;
+ALTER TABLE test_runs ADD COLUMN cost_usd      REAL;
+`,
+	},
+	{
+		version: 12,
+		sql: `
+-- Environment variables used during the test run.
+-- Stored as JSON object with key-value pairs (e.g. {"GOOGLE_AI_API_KEY": "AIza..."}).
+-- Useful for tracking which API keys, server URLs, and other config was used.
+ALTER TABLE test_runs ADD COLUMN env_vars TEXT;
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,7 +313,7 @@ func (rdb *RunDB) applyMigrations() error {
 // InsertRun inserts a new test_runs row and returns its auto-assigned ID.
 // runner identifies the execution environment (e.g. "host", "docker").
 // Pass "" to leave the runner column NULL.
-func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string, envName string) (int64, error) {
+func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string, envName string, envVars map[string]string) (int64, error) {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 
@@ -304,9 +325,16 @@ func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string,
 	if envName != "" {
 		envNameVal = envName
 	}
+	var envVarsVal any
+	if len(envVars) > 0 {
+		b, err := json.Marshal(envVars)
+		if err == nil {
+			envVarsVal = string(b)
+		}
+	}
 	res, err := rdb.db.Exec(
-		`INSERT INTO test_runs(test_name, started_at, runner, env_name) VALUES (?, ?, ?, ?)`,
-		testName, startedAt.UTC().Format(time.RFC3339), runnerVal, envNameVal,
+		`INSERT INTO test_runs(test_name, started_at, runner, env_name, env_vars) VALUES (?, ?, ?, ?, ?)`,
+		testName, startedAt.UTC().Format(time.RFC3339), runnerVal, envNameVal, envVarsVal,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("rundb: InsertRun: %w", err)
@@ -376,15 +404,31 @@ const (
 // reason is a human-readable explanation (e.g. skip reason or last failure
 // message); pass "" to leave the column NULL.
 func (rdb *RunDB) FinishRun(id int64, finishedAt time.Time, outcome RunOutcome, reason string) error {
+	return rdb.FinishRunWithCost(id, finishedAt, outcome, reason, 0, 0, 0)
+}
+
+// FinishRunWithCost is like FinishRun but also records token usage and cost.
+// Pass 0 for inputTokens, outputTokens, costUSD to leave those columns NULL.
+func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunOutcome, reason string, inputTokens, outputTokens int64, costUSD float64) error {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 	var reasonVal any
 	if reason != "" {
 		reasonVal = reason
 	}
+	var inputTokVal, outputTokVal, costVal any
+	if inputTokens > 0 {
+		inputTokVal = inputTokens
+	}
+	if outputTokens > 0 {
+		outputTokVal = outputTokens
+	}
+	if costUSD > 0 {
+		costVal = costUSD
+	}
 	_, err := rdb.db.Exec(
-		`UPDATE test_runs SET finished_at = ?, passed = ?, reason = ? WHERE id = ?`,
-		finishedAt.UTC().Format(time.RFC3339), int(outcome), reasonVal, id,
+		`UPDATE test_runs SET finished_at = ?, passed = ?, reason = ?, input_tokens = ?, output_tokens = ?, cost_usd = ? WHERE id = ?`,
+		finishedAt.UTC().Format(time.RFC3339), int(outcome), reasonVal, inputTokVal, outputTokVal, costVal, id,
 	)
 	return err
 }
@@ -539,13 +583,17 @@ type RunRow struct {
 	Passed       *bool      // nil if not yet determined
 	Skipped      bool       // true when the test called t.Skip() (passed column = 2)
 	EventCount   int
-	Description  *RunDescription  // nil if not set
-	TokenSummary *RunTokenSummary // nil if PrintTokenSummary was never called
-	Tags         []string         // nil if no tags set; decoded from JSON array
-	Experiment   *string          // nil if not set
-	Runner       *string          // nil for older rows; "host" or "docker"
-	Reason       *string          // nil for passes and older rows; skip/fail reason
-	EnvName      *string          // nil for older rows; environment profile name from MEMORY_TEST_ENV
+	Description  *RunDescription   // nil if not set
+	TokenSummary *RunTokenSummary  // nil if PrintTokenSummary was never called
+	Tags         []string          // nil if no tags set; decoded from JSON array
+	Experiment   *string           // nil if not set
+	Runner       *string           // nil for older rows; "host" or "docker"
+	Reason       *string           // nil for passes and older rows; skip/fail reason
+	EnvName      *string           // nil for older rows; environment profile name from MEMORY_TEST_ENV
+	InputTokens  *int64            // nil if no LLM calls made; total input tokens consumed
+	OutputTokens *int64            // nil if no LLM calls made; total output tokens generated
+	CostUSD      *float64          // nil if no LLM calls made; estimated cost in USD
+	EnvVars      map[string]string // nil if not set; environment variables used during test
 }
 
 // ChildEvent is one entry in the `children` JSON array stored on a group event.
@@ -589,7 +637,11 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
             r.experiment,
             r.runner,
             r.reason,
-            r.env_name
+            r.env_name,
+            r.input_tokens,
+            r.output_tokens,
+            r.cost_usd,
+            r.env_vars
         FROM test_runs r
         LEFT JOIN run_events e ON e.run_id = r.id
         WHERE r.started_at >= ?
@@ -613,6 +665,10 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 		var runner *string
 		var reason *string
 		var envName *string
+		var inputTokens *int64
+		var outputTokens *int64
+		var costUSD *float64
+		var envVarsJSON *string
 		if err := rows.Scan(
 			&row.ID,
 			&row.TestName,
@@ -626,6 +682,10 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 			&runner,
 			&reason,
 			&envName,
+			&inputTokens,
+			&outputTokens,
+			&costUSD,
+			&envVarsJSON,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListRuns scan: %w", err)
 		}
@@ -659,6 +719,15 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 		row.Runner = runner
 		row.Reason = reason
 		row.EnvName = envName
+		row.InputTokens = inputTokens
+		row.OutputTokens = outputTokens
+		row.CostUSD = costUSD
+		if envVarsJSON != nil && *envVarsJSON != "" {
+			var envVars map[string]string
+			if json.Unmarshal([]byte(*envVarsJSON), &envVars) == nil {
+				row.EnvVars = envVars
+			}
+		}
 		result = append(result, row)
 	}
 	if err := rows.Err(); err != nil {
@@ -1301,7 +1370,7 @@ func resetSharedDB() {
 // SharedDB returns the process-wide RunDB, opening it lazily on first call.
 // The path resolves via dbPath():
 //  1. $TEST_RUNS_DB         (explicit override)
-//  2. <repo_root>/logs/runs.db  (via runtime.Caller)
+//  2. <repo_root>/.runlog/runs.db  (via runtime.Caller)
 //  3. $TMPDIR/.../runs.db   (last-resort fallback)
 //
 // If the DB cannot be opened, a nil handle is returned and the error is
@@ -1318,34 +1387,27 @@ func SharedDB() (*RunDB, error) {
 //
 // Resolution order:
 //  1. TEST_RUNS_DB env var            — explicit override (absolute path)
-//  2. .runlog.yaml db: field          — from config file in working directory
-//  3. ./logs/runs.db                  — relative to working directory
-//  4. ./runs.db                       — working directory itself
-//  5. $TMPDIR/.../runs.db             — last-resort fallback
+//  2. config file db: field           — from config.yaml in .runlog directory
+//  3. .runlog/runs.db                 — in the project's .runlog directory
+//  4. $TMPDIR/.../runs.db             — last-resort fallback
 //
 // NOTE: TEST_LOG_DIR is intentionally NOT consulted here.  Flat log files
 // (run.log, session-*.log) live under TEST_LOG_DIR, but the DB is always
-// at the repo root so Docker and host runs share a single database.
+// at the project root so Docker and host runs share a single database.
 func dbPath() string {
 	if d := os.Getenv("TEST_RUNS_DB"); d != "" {
 		return d
 	}
-	// Check .runlog.yaml for an explicit db: field.
+	// Check config for an explicit db: field.
 	if cfg, err := LoadConfig(""); err == nil && cfg.DBPath != "" {
 		return cfg.DBPath
 	}
-	// Check common paths relative to the working directory.
-	if wd, err := os.Getwd(); err == nil {
-		candidate := filepath.Join(wd, "logs", "runs.db")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-		candidate = filepath.Join(wd, "runs.db")
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-		// Default: create in logs/ under working directory.
-		return filepath.Join(wd, "logs", "runs.db")
+
+	// Default: create in .runlog/ under the project root.
+	runlogDir := RunlogDir()
+	if runlogDir != "" {
+		return filepath.Join(runlogDir, "runs.db")
 	}
+
 	return filepath.Join(os.TempDir(), "memory-cli-docker-tests", "runs.db")
 }
