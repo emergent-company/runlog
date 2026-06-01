@@ -348,6 +348,100 @@ func cmdExperiments(db *runlog.RunDB) error {
 	return nil
 }
 
+// cmdFailing prints a table of tests whose most recent completed run (within
+// the since window) was a failure, sorted by failure streak length descending.
+func cmdFailing(db *runlog.RunDB, since time.Duration) error {
+	rows, err := db.ListFailingTests(time.Now().Add(-since))
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		fmt.Printf("no failing tests in the last %s\n", since)
+		return nil
+	}
+
+	fmt.Printf("%-55s  %-8s  %-8s  %s\n", "TEST", "STREAK", "AGO", "REASON")
+	fmt.Println(strings.Repeat("─", 110))
+	for _, r := range rows {
+		// Build streak string: ✗ repeated up to 5, then count.
+		marks := r.FailStreak
+		if marks > 5 {
+			marks = 5
+		}
+		streakStr := strings.Repeat("✗", marks)
+		if r.FailStreak > 5 {
+			streakStr += fmt.Sprintf(" %d", r.FailStreak)
+		} else {
+			streakStr += fmt.Sprintf(" %d", r.FailStreak)
+		}
+
+		ago := formatAgePlain(r.LastRunAt)
+		reason := "—"
+		if r.Reason != nil && *r.Reason != "" {
+			reason = *r.Reason
+			if len(reason) > 50 {
+				reason = reason[:49] + "…"
+			}
+		}
+		fmt.Printf("%-55s  %-8s  %-8s  %s\n",
+			truncate(r.TestName, 55), streakStr, ago, reason)
+	}
+	return nil
+}
+
+// cmdStats prints per-test aggregated statistics (pass rate, duration, run
+// count) for all tests with at least one completed run within the since window.
+func cmdStats(db *runlog.RunDB, since time.Duration) error {
+	rows, err := db.TestStats(time.Now().Add(-since))
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		fmt.Printf("no test runs found in the last %s\n", since)
+		return nil
+	}
+
+	fmt.Printf("%-50s  %5s  %5s  %7s  %7s  %7s  %s\n",
+		"TEST", "RUNS", "PASS%", "AVG", "MIN", "MAX", "LAST")
+	fmt.Println(strings.Repeat("─", 105))
+	for _, r := range rows {
+		passRate := "   —"
+		if r.TotalRuns > 0 {
+			pct := int(float64(r.PassCount) / float64(r.TotalRuns) * 100)
+			passRate = fmt.Sprintf("%3d%%", pct)
+		}
+
+		fmtDur := func(s float64) string {
+			if s == 0 {
+				return "  —    "
+			}
+			return fmt.Sprintf("%6.1fs", s)
+		}
+
+		lastStr := "—"
+		if r.LastPassed != nil {
+			if *r.LastPassed {
+				lastStr = "✓ " + formatAgePlain(r.LastRunAt)
+			} else {
+				lastStr = "✗ " + formatAgePlain(r.LastRunAt)
+			}
+		} else {
+			lastStr = "~ " + formatAgePlain(r.LastRunAt) // skip
+		}
+
+		fmt.Printf("%-50s  %5d  %5s  %7s  %7s  %7s  %s\n",
+			truncate(r.TestName, 50),
+			r.TotalRuns,
+			passRate,
+			fmtDur(r.AvgDurationS),
+			fmtDur(r.MinDurationS),
+			fmtDur(r.MaxDurationS),
+			lastStr,
+		)
+	}
+	return nil
+}
+
 // cmdTestsList prints a plain-text table of all known tests with their last
 // run status and age, discovered from the database and optional config.
 func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
@@ -5182,6 +5276,8 @@ USAGE
   runlog events [flags] <run-id>        list events for a run
   runlog show [flags] <run-id>          full detail dump of a run
   runlog tail [flags]                   stream new events as they arrive
+  runlog failing [flags]                list currently failing tests (streak-sorted)
+  runlog stats [flags]                  per-test pass rate, avg duration, run count
   runlog experiments [flags]            list all experiments (non-interactive)
   runlog tests [flags]                  list all known tests with last status
   runlog tests [flags] <test-name>      list recent runs for a specific test
@@ -5210,6 +5306,10 @@ EXAMPLES
   runlog show 42 | grep state_change
   runlog tail                           # live stream of new events
   runlog tail --since 1h                # include runs from last hour
+  runlog failing                        # currently failing tests, last 24h
+  runlog failing --since 7d             # failing tests over the last 7 days
+  runlog stats                          # per-test pass rate + duration (last 24h)
+  runlog stats --since 7d               # stats over the last 7 days
   runlog experiments                    # table of all experiments
   runlog tests                          # table of all tests with last run status
   runlog tests --since 7d              # tests with runs from last 7 days
@@ -5236,6 +5336,13 @@ EXAMPLES
 
 // parseSince parses a --since flag value and exits on error.
 func parseSince(val, context string) time.Duration {
+	// Support "Nd" shorthand for N days (e.g. "7d" = 168h).
+	if strings.HasSuffix(val, "d") {
+		n, err := strconv.Atoi(strings.TrimSuffix(val, "d"))
+		if err == nil && n > 0 {
+			return time.Duration(n) * 24 * time.Hour
+		}
+	}
 	d, err := time.ParseDuration(val)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "runlog %s: invalid --since value %q: %v\n", context, val, err)
@@ -5322,6 +5429,17 @@ func main() {
 		dbPath = resolveDBPath(*dbOut)
 		since = parseSince(*sinceOut, subcommand)
 		subArgs = fs.Args() // positional args (run-id)
+
+	case "failing", "stats":
+		fs, dbOut, sinceOut := subFS(subcommand, *globalDB, *globalSince)
+		if err := fs.Parse(subArgs); err != nil {
+			if err == flag.ErrHelp {
+				os.Exit(0)
+			}
+			os.Exit(2)
+		}
+		dbPath = resolveDBPath(*dbOut)
+		since = parseSince(*sinceOut, subcommand)
 
 	case "experiments":
 		fs, dbOut, sinceOut := subFS(subcommand, *globalDB, *globalSince)
@@ -5503,6 +5621,18 @@ func main() {
 	case "tail":
 		if err := cmdTail(db, since); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog tail: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "failing":
+		if err := cmdFailing(db, since); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog failing: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "stats":
+		if err := cmdStats(db, since); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog stats: %v\n", err)
 			os.Exit(1)
 		}
 

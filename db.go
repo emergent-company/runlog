@@ -823,6 +823,216 @@ func (rdb *RunDB) DiscoverTests() ([]string, error) {
 	return names, rows.Err()
 }
 
+// FailingTestRow holds the last-run info for a test whose most recent
+// completed run within the query window was a failure.
+type FailingTestRow struct {
+	TestName   string
+	LastRunAt  time.Time
+	Reason     *string
+	FailStreak int // consecutive failures (newest-first) within the window
+}
+
+// ListFailingTests returns one row per test whose most recent completed run
+// (within the since window) was a failure, sorted by FailStreak DESC then
+// LastRunAt DESC.  Streak is capped to runs within the since window.
+func (rdb *RunDB) ListFailingTests(since time.Time) ([]FailingTestRow, error) {
+	// Step 1: find tests whose last completed run is a failure.
+	rdb.mu.Lock()
+	rows, err := rdb.db.Query(`
+		WITH ranked AS (
+			SELECT test_name, started_at, passed, reason,
+			       ROW_NUMBER() OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
+			FROM test_runs
+			WHERE finished_at IS NOT NULL
+			  AND started_at >= ?
+		)
+		SELECT test_name, started_at, reason
+		FROM ranked
+		WHERE rn = 1 AND passed = 0
+		ORDER BY started_at DESC
+	`, since.UTC().Format(time.RFC3339))
+	rdb.mu.Unlock()
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListFailingTests: %w", err)
+	}
+	defer rows.Close()
+
+	type candidate struct {
+		testName string
+		lastAt   time.Time
+		reason   *string
+	}
+	var candidates []candidate
+	for rows.Next() {
+		var c candidate
+		var startedStr string
+		if err := rows.Scan(&c.testName, &startedStr, &c.reason); err != nil {
+			return nil, fmt.Errorf("rundb: ListFailingTests scan: %w", err)
+		}
+		c.lastAt, _ = time.Parse(time.RFC3339, startedStr)
+		candidates = append(candidates, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	// Step 2: for each failing test, count consecutive failures from newest.
+	result := make([]FailingTestRow, 0, len(candidates))
+	for _, c := range candidates {
+		rdb.mu.Lock()
+		srows, err := rdb.db.Query(`
+			SELECT passed FROM test_runs
+			WHERE test_name = ? AND finished_at IS NOT NULL AND started_at >= ?
+			ORDER BY started_at DESC
+		`, c.testName, since.UTC().Format(time.RFC3339))
+		rdb.mu.Unlock()
+		if err != nil {
+			return nil, fmt.Errorf("rundb: ListFailingTests streak %s: %w", c.testName, err)
+		}
+		streak := 0
+		for srows.Next() {
+			var passed int
+			if err := srows.Scan(&passed); err != nil {
+				srows.Close()
+				return nil, fmt.Errorf("rundb: ListFailingTests streak scan: %w", err)
+			}
+			if passed != 0 { // pass or skip breaks the streak
+				break
+			}
+			streak++
+		}
+		srows.Close()
+
+		result = append(result, FailingTestRow{
+			TestName:   c.testName,
+			LastRunAt:  c.lastAt,
+			Reason:     c.reason,
+			FailStreak: streak,
+		})
+	}
+
+	// Sort by streak DESC, then LastRunAt DESC.
+	for i := 1; i < len(result); i++ {
+		for j := i; j > 0; j-- {
+			a, b := result[j-1], result[j]
+			if a.FailStreak < b.FailStreak ||
+				(a.FailStreak == b.FailStreak && a.LastRunAt.Before(b.LastRunAt)) {
+				result[j-1], result[j] = result[j], result[j-1]
+			} else {
+				break
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// TestStatRow holds aggregated run statistics for a single test.
+type TestStatRow struct {
+	TestName     string
+	TotalRuns    int
+	PassCount    int
+	FailCount    int
+	SkipCount    int
+	AvgDurationS float64
+	MinDurationS float64
+	MaxDurationS float64
+	LastRunAt    time.Time
+	LastPassed   *bool // nil = last run was a skip or outcome unknown
+}
+
+// TestStats returns per-test aggregated statistics for runs within the since
+// window, ordered alphabetically by test name.
+func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
+	rdb.mu.Lock()
+	rows, err := rdb.db.Query(`
+		SELECT
+			test_name,
+			COUNT(*) AS total_runs,
+			SUM(CASE WHEN passed = 1 THEN 1 ELSE 0 END) AS pass_count,
+			SUM(CASE WHEN passed = 0 THEN 1 ELSE 0 END) AS fail_count,
+			SUM(CASE WHEN passed = 2 THEN 1 ELSE 0 END) AS skip_count,
+			AVG((julianday(finished_at) - julianday(started_at)) * 86400.0) AS avg_dur,
+			MIN((julianday(finished_at) - julianday(started_at)) * 86400.0) AS min_dur,
+			MAX((julianday(finished_at) - julianday(started_at)) * 86400.0) AS max_dur,
+			MAX(started_at) AS last_run_at
+		FROM test_runs
+		WHERE finished_at IS NOT NULL
+		  AND started_at >= ?
+		GROUP BY test_name
+		ORDER BY test_name
+	`, since.UTC().Format(time.RFC3339))
+	rdb.mu.Unlock()
+	if err != nil {
+		return nil, fmt.Errorf("rundb: TestStats: %w", err)
+	}
+	defer rows.Close()
+
+	var result []TestStatRow
+	for rows.Next() {
+		var r TestStatRow
+		var lastRunStr string
+		var avgDur, minDur, maxDur *float64
+		if err := rows.Scan(
+			&r.TestName,
+			&r.TotalRuns,
+			&r.PassCount,
+			&r.FailCount,
+			&r.SkipCount,
+			&avgDur,
+			&minDur,
+			&maxDur,
+			&lastRunStr,
+		); err != nil {
+			return nil, fmt.Errorf("rundb: TestStats scan: %w", err)
+		}
+		r.LastRunAt, _ = time.Parse(time.RFC3339, lastRunStr)
+		if avgDur != nil {
+			r.AvgDurationS = *avgDur
+		}
+		if minDur != nil {
+			r.MinDurationS = *minDur
+		}
+		if maxDur != nil {
+			r.MaxDurationS = *maxDur
+		}
+		result = append(result, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+
+	// Determine LastPassed for each test via a second query.
+	for i := range result {
+		rdb.mu.Lock()
+		row := rdb.db.QueryRow(`
+			SELECT passed FROM test_runs
+			WHERE test_name = ? AND finished_at IS NOT NULL AND started_at >= ?
+			ORDER BY started_at DESC LIMIT 1
+		`, result[i].TestName, since.UTC().Format(time.RFC3339))
+		rdb.mu.Unlock()
+		var passed int
+		if err := row.Scan(&passed); err == nil {
+			if passed == 1 {
+				v := true
+				result[i].LastPassed = &v
+			} else if passed == 0 {
+				v := false
+				result[i].LastPassed = &v
+			}
+			// passed==2 (skip) → leave nil
+		}
+	}
+
+	return result, nil
+}
+
 // ListExperiments returns one ExperimentSummary per distinct non-null
 // experiment value across all test_runs rows, sorted newest-first by LastRunAt.
 // It re-uses ListRuns with a zero time to get every run, then groups in memory.
