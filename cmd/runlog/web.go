@@ -546,8 +546,6 @@ func reqCtx(c echo.Context) context.Context {
 // dbEvent() path (rl.Printf → dbEvent inserts into run_events directly).
 func skipLogLine(line string) bool {
 	// Skip t.Log() output lines: "    file.go:line: message"
-	// These are prefixed with 4+ spaces followed by a .go file reference.
-	// They are duplicates of rl.Printf → dbEvent entries.
 	if len(line) > 4 {
 		trimmed := line
 		i := 0
@@ -556,16 +554,34 @@ func skipLogLine(line string) bool {
 		}
 		if i >= 4 && i < len(trimmed)-5 {
 			rest := trimmed[i:]
-			// Match "file.go:number: " pattern
 			if dotIdx := strings.Index(rest, ".go:"); dotIdx > 0 && dotIdx < 40 {
 				afterDot := rest[dotIdx+4:]
 				colonIdx := strings.Index(afterDot, ":")
 				if colonIdx > 0 && colonIdx < 10 {
-					// Has .go:digits: prefix — it's a t.Log() line, skip it
 					return true
 				}
 			}
 		}
+	}
+	// Skip go test framework output lines — these are noise in the event log.
+	// The test's rl.Printf/dbEvent already captures meaningful progress.
+	switch {
+	case strings.HasPrefix(line, "=== RUN "):
+		return true
+	case strings.HasPrefix(line, "--- PASS"):
+		return true
+	case strings.HasPrefix(line, "--- FAIL"):
+		return true
+	case strings.HasPrefix(line, "PASS"):
+		return true
+	case strings.HasPrefix(line, "FAIL"):
+		return true
+	case strings.HasPrefix(line, "ok  "):
+		return true
+	case strings.HasPrefix(line, "?   "):
+		return true
+	case strings.HasPrefix(line, "testing: warning"):
+		return true
 	}
 	return false
 }
