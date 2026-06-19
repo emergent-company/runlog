@@ -526,6 +526,40 @@ func (rl *RunLog) Printf(format string, args ...any) {
 	rl.dbEvent("log", msg, nil)
 }
 
+// LogStep writes a labelled log event with structured details.
+// The label is shown in the TUI event table; details are shown as a
+// key-value table when the user clicks to expand the event row.
+// Example:
+//
+//	rl.LogStep("setting up project", map[string]any{"project_id": id})
+func (rl *RunLog) LogStep(label string, details map[string]any) {
+	rl.t.Helper()
+	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
+	rl.writef("[%s] %s\n", ts, label)
+	rl.t.Log(label)
+	rl.dbEvent("log", label, details)
+}
+
+// AssertionStep records a test assertion with structured expected/actual values.
+// The label describes the comparison (e.g. "response status == 404").
+// Details include expected, actual, and optional extra fields.
+// The TUI renders these in a dedicated comparison layout.
+// Example:
+//
+//	rl.AssertionStep("status == 404", 404, resp.StatusCode, nil)
+func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[string]any) {
+	rl.t.Helper()
+	details := map[string]any{
+		"expected": expected,
+		"actual":   actual,
+	}
+	for k, v := range extra {
+		details[k] = v
+	}
+	rl.t.Log(label)
+	rl.dbEvent("assertion", label, details)
+}
+
 // CLI writes a CLI invocation header and its full output to the log file.
 // It does NOT call t.Log for the output (to avoid noise); only the header is
 // passed to t.Log.

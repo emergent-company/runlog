@@ -70,6 +70,16 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+		} else if data.Kind == "log" && isJSON(data.Details) {
+			templ_7745c5c3_Err = renderLogDetail(data.Details).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if data.Kind == "assertion" && isJSON(data.Details) {
+			templ_7745c5c3_Err = renderAssertionDetail(data.Details).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		} else if len(data.Children) > 0 {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"text-sm\"><table class=\"table table-xs w-full\" data-testid=\"")
 			if templ_7745c5c3_Err != nil {
@@ -78,7 +88,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("child-table-%d", data.EventID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 23, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 27, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -96,7 +106,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(c.Kind)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 38, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 42, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -109,7 +119,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(c.Message)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 39, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 43, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -122,7 +132,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmtElapsed(c.ElapsedS))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 40, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 44, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -184,7 +194,7 @@ func renderGanttChart(eventID int64, details string) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(details)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 57, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 61, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -235,7 +245,7 @@ func renderedDetails(details string) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(formatJSON(details))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 111, Col: 132}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 115, Col: 132}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -253,7 +263,7 @@ func renderedDetails(details string) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(details)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 114, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 118, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -361,6 +371,70 @@ func formatJSON(s string) string {
 		return s
 	}
 	return string(formatted)
+}
+
+func renderLogDetail(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return &_renderLogDetail{details: details}
+}
+
+type _renderLogDetail struct {
+	details map[string]any
+}
+
+func (r *_renderLogDetail) Render(ctx context.Context, w io.Writer) error {
+	_, err := fmt.Fprintf(w, `<div class="text-sm space-y-1">`)
+	if err != nil {
+		return err
+	}
+	for k, v := range r.details {
+		val := fmt.Sprintf("%v", v)
+		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
+			html.EscapeString(k), html.EscapeString(val))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprint(w, `</div>`)
+	return err
+}
+
+func renderAssertionDetail(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return &_renderAssertionDetail{details: details}
+}
+
+type _renderAssertionDetail struct {
+	details map[string]any
+}
+
+func (r *_renderAssertionDetail) Render(ctx context.Context, w io.Writer) error {
+	expected := fmt.Sprintf("%v", r.details["expected"])
+	actual := fmt.Sprintf("%v", r.details["actual"])
+	matchClass := "badge-success"
+	matchTxt := "MATCH"
+	if expected != actual {
+		matchClass = "badge-error"
+		matchTxt = "MISMATCH"
+	}
+	_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm %s">%s</span></div><div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">expected</span><span class="font-mono text-xs break-all">%s</span></div><div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">actual</span><span class="font-mono text-xs break-all">%s</span></div>`,
+		matchClass, matchTxt, html.EscapeString(expected), html.EscapeString(actual))
+	if err != nil {
+		return err
+	}
+	for k, v := range r.details {
+		if k == "expected" || k == "actual" {
+			continue
+		}
+		val := fmt.Sprintf("%v", v)
+		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
+			html.EscapeString(k), html.EscapeString(val))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprint(w, `</div>`)
+	return err
 }
 
 var _ = templruntime.GeneratedTemplate
