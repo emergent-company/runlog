@@ -24,7 +24,7 @@ func (app *WebApp) handleDashboard(c echo.Context) error {
 		return fmt.Errorf("list runs: %w", err)
 	}
 
-	passCount, failCount, skipCount := 0, 0, 0
+	passCount, failCount, skipCount, timeoutCount := 0, 0, 0, 0
 	for _, r := range allRuns {
 		if r.FinishedAt == nil {
 			continue
@@ -33,10 +33,14 @@ func (app *WebApp) handleDashboard(c echo.Context) error {
 			skipCount++
 		} else if r.Passed != nil && *r.Passed {
 			passCount++
+		} else if r.Reason != nil && *r.Reason == "timed out" {
+			timeoutCount++
 		} else {
 			failCount++
 		}
 	}
+	// Count timed-out runs as failures in the dashboard summary
+	failCount += timeoutCount
 
 	names, _ := app.db.DiscoverTests()
 	allTestNames := make(map[string]bool)
@@ -133,12 +137,12 @@ func (app *WebApp) handleTests(c echo.Context) error {
 	// Uses idx_test_runs_name_started composite index for GROUP BY.
 	rows, err := rawDB.Query(`
 		SELECT t.test_name, t.run_count, t.last_started,
-		       t.passed, t.skipped
+		       t.passed, t.skipped, t.reason
 		FROM (
 			SELECT test_name,
 			       COUNT(*)       OVER (PARTITION BY test_name) AS run_count,
 			       MAX(started_at) OVER (PARTITION BY test_name) AS last_started,
-			       passed, skipped,
+			       passed, skipped, reason,
 			       ROW_NUMBER()   OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
 			FROM test_runs
 		) t
@@ -162,7 +166,8 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		var runCount int
 		var lastStarted string
 		var passed, skipped sql.NullInt64
-		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped); err != nil {
+		var reason sql.NullString
+		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped, &reason); err != nil {
 			continue
 		}
 		agg = append(agg, aggRow{Name: name, RunCount: runCount, LastStarted: lastStarted})
@@ -173,6 +178,8 @@ func (app *WebApp) handleTests(c echo.Context) error {
 			statusMap[name] = "skip"
 		case passed.Int64 == 1:
 			statusMap[name] = "pass"
+		case reason.Valid && reason.String == "timed out":
+			statusMap[name] = "timeout"
 		default:
 			statusMap[name] = "fail"
 		}

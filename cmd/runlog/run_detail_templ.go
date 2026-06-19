@@ -1120,6 +1120,10 @@ func eventKindIntent(kind string) string {
 		return "info"
 	case "log":
 		return "info"
+	case "assertion":
+		return "pass"
+	case "http_call":
+		return "info"
 	case "failure":
 		return "fail"
 	case "skip":
