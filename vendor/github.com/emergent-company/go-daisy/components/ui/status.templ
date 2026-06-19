@@ -1,0 +1,43 @@
+package ui
+
+import (
+	"strings"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StatusColor controls the color of a status dot.
+type StatusColor string
+
+const (
+	StatusSuccess   StatusColor = "status-success"
+	StatusError     StatusColor = "status-error"
+	StatusWarning   StatusColor = "status-warning"
+	StatusInfo      StatusColor = "status-info"
+	StatusNeutral   StatusColor = "status-neutral"
+	StatusPrimary   StatusColor = "status-primary"
+	StatusSecondary StatusColor = "status-secondary"
+	StatusAccent    StatusColor = "status-accent"
+)
+
+// StatusColorForLog maps a log type string to a StatusColor via substring matching.
+// Exported so callers can perform the mapping without depending on the component internals.
+func StatusColorForLog(logType string) StatusColor {
+	lower := strings.ToLower(logType)
+	switch {
+	case strings.Contains(lower, "error") || strings.Contains(lower, "fail"):
+		return StatusError
+	case strings.Contains(lower, "success") || strings.Contains(lower, "complete"):
+		return StatusSuccess
+	case strings.Contains(lower, "pending") || strings.Contains(lower, "start"):
+		return StatusWarning
+	default:
+		return StatusNeutral
+	}
+}
+
+// StatusDot renders a small colored DaisyUI status indicator dot.
+// Set animate=true to pulse the dot (e.g. for "in progress" states).
+templ StatusDot(color StatusColor, animate bool) {
+	<span class={ "status", string(color), templ.KV("animate-ping", animate) } { devmode.Attrs(ctx, "ui/StatusDot")... }></span>
+}

@@ -2,6 +2,8 @@
 
 Terminal-native test observability for Go projects. Structured logging, SQLite-backed run history, interactive TUI, Gantt charts, and LLM-powered analysis.
 
+📖 **[Writing Tests Guide](GUIDE.md)** — full API reference, patterns, and examples.
+
 ## Features
 
 - **Structured test logging** — `RunLog` provides sections, groups, key-value pairs, and Gantt chart timing for Go tests
@@ -58,6 +60,39 @@ func TestUserCreation(t *testing.T) {
     rl.Printf("Email verified: true")
 }
 ```
+
+## Version Tracking
+
+### Test Version (auto)
+
+Every test file gets a unique version identifier — the **SHA-256 hash** of the test file — recorded automatically at test start. This catches local edits that aren't committed to git. The git commit hash of the last change to the file is also included in the event details when available.
+
+```go
+// Auto-detected in NewRunLog:
+//   test_version: <SHA256> + event with {"sha256":..., "git_commit":...}
+```
+
+Override the auto-detected version:
+```go
+rl.SetTestVersion("my-custom-label")
+```
+
+### App Version (manual)
+
+Record which version of the application-under-test was used. Test writer decides when and what to record.
+
+```go
+// Directly on RunLog:
+rl := runlog.NewRunLog(t)
+rl.SetAppVersion("v2.1.0")
+
+// Or via TestContext:
+tc := runlog.NewTest(t, runlog.TestOpts{
+    AppVersion: "v2.1.0",
+})
+```
+
+Both values appear in the TUI run inspector panel and are persisted to the SQLite database for filtering and historical queries.
 
 ### Browse results in the TUI
 

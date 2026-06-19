@@ -1,0 +1,64 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// MockupCode renders a terminal-style code mockup container.
+templ MockupCode() {
+	<div class="mockup-code" { devmode.Attrs(ctx, "ui/MockupCode")... }>
+		{ children... }
+	</div>
+}
+
+// MockupCodeLine renders a single line with a prefix inside MockupCode.
+// colorClass: "" for default, "text-success", "text-error", "text-warning" etc.
+templ MockupCodeLine(prefix string, colorClass string) {
+	<pre
+		if prefix != "" {
+			data-prefix={ prefix }
+		}
+		class={ colorClass }
+		{ devmode.Attrs(ctx, "ui/MockupCodeLine")... }
+	><code>{ children... }</code></pre>
+}
+
+// MockupBrowser renders a browser window mockup.
+templ MockupBrowser(url string) {
+	<div class="mockup-browser border border-base-300" { devmode.Attrs(ctx, "ui/MockupBrowser")... }>
+		<div class="mockup-browser-toolbar">
+			<div class="input">{ url }</div>
+		</div>
+		{ children... }
+	</div>
+}
+
+// MockupBrowserPlaceholder renders placeholder content for the MockupBrowser gallery example.
+templ MockupBrowserPlaceholder() {
+	<div class="flex justify-center px-4 py-8 border-t border-base-300 bg-base-200 text-sm text-base-content/50" { devmode.Attrs(ctx, "ui/MockupBrowserPlaceholder")... }>Page content here</div>
+}
+
+// MockupPhone renders a phone frame mockup.
+templ MockupPhone() {
+	<div class="mockup-phone" { devmode.Attrs(ctx, "ui/MockupPhone")... }>
+		<div class="mockup-phone-camera"></div>
+		<div class="mockup-phone-display">
+			{ children... }
+		</div>
+	</div>
+}
+
+// MockupPhonePlaceholder renders placeholder content for the MockupPhone gallery example.
+templ MockupPhonePlaceholder() {
+	<div class="artboard artboard-demo phone-1 bg-base-200 flex items-center justify-center text-sm text-base-content/50" { devmode.Attrs(ctx, "ui/MockupPhonePlaceholder")... }>App screen</div>
+}
+
+// MockupWindow renders a desktop window frame mockup.
+templ MockupWindow() {
+	<div class="mockup-window border border-base-300" { devmode.Attrs(ctx, "ui/MockupWindow")... }>
+		{ children... }
+	</div>
+}
+
+// MockupWindowPlaceholder renders placeholder content for the MockupWindow gallery example.
+templ MockupWindowPlaceholder() {
+	<div class="flex justify-center px-4 py-8 border-t border-base-300 bg-base-200 text-sm text-base-content/50" { devmode.Attrs(ctx, "ui/MockupWindowPlaceholder")... }>Window content here</div>
+}

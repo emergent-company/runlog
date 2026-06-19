@@ -1,0 +1,155 @@
+package ui
+
+import (
+	"strings"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// AvatarSize maps to a DaisyUI avatar size modifier.
+type AvatarSize string
+
+const (
+	AvatarXS AvatarSize = "avatar-xs"
+	AvatarSM AvatarSize = "avatar-sm"
+	AvatarMD AvatarSize = "avatar-md"
+	AvatarLG AvatarSize = "avatar-lg"
+)
+
+// avatarSizeClass maps an AvatarSize to a Tailwind size-* utility for the inner div.
+// DaisyUI v5 does not ship avatar-xs/sm/md/lg CSS rules; sizing must be explicit.
+func avatarSizeClass(size AvatarSize) string {
+	switch size {
+	case AvatarXS:
+		return "size-6"
+	case AvatarSM:
+		return "size-8"
+	case AvatarLG:
+		return "size-14"
+	default: // AvatarMD and zero-value
+		return "size-10"
+	}
+}
+
+// avatarInitials returns up to 2 uppercase initials from a name string.
+func avatarInitials(name string) string {
+	parts := strings.Fields(name)
+	if len(parts) == 0 {
+		return "?"
+	}
+	if len(parts) == 1 {
+		if len(parts[0]) == 0 {
+			return "?"
+		}
+		return strings.ToUpper(string(parts[0][0]))
+	}
+	return strings.ToUpper(string(parts[0][0])) + strings.ToUpper(string(parts[len(parts)-1][0]))
+}
+
+// Avatar renders a circular avatar.
+// Priority: src (image) > icon (icon placeholder) > name initials.
+// Set icon to a Lucide icon suffix, e.g. "lucide--building-2" for a company avatar.
+// attrs is optional; pass nil when not needed.
+templ Avatar(name string, src string, icon string, size AvatarSize, attrs templ.Attributes) {
+	{{ sc := avatarSizeClass(size) }}
+	<div class="avatar" { devmode.Attrs(ctx, "ui/Avatar")... } { attrs... }>
+		if src != "" {
+			<div class={ sc + " rounded-full overflow-hidden" }>
+				<img src={ src } alt={ name } class="object-cover w-full h-full"/>
+			</div>
+		} else if icon != "" {
+			<div class={ sc + " avatar-placeholder rounded-full bg-base-300 flex items-center justify-center text-base-content/60" }>
+				<span class={ "iconify size-[55%] " + icon }></span>
+			</div>
+		} else {
+			<div class={ sc + " avatar-placeholder rounded-full bg-primary flex items-center justify-center font-semibold text-primary-content" }>
+				{ avatarInitials(name) }
+			</div>
+		}
+	</div>
+}
+
+// PlaceholderAvatar is a backwards-compatible alias for Avatar with an icon.
+// Deprecated: use Avatar("", "", icon, size, nil) directly.
+templ PlaceholderAvatar(icon string, size AvatarSize) {
+	@Avatar("", "", icon, size, nil)
+}
+
+// PersonChipContact holds optional contact details shown in the PersonChip hover card.
+type PersonChipContact struct {
+	Email string
+	Role  string
+	// BadgeLabel is the text shown in the status badge (e.g. "Active", "On leave").
+	BadgeLabel string
+	// BadgeClass is the DaisyUI badge modifier classes (e.g. "badge-success badge-soft").
+	BadgeClass string
+	// ProfileHref is the optional "View profile" link URL.
+	ProfileHref string
+}
+
+// PersonChip renders an inline avatar+name chip with a CSS-only hover card revealing contact details.
+// avatarColor: a Tailwind bg-* class for the initials avatar (e.g. "bg-primary").
+// textColor: a Tailwind text-* class for the initials contrast (e.g. "text-primary-content").
+// gradientFrom/To: Tailwind from-*/to-* classes for the card header gradient (e.g. "from-primary/20 to-primary/5").
+templ PersonChip(name string, avatarColor string, textColor string, gradientFrom string, gradientTo string, contact PersonChipContact) {
+	<style>
+		.person-chip .person-card {
+			opacity: 0;
+			pointer-events: none;
+			transform: translateY(4px) scale(0.98);
+			transition: opacity 120ms ease, transform 120ms ease;
+		}
+		.person-chip .person-card::before {
+			content: '';
+			display: block;
+			position: absolute;
+			top: -8px;
+			left: 0;
+			right: 0;
+			height: 8px;
+		}
+		.person-chip:hover .person-card,
+		.person-chip:focus-within .person-card {
+			opacity: 1;
+			pointer-events: auto;
+			transform: translateY(0) scale(1);
+		}
+	</style>
+	<div class="relative person-chip inline-flex items-center gap-1.5 rounded-full px-2 py-1 cursor-default select-none hover:bg-base-200 transition-colors" { devmode.Attrs(ctx, "ui/PersonChip")... }>
+		<div class={ "size-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0", avatarColor, textColor }>{ avatarInitials(name) }</div>
+		<span class="text-sm font-medium text-base-content leading-none">{ name }</span>
+		<div class="person-card absolute left-[-8px] top-full z-50 w-64 rounded-2xl border border-base-200 bg-base-100 shadow-xl overflow-hidden">
+			<div class={ "h-10 bg-gradient-to-r", gradientFrom, gradientTo }></div>
+			<div class="px-4 pb-3 -mt-5 flex items-end gap-3">
+				<div class={ "size-10 rounded-full flex items-center justify-center text-sm font-bold ring-2 ring-base-100 shrink-0", avatarColor, textColor }>{ avatarInitials(name) }</div>
+				<div class="pb-0.5 min-w-0">
+					<p class="text-sm font-semibold text-base-content leading-tight truncate">{ name }</p>
+					if contact.Role != "" {
+						<p class="text-xs text-base-content/50 leading-tight">{ contact.Role }</p>
+					}
+				</div>
+			</div>
+			<div class="px-4 pb-4 space-y-2">
+				if contact.Email != "" {
+					<div class="flex items-center gap-2 text-xs text-base-content/60">
+						<svg class="size-3.5 shrink-0 text-base-content/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+						<span class="truncate">{ contact.Email }</span>
+					</div>
+				}
+				if contact.BadgeLabel != "" || contact.ProfileHref != "" {
+					<div class="flex items-center justify-between pt-1">
+						if contact.BadgeLabel != "" {
+							<span class={ "badge badge-sm", contact.BadgeClass }>{ contact.BadgeLabel }</span>
+						}
+						if contact.ProfileHref != "" {
+							<a href={ templ.URL(contact.ProfileHref) } class="btn btn-xs btn-ghost text-primary gap-1 px-2">
+								View profile
+								<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+							</a>
+						}
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}

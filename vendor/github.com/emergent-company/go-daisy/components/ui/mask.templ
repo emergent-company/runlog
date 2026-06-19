@@ -1,0 +1,30 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// MaskShape controls the CSS mask shape applied to an element.
+type MaskShape string
+
+const (
+	MaskSquircle MaskShape = "mask-squircle"
+	MaskHeart    MaskShape = "mask-heart"
+	MaskHexagon  MaskShape = "mask-hexagon"
+	MaskTriangle MaskShape = "mask-triangle"
+	MaskCircle   MaskShape = "mask-circle"
+	MaskStar     MaskShape = "mask-star"
+	MaskStar2    MaskShape = "mask-star-2"
+	MaskPentagon MaskShape = "mask-pentagon"
+	MaskDiamond  MaskShape = "mask-diamond"
+)
+
+// Mask applies a CSS mask shape to its child content.
+templ Mask(shape MaskShape) {
+	<div class={ "mask", string(shape) } { devmode.Attrs(ctx, "ui/Mask")... }>
+		{ children... }
+	</div>
+}
+
+// MaskSwatch renders a 16×16 colored square with a centered label, suitable for use inside Mask.
+templ MaskSwatch(label string, colorClasses string) {
+	<div class={ "w-16", "h-16", "flex", "items-center", "justify-center", "font-bold", "text-lg", colorClasses } { devmode.Attrs(ctx, "ui/MaskSwatch")... }>{ label }</div>
+}

@@ -1,0 +1,110 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// BadgeIntent maps a semantic intent to a DaisyUI badge class.
+type BadgeIntent string
+
+const (
+	BadgeSuccess   BadgeIntent = "badge-success"
+	BadgeError     BadgeIntent = "badge-error"
+	BadgeWarning   BadgeIntent = "badge-warning"
+	BadgeInfo      BadgeIntent = "badge-info"
+	BadgeNeutral   BadgeIntent = "badge-neutral"
+	BadgeGhost     BadgeIntent = "badge-ghost"
+	BadgePrimary   BadgeIntent = "badge-primary"
+	BadgeSecondary BadgeIntent = "badge-secondary"
+	BadgeAccent    BadgeIntent = "badge-accent"
+)
+
+// BadgeStyle controls the visual style variant of a badge.
+type BadgeStyle string
+
+const (
+	BadgeStyleDefault BadgeStyle = ""
+	BadgeStyleOutline BadgeStyle = "badge-outline"
+	BadgeStyleSoft    BadgeStyle = "badge-soft"
+	BadgeStyleDash    BadgeStyle = "badge-dash"
+)
+
+// BadgeSize controls the size of a badge.
+type BadgeSize string
+
+const (
+	BadgeSizeSM BadgeSize = "badge-sm"
+	BadgeSizeMD BadgeSize = "badge-md"
+	BadgeSizeLG BadgeSize = "badge-lg"
+)
+
+// BadgeProps configures a Badge component.
+type BadgeProps struct {
+	Label    string
+	Variant  BadgeIntent
+	Style    BadgeStyle
+	Size     BadgeSize
+	Icon     string           // Lucide icon suffix, e.g. "lucide--circle-check"
+	Dot      bool             // when true, renders a status dot prefix (uses Variant to colour it)
+	Animate  bool             // when true, adds animate-pulse to the icon/dot span
+	MaxWidth string           // optional Tailwind max-width class (e.g. "max-w-24"); enables truncation with ellipsis
+	Attrs    templ.Attributes // optional extra HTML attributes, e.g. {"data-testid": "status-badge"}
+}
+
+// StatusIntentFor maps a status string to a BadgeIntent.
+// Exported so callers (e.g. gallery seed) can use the same mapping.
+func StatusIntentFor(status string) BadgeIntent {
+	switch status {
+	case "active", "open", "completed", "approved":
+		return BadgeSuccess
+	case "closed", "rejected", "cancelled", "deleted":
+		return BadgeError
+	case "pending", "in_progress", "review":
+		return BadgeWarning
+	case "draft":
+		return BadgeGhost
+	default:
+		return BadgeNeutral
+	}
+}
+
+// Badge renders a DaisyUI badge.
+// Set Dot=true to show a coloured status dot prefix (colour matches Variant).
+// Set Icon to show a Lucide icon prefix instead of (or in addition to) a dot.
+// Set MaxWidth to a Tailwind max-width class (e.g. "max-w-24") to enable label truncation.
+templ Badge(props BadgeProps) {
+	<span class={ "badge gap-1", string(props.Variant), string(props.Style), string(props.Size), templ.KV("overflow-hidden", props.MaxWidth != ""), props.MaxWidth } { devmode.Attrs(ctx, "ui/Badge")... } { props.Attrs... }>
+		if props.Dot {
+			<span class={ templ.KV("animate-pulse", props.Animate), dotClass(props.Variant) }></span>
+		} else if props.Icon != "" {
+			<span class={ "iconify size-3 shrink-0", props.Icon, templ.KV("animate-pulse", props.Animate) }></span>
+		}
+		<span class={ templ.KV("truncate", props.MaxWidth != "") }>{ props.Label }</span>
+	</span>
+}
+
+// dotClass maps a BadgeIntent to its corresponding DaisyUI status-dot class.
+func dotClass(intent BadgeIntent) string {
+	switch intent {
+	case BadgeSuccess:
+		return "status status-success status-xs"
+	case BadgeError:
+		return "status status-error status-xs"
+	case BadgeWarning:
+		return "status status-warning status-xs"
+	case BadgeInfo:
+		return "status status-info status-xs"
+	case BadgePrimary:
+		return "status status-primary status-xs"
+	case BadgeSecondary:
+		return "status status-secondary status-xs"
+	case BadgeAccent:
+		return "status status-accent status-xs"
+	default:
+		return "status status-neutral status-xs"
+	}
+}
+
+// StatusBadge maps a string status value to an appropriately coloured Badge.
+// Kept as a convenience wrapper for callers that receive raw status strings.
+templ StatusBadge(status string) {
+	@Badge(BadgeProps{Label: status, Variant: StatusIntentFor(status), Size: BadgeSizeSM})
+}

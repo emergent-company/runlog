@@ -1,0 +1,89 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/emergent-company/go-daisy/components/table"
+)
+
+type eventKindDoc struct {
+	Kind        string
+	Description string
+	Usage       string
+	IsMeta      bool
+}
+
+var eventKinds = []eventKindDoc{
+	{Kind: "section", Description: "Logical grouping of child events. Children rendered as expandable sub-table on click.", Usage: "db.InsertGroupEvent, db.AppendGroupChildren", IsMeta: false},
+	{Kind: "cli", Description: "Command-line invocation output (e.g. go build, go vet). Grouped under sections.", Usage: "db.InsertEvent with kind \"cli\"", IsMeta: false},
+	{Kind: "log", Description: "Free-form log messages from the test run (stdout lines, progress, notices).", Usage: "db.InsertEvent with kind \"log\"", IsMeta: false},
+	{Kind: "failure", Description: "Test assertion failure with structured details (expected, actual, file, line).", Usage: "db.InsertEvent with kind \"failure\" and details map", IsMeta: false},
+	{Kind: "skip", Description: "Test was skipped (e.g. t.Skip). Reason stored in message field.", Usage: "db.InsertEvent with kind \"skip\"", IsMeta: false},
+	{Kind: "gantt", Description: "Agent/step timeline as a gantt chart. Details contain total_s and rows array.", Usage: "db.InsertEvent with kind \"gantt\" and details map", IsMeta: false},
+	{Kind: "http_call", Description: "HTTP request/response recorded during test execution. Details contain method, url, status_code, headers, and response_body.", Usage: "POST /runs/:id/events with kind \"http_call\" and details map", IsMeta: false},
+	{Kind: "artifact", Description: "Test artifact (screenshot, trace file) for visual inspection. Details contain type, url, and mime.", Usage: "POST /runs/:id/events with kind \"artifact\" and details map", IsMeta: false},
+	{Kind: "gantt_row", Description: "Individual row within a gantt chart (agent_name, start_s, end_s, duration_ms).", Usage: "Emitted as child of a gantt event", IsMeta: false},
+	{Kind: "trace_span", Description: "Distributed tracing span (trace_id, span_id, duration_ms, service).", Usage: "db.InsertEvent with kind \"trace_span\" and details map", IsMeta: false},
+	{Kind: "skill", Description: "Skill/tool call recorded during test execution.", Usage: "db.InsertEvent with kind \"skill\"", IsMeta: false},
+	{Kind: "credentials", Description: "Credential usage record during test execution.", Usage: "db.InsertEvent with kind \"credentials\"", IsMeta: false},
+	{Kind: "group", Description: "Grouping container used internally for section child events.", Usage: "db.InsertGroupEvent (used internally)", IsMeta: false},
+	{Kind: "state_change", Description: "Run state transitions (test started, test finished). Reflected in run metadata badges.", Usage: "db.InsertEvent with kind \"state_change\"", IsMeta: true},
+	{Kind: "tag", Description: "Run-level tags (e.g. variant:baseline, coverage:67%). Shown in run metadata section and run history tags column.", Usage: "db.InsertEvent with kind \"tag\" and details {\"tags\": [...]}", IsMeta: true},
+	{Kind: "token_usage", Description: "Per-call LLM token usage (input_tokens, output_tokens, cost_usd). Aggregated into run totals.", Usage: "db.InsertEvent with kind \"token_usage\" and details map", IsMeta: true},
+	{Kind: "token_summary", Description: "Aggregated token summary across all LLM calls with per-agent breakdown.", Usage: "db.InsertEvent with kind \"token_summary\" and details map", IsMeta: true},
+	{Kind: "metric", Description: "Performance/quality metrics (timings, scores, counts). Reflected in run stats.", Usage: "db.InsertEvent with kind \"metric\" and details map", IsMeta: true},
+}
+
+templ EventsReferencePage() {
+	@AppPage(fmt.Sprintf("Runlog - %s - Events Reference", appName()), sidebarGroups) {
+		<div data-testid="events-reference-page">
+			<h1 class="text-2xl font-bold mb-6">Events Reference</h1>
+			<p class="text-base-content/60 mb-6">All supported event kinds emitted by runlog tests. Meta events are hidden from the timeline by default and shown via the debug toggle.</p>
+			@eventsReferenceTable()
+			<div class="mt-8 text-sm text-base-content/50">
+				<p><strong>Meta events</strong> are hidden from the run timeline by default. Toggle the Debug switch on any run detail page to see them interleaved at their correct sequence position with muted styling.</p>
+			</div>
+		</div>
+	}
+}
+
+templ EventsReferenceContent() {
+	<div data-testid="events-reference-content">
+		<h1 class="text-2xl font-bold mb-6">Events Reference</h1>
+		<p class="text-base-content/60 mb-6">All supported event kinds emitted by runlog tests. Meta events are hidden from the timeline by default and shown via the debug toggle.</p>
+		@eventsReferenceTable()
+		<div class="mt-8 text-sm text-base-content/50">
+			<p><strong>Meta events</strong> are hidden from the run timeline by default. Toggle the Debug switch on any run detail page to see them interleaved at their correct sequence position with muted styling.</p>
+		</div>
+	</div>
+}
+
+templ eventsReferenceTable() {
+	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+		@table.TableHead() {
+			@table.TableHeadRow() {
+				@table.TableHeadCell("Kind")
+				@table.TableHeadCell("Description")
+				@table.TableHeadCell("Usage")
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Meta</th> <!-- lint:allow-raw -->
+			}
+		}
+		@table.TableBody() {
+			for _, ek := range eventKinds {
+				<tr class="hover hover:bg-base-200 transition-colors">
+					<!-- lint:allow-raw -->
+					<td class="font-mono text-sm font-semibold">{ ek.Kind }</td>
+					<td class="text-sm">{ ek.Description }</td>
+					<td class="text-xs font-mono text-base-content/60">{ ek.Usage }</td>
+					<td class="text-center">
+						if ek.IsMeta {
+							<span class="badge badge-ghost badge-xs">yes</span>
+						} else {
+							<span class="text-base-content/30">—</span>
+						}
+					</td>
+				</tr>
+			}
+		}
+	}
+}

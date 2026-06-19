@@ -1,0 +1,18 @@
+package form
+
+import "strconv"
+
+// RangeInput renders a DaisyUI range slider.
+templ RangeInput(name string, label string, value int, min int, max int, step int, color string) {
+	@Field(label, name, "") {
+		<input
+			type="range"
+			name={ name }
+			min={ strconv.Itoa(min) }
+			max={ strconv.Itoa(max) }
+			value={ strconv.Itoa(value) }
+			step={ strconv.Itoa(step) }
+			class={ "range", color }
+		/>
+	}
+}

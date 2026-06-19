@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -110,7 +111,7 @@ var (
 
 // cmdRuns prints a table of recent runs to stdout.
 func cmdRuns(db *runlog.RunDB, since time.Duration) error {
-	rows, err := db.ListRuns(time.Now().Add(-since))
+	rows, err := db.ListRuns(time.Now().Add(-since), 0)
 	if err != nil {
 		return err
 	}
@@ -163,6 +164,7 @@ func cmdRuns(db *runlog.RunDB, since time.Duration) error {
 				r.ID, status, runner, env, age, dur, r.EventCount, r.TestName)
 		}
 	}
+	printRunSummary(rows)
 	return nil
 }
 
@@ -192,7 +194,7 @@ func cmdEvents(db *runlog.RunDB, runID int64) error {
 // including pretty-printed details JSON.
 func cmdShow(db *runlog.RunDB, runID int64) error {
 	// Fetch the run row via ListRuns with a wide enough window.
-	rows, err := db.ListRuns(time.Time{})
+	rows, err := db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return err
 	}
@@ -298,7 +300,7 @@ func cmdTail(db *runlog.RunDB, since time.Duration) error {
 	lastSeen := time.Now().Add(-since)
 	fmt.Printf("tailing events since %s (Ctrl+C to stop)…\n", lastSeen.Format("15:04:05"))
 	for {
-		rows, err := db.ListRuns(lastSeen)
+		rows, err := db.ListRuns(lastSeen, 0)
 		if err != nil {
 			return err
 		}
@@ -445,7 +447,7 @@ func cmdStats(db *runlog.RunDB, since time.Duration) error {
 // cmdTestsList prints a plain-text table of all known tests with their last
 // run status and age, discovered from the database and optional config.
 func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
-	rows, err := db.ListRuns(time.Now().Add(-since))
+	rows, err := db.ListRuns(time.Now().Add(-since), 0)
 	if err != nil {
 		return err
 	}
@@ -506,7 +508,7 @@ func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
 
 // cmdTestRuns prints all recent runs for a specific test name.
 func cmdTestRuns(db *runlog.RunDB, testName string, since time.Duration) error {
-	rows, err := db.ListRuns(time.Now().Add(-since))
+	rows, err := db.ListRuns(time.Now().Add(-since), 0)
 	if err != nil {
 		return err
 	}
@@ -520,15 +522,37 @@ func cmdTestRuns(db *runlog.RunDB, testName string, since time.Duration) error {
 		fmt.Printf("no runs found for %q in the last %s\n", testName, since)
 		return nil
 	}
+	hasCost := false
+	for _, r := range matching {
+		if r.CostUSD != nil && *r.CostUSD > 0 {
+			hasCost = true
+			break
+		}
+	}
 	fmt.Printf("runs for: %s\n", testName)
 	fmt.Println(strings.Repeat("─", 80))
-	fmt.Printf("%-6s  %-8s  %-8s  %-8s  %-7s\n", "ID", "STATUS", "AGE", "DURATION", "EVENTS")
+	if hasCost {
+		fmt.Printf("%-6s  %-8s  %-8s  %-8s  %-7s  %s\n", "ID", "STATUS", "AGE", "DURATION", "EVENTS", "COST")
+	} else {
+		fmt.Printf("%-6s  %-8s  %-8s  %-8s  %-7s\n", "ID", "STATUS", "AGE", "DURATION", "EVENTS")
+	}
 	fmt.Println(strings.Repeat("─", 80))
 	for _, r := range matching {
-		fmt.Printf("%-6d  %-8s  %-8s  %-8s  %-7d\n",
-			r.ID, passLabel(r), formatAgePlain(r.StartedAt),
-			formatDurationPlain(r.StartedAt, r.FinishedAt), r.EventCount)
+		if hasCost {
+			costStr := "—"
+			if r.CostUSD != nil && *r.CostUSD > 0 {
+				costStr = fmt.Sprintf("$%.6f", *r.CostUSD)
+			}
+			fmt.Printf("%-6d  %-8s  %-8s  %-8s  %-7d  %s\n",
+				r.ID, passLabel(r), formatAgePlain(r.StartedAt),
+				formatDurationPlain(r.StartedAt, r.FinishedAt), r.EventCount, costStr)
+		} else {
+			fmt.Printf("%-6d  %-8s  %-8s  %-8s  %-7d\n",
+				r.ID, passLabel(r), formatAgePlain(r.StartedAt),
+				formatDurationPlain(r.StartedAt, r.FinishedAt), r.EventCount)
+		}
 	}
+	printRunSummary(matching)
 	return nil
 }
 
@@ -607,7 +631,7 @@ func cmdClear(dbPath string) error {
 // When dryRun is true, it prints what would be reaped without changing anything.
 func cmdReap(db *runlog.RunDB, runID int64, dryRun bool) error {
 	// Collect candidate runs.
-	allRuns, err := db.ListRuns(time.Time{})
+	allRuns, err := db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return err
 	}
@@ -683,7 +707,7 @@ func cmdReap(db *runlog.RunDB, runID int64, dryRun bool) error {
 // TUI inspector panel shows, rendered via buildDetailLines.
 func cmdInspect(db *runlog.RunDB, runID int64) error {
 	// Resolve the run row.
-	rows, err := db.ListRuns(time.Time{})
+	rows, err := db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return err
 	}
@@ -2401,6 +2425,74 @@ func formatDurationPlain(start time.Time, end *time.Time) string {
 	return fmt.Sprintf("%dm%02ds", int(d.Minutes()), int(d.Seconds())%60)
 }
 
+// printRunSummary appends an aggregate footer after a run table.
+func printRunSummary(rows []runlog.RunRow) {
+	if len(rows) == 0 {
+		return
+	}
+	var passed, failed, skipped int
+	var totalDur time.Duration
+	durCount := 0
+	var totalCost float64
+	var totalIn, totalOut int64
+	hasCost := false
+	for _, r := range rows {
+		if r.Skipped {
+			skipped++
+		} else if r.Passed != nil {
+			if *r.Passed {
+				passed++
+			} else {
+				failed++
+			}
+		}
+		if r.FinishedAt != nil {
+			totalDur += r.FinishedAt.Sub(r.StartedAt)
+			durCount++
+		}
+		if r.CostUSD != nil && *r.CostUSD > 0 {
+			totalCost += *r.CostUSD
+			hasCost = true
+		}
+		if r.InputTokens != nil {
+			totalIn += *r.InputTokens
+		}
+		if r.OutputTokens != nil {
+			totalOut += *r.OutputTokens
+		}
+	}
+
+	fmt.Println(strings.Repeat("─", 60))
+	// counts line
+	countLine := fmt.Sprintf("  runs: %d  passed: %d  failed: %d", len(rows), passed, failed)
+	if skipped > 0 {
+		countLine += fmt.Sprintf("  skipped: %d", skipped)
+	}
+	fmt.Println(countLine)
+
+	// timing line
+	if durCount > 0 {
+		avg := totalDur / time.Duration(durCount)
+		fmtDur := func(d time.Duration) string {
+			if d < time.Minute {
+				return fmt.Sprintf("%.1fs", d.Seconds())
+			}
+			return fmt.Sprintf("%dm%02ds", int(d.Minutes()), int(d.Seconds())%60)
+		}
+		fmt.Printf("  total: %s  avg: %s\n", fmtDur(totalDur), fmtDur(avg))
+	}
+
+	// cost line
+	if hasCost {
+		costLine := fmt.Sprintf("  cost: $%.6f", totalCost)
+		if totalIn > 0 || totalOut > 0 {
+			costLine += fmt.Sprintf("  tokens: %s in / %s out",
+				formatTokenCount(totalIn), formatTokenCount(totalOut))
+		}
+		fmt.Println(costLine)
+	}
+}
+
 func formatDurationTUI(start time.Time, end *time.Time, frame int) string {
 	if end == nil {
 		spin := spinnerFrames[frame%len(spinnerFrames)]
@@ -3123,7 +3215,7 @@ func buildDetailLines(ev runlog.EventRow, child *runlog.ChildEvent, width int) [
 	add("kind", ev.Kind)
 	add("seq", fmt.Sprintf("%d", ev.Seq))
 	add("elapsed", fmt.Sprintf("%.3fs", ev.ElapsedS))
-	add("occurred_at", ev.OccurredAt.Format(time.RFC3339))
+	add("occurred_at", formatTime(ev.OccurredAt, TimeISO))
 	if ev.Message != "" {
 		add("message", ev.Message)
 	}
@@ -3766,7 +3858,7 @@ func (m model) loadActiveLauncher() tea.Cmd {
 func (m model) loadRuns() tea.Cmd {
 	return func() tea.Msg {
 		since := time.Now().Add(-m.since)
-		rows, err := m.db.ListRuns(since)
+		rows, err := m.db.ListRuns(since, 0)
 		if err != nil {
 			return errMsg{err}
 		}
@@ -4609,21 +4701,12 @@ func (m model) viewRunAnalysis() string {
 // On success it inserts a test_launchers row and sends testLaunchedMsg{pid};
 // on error it sends testLaunchErrMsg.
 func (m model) launchTest(testName string) tea.Cmd {
-	env := m.testEnv
 	db := m.db
 	cfg := m.config
 	return func() tea.Msg {
-		// Build the command from the config template.
-		// Supported placeholders: {name} → test function name, {env} → test env.
-		tmpl := cfg.TestCommandOrDefault()
-		expanded := strings.ReplaceAll(tmpl, "{name}", testName)
-		expanded = strings.ReplaceAll(expanded, "{env}", env)
-
-		// Split into command + args. Use shell execution via "sh -c" so that
-		// pipes, redirects, and complex commands work as expected.
+		expanded := cfg.BuildTestCommand(testName)
 		now := time.Now()
 		cmd := exec.Command("sh", "-c", expanded)
-		// Run in a new session so the child survives if the TUI is closed.
 		setSysProcAttr(cmd)
 		cmd.Stdout = nil
 		cmd.Stderr = nil
@@ -4632,13 +4715,10 @@ func (m model) launchTest(testName string) tea.Cmd {
 			return testLaunchErrMsg{err}
 		}
 		pid := cmd.Process.Pid
-		// Detach: let the child run on its own.
 		go func() { _ = cmd.Wait() }()
 
-		// Persist the launcher PID to the DB so it survives runlog restarts.
-		launcherID, err := db.InsertLauncher(testName, env, now, pid)
+		launcherID, err := db.InsertLauncher(testName, m.testEnv, now, pid)
 		if err != nil {
-			// Non-fatal: we still launched successfully, just without DB record.
 			launcherID = 0
 		}
 		return testLaunchedMsg{launcherID: launcherID, pid: pid}
@@ -5363,6 +5443,16 @@ func subFS(name, dbDefault, sinceDefault string) (fs *flag.FlagSet, dbOut, since
 }
 
 func main() {
+	// ── Internal daemon mode ───────────────────────────────────────────────
+	// When the daemon spawns itself via re-exec, it passes --daemon as the
+	// first argument.  Handle this before any other flag or subcommand logic.
+	if len(os.Args) > 1 && os.Args[1] == "--daemon" {
+		if err := runDaemonInternal(os.Args[2:]); err != nil {
+			log.Fatalf("runlog daemon: %v", err)
+		}
+		return
+	}
+
 	// Load .env (and optional .env.<MEMORY_TEST_ENV> overlay) from the
 	// current working directory so GOOGLE_AI_API_KEY and other env vars are
 	// available without requiring shell exports.
@@ -5540,6 +5630,11 @@ func main() {
 		dbPath = resolveDBPath(*globalDB)
 		since = parseSince(*globalSince, "")
 
+	case "daemon", "cleanup":
+		// daemon and cleanup communicate with the local daemon; do not need DB directly.
+		dbPath = resolveDBPath(*globalDB)
+		since = parseSince(*globalSince, "")
+
 	default:
 		// Unknown subcommand or help — handle below without DB.
 		dbPath = resolveDBPath(*globalDB)
@@ -5566,6 +5661,22 @@ func main() {
 	if subcommand == "test" {
 		if err := cmdTest(subArgs); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog test: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if subcommand == "daemon" {
+		if err := cmdDaemon(subArgs, dbPath); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog daemon: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if subcommand == "cleanup" {
+		if err := cmdCleanup(subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog cleanup: %v\n", err)
 			os.Exit(1)
 		}
 		return

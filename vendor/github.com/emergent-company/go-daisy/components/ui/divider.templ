@@ -1,0 +1,23 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// DividerColor controls the color of a divider.
+type DividerColor string
+
+const (
+	DividerDefault   DividerColor = ""
+	DividerPrimary   DividerColor = "divider-primary"
+	DividerSecondary DividerColor = "divider-secondary"
+	DividerNeutral   DividerColor = "divider-neutral"
+	DividerSuccess   DividerColor = "divider-success"
+	DividerWarning   DividerColor = "divider-warning"
+	DividerError     DividerColor = "divider-error"
+)
+
+// Divider renders a horizontal (or vertical) divider with optional label content.
+templ Divider(color DividerColor, vertical bool) {
+	<div class={ "divider", string(color), templ.KV("divider-horizontal", vertical) } { devmode.Attrs(ctx, "ui/Divider")... }>
+		{ children... }
+	</div>
+}

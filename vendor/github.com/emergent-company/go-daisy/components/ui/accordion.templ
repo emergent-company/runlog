@@ -1,0 +1,23 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// AccordionItem renders a single collapse/accordion item (checkbox-based).
+templ AccordionItem(title string, open bool) {
+	<div class="collapse collapse-arrow border border-base-200 bg-base-100" { devmode.Attrs(ctx, "ui/AccordionItem")... }>
+		<input type="checkbox" checked?={ open } />
+		<div class="collapse-title text-xl font-medium">
+			{ title }
+		</div>
+		<div class="collapse-content">
+			{ children... }
+		</div>
+	</div>
+}
+
+// Accordion wraps multiple AccordionItems in a vertical stack.
+templ Accordion() {
+	<div class="join join-vertical w-full" { devmode.Attrs(ctx, "ui/Accordion")... }>
+		{ children... }
+	</div>
+}

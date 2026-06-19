@@ -9,13 +9,16 @@
 package runlog
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -65,6 +68,12 @@ type RunLog struct {
 	tags []string
 	// Experiment name/id — auto-populated from the EXPERIMENT env var in NewRunLog.
 	experiment string
+	// App version — set by SetAppVersion (manual, test-writer responsibility).
+	appVersion string
+	// Test version — SHA256 of the test file, auto-detected in NewRunLog.
+	testVersion string
+	// Timeout duration set by SetTimeout.
+	timeoutSeconds float64
 
 	// Outcome reason tracking.
 	// skipReason is set by Skipf() before calling t.Skip().
@@ -93,10 +102,11 @@ func NewRunLog(t *testing.T) *RunLog {
 	t.Helper()
 	rl := &RunLog{t: t, StartedAt: time.Now()}
 
+	_, srcFile, _, _ := runtime.Caller(1) // test source file for version detection
+
 	logDir := os.Getenv("TEST_LOG_DIR")
 	if logDir == "" {
-		_, srcFile, _, ok := runtime.Caller(1)
-		if ok {
+		if srcFile != "" {
 			logDir = filepath.Join(filepath.Dir(srcFile), "logs")
 		} else if _, err := os.Stat("/test-logs"); err == nil {
 			logDir = "/test-logs"
@@ -134,7 +144,17 @@ func NewRunLog(t *testing.T) *RunLog {
 	if db, err := SharedDB(); err == nil && db != nil {
 		envName := os.Getenv("MEMORY_TEST_ENV")
 		envVars := captureEnvVars()
-		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars); err == nil {
+
+		// If RUNLOG_RUN_ID is set, use the existing row instead of creating a new one.
+		if ridStr := os.Getenv("RUNLOG_RUN_ID"); ridStr != "" {
+			if rid, err := strconv.ParseInt(ridStr, 10, 64); err == nil {
+				rl.db = db
+				rl.runID = rid
+				t.Logf("runlog: using existing run ID %d from RUNLOG_RUN_ID", rid)
+			} else {
+				t.Logf("warn: RunLog: invalid RUNLOG_RUN_ID %q: %v", ridStr, err)
+			}
+		} else if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars); err == nil {
 			rl.db = db
 			rl.runID = id
 		} else {
@@ -147,6 +167,30 @@ func NewRunLog(t *testing.T) *RunLog {
 	// Auto-populate experiment from the EXPERIMENT env var.
 	if exp := os.Getenv("EXPERIMENT"); exp != "" {
 		rl.SetExperiment(exp)
+	}
+
+	// Auto-detect test version from the test source file.
+	if srcFile != "" {
+		sha := FileSHA256(srcFile)
+		gitHash := GitCommitHash(srcFile)
+		testVer := sha
+		if testVer == "" {
+			testVer = gitHash
+		}
+		if testVer != "" {
+			details := map[string]any{"sha256": sha}
+			if gitHash != "" {
+				details["git_commit"] = gitHash
+			}
+			rl.testVersion = testVer
+			rl.writef("test_version: %s\n", testVer)
+			if rl.db != nil && rl.runID != 0 {
+				if err := rl.db.UpdateRunTestVersion(rl.runID, testVer); err != nil {
+					rl.t.Logf("warn: RunLog: DB UpdateRunTestVersion: %v", err)
+				}
+			}
+			rl.dbEvent("test_version", testVer, details)
+		}
 	}
 
 	return rl
@@ -341,6 +385,82 @@ func (rl *RunLog) SetExperiment(name string) {
 	}
 }
 
+// SetTimeout registers a per-test timeout duration.  The background timeout
+// worker will mark the run as timed out if it exceeds this duration.
+// Call this at the start of a test to prevent stuck runs.
+func (rl *RunLog) SetTimeout(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	sec := d.Seconds()
+	rl.mu.Lock()
+	rl.timeoutSeconds = sec
+	rl.mu.Unlock()
+
+	rl.writef("timeout: %.0fs\n", sec)
+
+	if rl.db != nil && rl.runID != 0 {
+		if err := rl.db.UpdateRunTimeout(rl.runID, sec); err != nil {
+			rl.t.Logf("warn: RunLog.SetTimeout: DB UpdateRunTimeout: %v", err)
+		}
+	}
+}
+
+// SetAppVersion records the version of the application-under-test.  Call this
+// at the start of a test to document which version of the app was tested.
+// It is stored in test_runs.app_version and emitted as an "app_version" event.
+//
+// Unlike SetTestVersion, this is always manual — the test writer decides what
+// version to record and when.
+func (rl *RunLog) SetAppVersion(version string) {
+	if version == "" {
+		return
+	}
+
+	rl.mu.Lock()
+	rl.appVersion = version
+	rl.mu.Unlock()
+
+	rl.writef("app_version: %s\n", version)
+
+	// Persist to the DB run row (best-effort).
+	if rl.db != nil && rl.runID != 0 {
+		if err := rl.db.UpdateRunAppVersion(rl.runID, version); err != nil {
+			rl.t.Logf("warn: RunLog.SetAppVersion: DB UpdateRunAppVersion: %v", err)
+		}
+	}
+
+	// Emit an app_version event.
+	rl.Event("app_version", version, map[string]any{"version": version})
+}
+
+// SetTestVersion records a unique identifier for the test file (SHA256 by
+// default, set automatically in NewRunLog).  Call this to override the
+// auto-detected version with a custom label.
+//
+// It is stored in test_runs.test_version and emitted as a "test_version" event.
+func (rl *RunLog) SetTestVersion(version string) {
+	if version == "" {
+		return
+	}
+
+	rl.mu.Lock()
+	rl.testVersion = version
+	rl.mu.Unlock()
+
+	rl.writef("test_version: %s\n", version)
+
+	// Persist to the DB run row (best-effort).
+	if rl.db != nil && rl.runID != 0 {
+		if err := rl.db.UpdateRunTestVersion(rl.runID, version); err != nil {
+			rl.t.Logf("warn: RunLog.SetTestVersion: DB UpdateRunTestVersion: %v", err)
+		}
+	}
+
+	// Emit a test_version event.
+	rl.Event("test_version", version, map[string]any{"version": version})
+}
+
 // RecordTokenUsage accumulates token usage and cost for LLM operations performed
 // during this test run.  Call this after each `memory ask` or agent operation
 // that consumes tokens.  The accumulated totals are written to the DB when the
@@ -398,6 +518,7 @@ func (rl *RunLog) Section(name string) {
 
 // Printf writes a timestamped line to the log file and also calls t.Log.
 func (rl *RunLog) Printf(format string, args ...any) {
+	rl.t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] %s\n", ts, msg)
@@ -421,6 +542,26 @@ func (rl *RunLog) CLI(invocation, output string) {
 // event details so the TUI can highlight the row in red on failure.
 func (rl *RunLog) CLIErr(invocation, output string, err error) {
 	rl.CLIStepErr("$ "+invocation, invocation, output, err)
+}
+
+// MustRunCLI runs `memory <args>` and emits a CLI event with the full
+// invocation and output. Fails the test on non-zero exit.
+// Equivalent to calling runlog.MustRunCLI then rl.CLI, but in one step.
+func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string {
+	t.Helper()
+	out := MustRunCLI(t, args...)
+	invocation := "memory " + strings.Join(args, " ")
+	rl.CLI(invocation, out)
+	return out
+}
+
+// MustRunCLIInDir runs `memory <args>` from dir and emits a CLI event.
+func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	out := MustRunCLIInDir(t, dir, args...)
+	invocation := "memory " + strings.Join(args, " ")
+	rl.CLI(invocation, out)
+	return out
 }
 
 // CLIStep is like CLI but uses desc as the short message shown in the run list
@@ -1018,6 +1159,31 @@ func FormatInt(n int64) string {
 		return "-" + string(result)
 	}
 	return string(result)
+}
+
+// FileSHA256 computes the SHA-256 hex digest of the file at path.
+// Returns empty string if the file cannot be read.
+func FileSHA256(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	h := sha256.Sum256(data)
+	return fmt.Sprintf("%x", h)
+}
+
+// GitCommitHash returns the full commit hash of the last commit that touched
+// the given file.  Returns empty string if git is unavailable, not a repo, or
+// the file has no commits.
+func GitCommitHash(filePath string) string {
+	dir := filepath.Dir(filePath)
+	cmd := exec.Command("git", "log", "-1", "--format=%H", "--", filepath.Base(filePath))
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // captureEnvVars returns a map of important environment variables that should

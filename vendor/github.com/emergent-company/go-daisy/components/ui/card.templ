@@ -1,0 +1,144 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// CardRaw renders a bare DaisyUI card shell with configurable card and body CSS classes.
+// Use this when Card or CardCompact don't fit the layout (e.g. custom padding, flex body).
+// attrs is optional; pass nil when not needed.
+templ CardRaw(cardClass string, bodyClass string, attrs templ.Attributes) {
+	<div class={ "card bg-base-100", cardClass } { devmode.Attrs(ctx, "ui/CardRaw")... } { attrs... }>
+		<div class={ "card-body", bodyClass }>
+			{ children... }
+		</div>
+	</div>
+}
+
+// Card renders a DaisyUI card with optional title.
+// attrs is optional; pass nil when not needed.
+templ Card(title string, attrs templ.Attributes) {
+	<div class="card bg-base-100 border border-base-200 shadow-sm" { devmode.Attrs(ctx, "ui/Card")... } { attrs... }>
+		<div class="card-body p-4">
+			if title != "" {
+				<h2 class="card-title text-base font-semibold text-base-content mb-3">{ title }</h2>
+			}
+			{ children... }
+		</div>
+	</div>
+}
+
+// CardBodyText renders a simple paragraph used as card body placeholder content.
+templ CardBodyText(text string) {
+	<p class="text-sm text-base-content/70" { devmode.Attrs(ctx, "ui/CardBodyText")... }>{ text }</p>
+}
+
+// CardPlaceholder renders a small labelled card placeholder for examples and gallery stories.
+templ CardPlaceholder(label string) {
+	<div class="card bg-base-100 border border-base-200 w-32 h-16 flex items-center justify-center text-sm text-base-content/50" { devmode.Attrs(ctx, "ui/CardPlaceholder")... }>{ label }</div>
+}
+
+// CardCompact renders a compact DaisyUI card with tighter padding.
+// attrs is optional; pass nil when not needed.
+templ CardCompact(attrs templ.Attributes) {
+	<div class="card bg-base-100 border border-base-200 shadow-sm" { devmode.Attrs(ctx, "ui/CardCompact")... } { attrs... }>
+		<div class="card-body p-3 gap-2">
+			{ children... }
+		</div>
+	</div>
+}
+
+// StatTrend indicates whether a metric is trending up, down, or neutral.
+type StatTrend string
+
+const (
+	StatTrendUp      StatTrend = "up"
+	StatTrendDown    StatTrend = "down"
+	StatTrendNeutral StatTrend = ""
+)
+
+// statTrendIntent maps a StatTrend to the appropriate BadgeIntent.
+func statTrendIntent(t StatTrend) BadgeIntent {
+	switch t {
+	case StatTrendUp:
+		return BadgeSuccess
+	case StatTrendDown:
+		return BadgeError
+	default:
+		return BadgeNeutral
+	}
+}
+
+// statTrendIcon returns the Lucide icon name for a given trend direction.
+func statTrendIcon(t StatTrend) string {
+	switch t {
+	case StatTrendUp:
+		return "lucide--chevron-up"
+	case StatTrendDown:
+		return "lucide--chevron-down"
+	default:
+		return ""
+	}
+}
+
+// StatCardMinimalItem holds data for a single StatCardMinimal cell.
+type StatCardMinimalItem struct {
+	Label string
+	Value string
+	// Trend direction and percentage label (e.g. "12.3%").
+	Trend      StatTrend
+	TrendLabel string
+	// Icon is a Lucide icon suffix, e.g. "lucide--briefcase".
+	// When set, StatCardMinimal renders as StatCardIconCorner style with a
+	// floating icon badge and a soft trend pill; otherwise as the minimal layout.
+	Icon string
+	// IconColor is a Tailwind text-* class for the icon colour.
+	IconColor string
+	// Attrs are optional extra HTML attributes on the card root, e.g. {"data-testid": "stat-revenue"}.
+	Attrs templ.Attributes
+}
+
+// StatCardMinimal renders a KPI stat card with a trend indicator (↑↓).
+// When item.Icon is set, it renders as StatCardIconCorner style with a
+// floating icon badge and a soft trend pill; otherwise as the minimal layout.
+templ StatCardMinimal(item StatCardMinimalItem) {
+	if item.Icon != "" {
+		<div class="card bg-base-100 relative shadow-sm border border-base-200" { devmode.Attrs(ctx, "ui/StatCardMinimal")... } { item.Attrs... }>
+			<div class="card-body gap-2">
+				<p class="text-2xl/none font-semibold">{ item.Value }</p>
+				<p class="text-base-content/60 mt-1 text-sm font-medium">{ item.Label }</p>
+			if item.TrendLabel != "" {
+				<div class="mt-5 flex items-center gap-2">
+					@BadgeWithBoundary(statTrendIntent(item.Trend), BadgeStyleSoft, BadgeSizeSM, false, statTrendIcon(item.Trend), item.TrendLabel)
+					<p class="text-base-content/60 text-sm">vs last month</p>
+				</div>
+			}
+		</div>
+		<div class="absolute -end-3 -top-3 rounded-full bg-gradient-to-bl from-transparent to-base-200/60 p-1.5">
+			<div class="bg-base-100 flex items-center justify-center rounded-full p-2 shadow">
+				@IconSpanColoredWithBoundary(item.Icon, "size-5", item.IconColor)
+			</div>
+		</div>
+		</div>
+	} else {
+		<div class="card bg-base-100 card-border" { devmode.Attrs(ctx, "ui/StatCardMinimal")... } { item.Attrs... }>
+			<div class="card-body">
+				<p class="text-base-content/60 text-xs font-medium tracking-wide uppercase">{ item.Label }</p>
+				<div class="mt-4 flex items-end justify-between gap-2 text-sm">
+					<p class="text-2xl/none font-semibold">{ item.Value }</p>
+				if item.TrendLabel != "" {
+					@BadgeWithBoundary(statTrendIntent(item.Trend), BadgeStyleSoft, BadgeSizeSM, false, statTrendIcon(item.Trend), item.TrendLabel)
+				}
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// StatCardIconCornerItem holds data for a single StatCardIconCorner cell.
+// Deprecated: use StatCardMinimalItem with Icon/IconColor set instead.
+type StatCardIconCornerItem = StatCardMinimalItem
+
+// StatCardIconCorner renders a stat card with a floating icon in the top corner and a soft trend badge.
+// Deprecated: use StatCardMinimal with Icon/IconColor set instead.
+templ StatCardIconCorner(item StatCardMinimalItem) {
+	@StatCardMinimal(item)
+}

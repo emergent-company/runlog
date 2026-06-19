@@ -1,0 +1,37 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Tag renders a removable tag chip.
+templ Tag(label string, removeHref string) {
+	<span class="badge badge-sm gap-1" { devmode.Attrs(ctx, "ui/Tag")... }>
+		{ label }
+		if removeHref != "" {
+			<a href={ templ.URL(removeHref) } class="opacity-60 hover:opacity-100" aria-label={ "Remove " + label }>
+				<span class="iconify lucide--x size-3"></span>
+			</a>
+		}
+	</span>
+}
+
+// Steps renders a DaisyUI steps list container.
+templ Steps() {
+	<ul class="steps" { devmode.Attrs(ctx, "ui/Steps")... }>
+		{ children... }
+	</ul>
+}
+
+// Step renders a single step item. Set done=true to apply the primary colour.
+templ Step(label string, done bool) {
+	<li class={ "step", templ.KV("step-primary", done) } { devmode.Attrs(ctx, "ui/Step")... }>{ label }</li>
+}
+
+// Fieldset wraps children in a DaisyUI fieldset with an optional legend label.
+templ Fieldset(legend string) {
+	<fieldset class="fieldset" { devmode.Attrs(ctx, "ui/Fieldset")... }>
+		if legend != "" {
+			<legend class="fieldset-legend">{ legend }</legend>
+		}
+		{ children... }
+	</fieldset>
+}

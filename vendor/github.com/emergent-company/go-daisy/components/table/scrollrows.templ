@@ -1,0 +1,21 @@
+package table
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ListAreaScrollRows is the server response for a scroll-load fetch.
+// It uses HTMX v4 <hx-partial> to append new rows to the tbody out-of-band.
+templ ListAreaScrollRows(props ScrollRowsProps) {
+	// OOB: append new rows to the tbody
+	<hx-partial hx-target={ "#" + props.ID + "-tbody" } hx-swap="beforeend" { devmode.Attrs(ctx, "table/ListAreaScrollRows")... }>
+		@props.Rows
+	</hx-partial>
+	// Main swap (outerHTML on sentinel): next sentinel or nothing
+	if props.HasMore {
+		@ListAreaSentinel(ScrollSentinelProps{
+			ID:       props.ID,
+			URL:      props.URL,
+			NextPage: props.NextPage,
+			ColSpan:  props.ColSpan,
+		})
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 )
 
 // setSysProcAttr is a no-op on Windows (Setsid is not supported).
@@ -39,4 +40,15 @@ func processAlive(pid int) bool {
 		return true
 	}
 	return !state.Exited()
+}
+
+// trapSigterm registers a handler that calls fn when the process is interrupted.
+// On Windows SIGTERM is not standard; we use os.Interrupt instead.
+func trapSigterm(fn func()) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt)
+	go func() {
+		<-ch
+		fn()
+	}()
 }

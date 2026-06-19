@@ -1,0 +1,25 @@
+title = "runlog gitleaks config"
+
+# Extend the full default ruleset — covers 150+ secret types out of the box.
+[extend]
+useDefault = true
+
+# ── Custom rules for project-specific secrets not in the default config ───────
+
+# emergent.memory token — prefix: emt_
+[[rules]]
+id          = "emergent-memory-token"
+description = "emergent.memory project/API token (emt_ prefix)"
+regex       = '''\b(emt_[A-Za-z0-9_\-]{10,})\b'''
+keywords    = ["emt_"]
+entropy     = 2.5
+
+# ── Global allowlist ──────────────────────────────────────────────────────────
+
+[[allowlists]]
+description = "Angle-bracket placeholders are never real keys — e.g. <YOUR_API_KEY>"
+regexes     = ['''<[A-Z][A-Z0-9_]{2,}>''']
+
+[[allowlists]]
+description = "Gitignored secret files — contain real keys intentionally, never committed"
+paths       = ['''(^|[\\/])\.env$''', '''(^|[\\/])\.env\.local$''']

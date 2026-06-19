@@ -1,0 +1,147 @@
+package form
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// TextInput renders a labeled text input with error support.
+templ TextInput(name string, label string, value string, errMsg string, required bool) {
+	@Field(label, name, errMsg) {
+		<input
+			id={ name }
+			name={ name }
+			type="text"
+			value={ value }
+			required?={ required }
+			class={ "input input-bordered w-full", templ.KV("input-error", errMsg != "") }
+		/>
+	}
+}
+
+// TextareaInput renders a labeled textarea with error support.
+templ TextareaInput(name string, label string, value string, errMsg string, rows int, required bool) {
+	@Field(label, name, errMsg) {
+		<textarea
+			id={ name }
+			name={ name }
+			rows={ strconv.Itoa(rows) }
+			required?={ required }
+			class={ "textarea textarea-bordered w-full", templ.KV("textarea-error", errMsg != "") }
+		>{ value }</textarea>
+	}
+}
+
+// CheckboxInput renders a labeled checkbox.
+templ CheckboxInput(name string, label string, checked bool, errMsg string) {
+	<div class="form-control mb-3" { devmode.Attrs(ctx, "form/CheckboxInput")... }>
+		<label class="label cursor-pointer justify-start gap-3">
+			<input
+				id={ name }
+				name={ name }
+				type="checkbox"
+				checked?={ checked }
+				class="checkbox checkbox-sm"
+			/>
+			<span class="label-text">{ label }</span>
+		</label>
+		if errMsg != "" {
+			<div class="label pt-1">
+				<span class="label-text-alt text-error">{ errMsg }</span>
+			</div>
+		}
+	</div>
+}
+
+// FormActions renders a flex-end footer for form action buttons.
+templ FormActions() {
+	<div class="flex justify-end gap-2 pt-2" { devmode.Attrs(ctx, "form/FormActions")... }>
+		{ children... }
+	</div>
+}
+
+// FormActionsWithLoading renders FormActions with a loading submit button.
+templ FormActionsWithLoading(submitText string, indicatorID string) {
+	@FormActions() {
+		<button type="submit" class="btn btn-primary btn-sm">
+			<span
+				if indicatorID != "" {
+					id={ indicatorID }
+				}
+				class="htmx-indicator loading loading-spinner loading-xs"
+			></span>
+			{ submitText }
+		</button>
+	}
+}
+
+// SearchInput renders a text input with HTMX search debounce.
+templ SearchInput(name string, value string, placeholder string, hxTarget string, hxGet string) {
+	<label class="input input-sm w-full flex items-center gap-2" { devmode.Attrs(ctx, "form/SearchInput")... }>
+		<span class="iconify lucide--search size-4 opacity-50 shrink-0"></span>
+		<input
+			type="search"
+			name={ name }
+			value={ value }
+			placeholder={ placeholder }
+			class="grow"
+			hx-get={ hxGet }
+			hx-target={ hxTarget }
+			hx-trigger="input delay:300ms, search"
+			hx-include="closest form"
+		/>
+	</label>
+}
+
+// DateInput renders a date input field.
+templ DateInput(name string, value string, hasError bool) {
+	<input
+		id={ name }
+		name={ name }
+		type="date"
+		value={ value }
+		class={ "input input-bordered w-full",
+			templ.KV("input-error", hasError) }
+		{ devmode.Attrs(ctx, "form/DateInput")... }
+	/>
+}
+
+// Checkbox renders a DaisyUI checkbox.
+templ Checkbox(name string, checked bool, label string) {
+	<label class="cursor-pointer label justify-start gap-3" { devmode.Attrs(ctx, "form/Checkbox")... }>
+		<input
+			type="checkbox"
+			name={ name }
+			class="checkbox checkbox-primary"
+			checked?={ checked }
+		/>
+		if label != "" {
+			<span class="label-text">{ label }</span>
+		}
+	</label>
+}
+
+// Toggle renders a DaisyUI toggle switch.
+templ Toggle(name string, checked bool, label string) {
+	<label class="cursor-pointer label justify-start gap-3" { devmode.Attrs(ctx, "form/Toggle")... }>
+		<input
+			type="checkbox"
+			name={ name }
+			class="toggle toggle-primary"
+			checked?={ checked }
+		/>
+		if label != "" {
+			<span class="label-text">{ label }</span>
+		}
+	</label>
+}
+
+// FieldError renders a standalone field error message.
+templ FieldError(errMsg string) {
+	if errMsg != "" {
+		<div class="label pt-1" { devmode.Attrs(ctx, "form/FieldError")... }>
+			<span class="label-text-alt text-error">{ errMsg }</span>
+		</div>
+	}
+}

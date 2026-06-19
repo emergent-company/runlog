@@ -1,0 +1,116 @@
+package layout
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Navbar renders the topbar. The children slot is for the right-side content
+// (theme toggle, user dropdown, etc.). Pass nil/empty for a minimal navbar.
+// Pass a non-nil logo component as the optional second argument to replace the plain appName text.
+templ Navbar(appName string, logo ...templ.Component) {
+	<div
+		role="navigation"
+		aria-label="Navbar"
+		class="flex items-center justify-between px-4 bg-base-100"
+		id="layout-topbar"
+		{ devmode.Attrs(ctx, "layout/Navbar")... }
+	>
+		<!-- LEFT: sidebar toggle + app name or logo -->
+		<div class="flex items-center gap-3">
+			<label
+				for="layout-sidebar-toggle-trigger"
+				class="btn btn-square btn-ghost btn-sm"
+				aria-label="Toggle sidebar"
+			>
+				<span id="topbar-menu-icon" class="iconify lucide--menu size-5"></span>
+				<span id="topbar-close-icon" class="iconify lucide--panel-left-close size-5"></span>
+			</label>
+			if len(logo) > 0 && logo[0] != nil {
+				@logo[0]
+			} else {
+				<span class="font-semibold text-base-content/80 text-sm hidden md:block">{ appName }</span>
+			}
+		</div>
+		<!-- RIGHT: slot for theme toggle, user menu, etc. -->
+		<div class="flex items-center gap-1">
+			{ children... }
+		</div>
+	</div>
+}
+
+// ThemeToggle renders a sun/moon button that switches between two DaisyUI themes.
+// lightTheme and darkTheme are DaisyUI theme names (e.g. "nord", "dark").
+templ ThemeToggle(lightTheme string, darkTheme string) {
+	<button
+		class="btn btn-sm btn-circle btn-ghost"
+		aria-label="Toggle theme"
+		onclick={ toggleTheme(lightTheme, darkTheme) }
+		{ devmode.Attrs(ctx, "layout/ThemeToggle")... }
+	>
+		<span id="theme-icon-sun" class="iconify lucide--sun size-4.5"></span>
+		<span id="theme-icon-moon" class="iconify lucide--moon size-4.5" style="display:none"></span>
+	</button>
+}
+
+// NavbarDropdownItem is a single option in a NavbarDropdown.
+type NavbarDropdownItem struct {
+	Label  string
+	Href   string
+	Icon   string // Lucide icon suffix, e.g. "lucide--folder"
+	Active bool
+}
+
+// NavbarDropdown renders a compact dropdown in the navbar for switching context
+// (e.g. project, tenant, organisation). currentLabel is shown on the trigger button;
+// pass an empty string to show a neutral placeholder. hxTarget is the HTMX swap
+// target for each item link (e.g. "#main-content").
+templ NavbarDropdown(currentLabel string, placeholder string, icon string, hxTarget string, items []NavbarDropdownItem) {
+	if len(items) > 0 {
+		<div class="dropdown dropdown-end" { devmode.Attrs(ctx, "layout/NavbarDropdown")... }>
+			<label tabindex="0" class="btn btn-sm btn-ghost gap-1.5 font-normal">
+				if icon != "" {
+					<span class={ "iconify size-4 text-base-content/60 " + icon }></span>
+				}
+				if currentLabel != "" {
+					<span class="max-w-[120px] truncate text-sm">{ currentLabel }</span>
+				} else {
+					<span class="text-sm text-base-content/60">{ placeholder }</span>
+				}
+				<span class="iconify lucide--chevron-down size-3.5 text-base-content/40"></span>
+			</label>
+			<ul
+				tabindex="0"
+				class="dropdown-content menu menu-sm bg-base-100 rounded-box shadow-lg z-50 w-52 p-1 border border-base-content/10 mt-1"
+			>
+				for _, item := range items {
+					<li>
+					<a
+						class={ templ.KV("active", item.Active) }
+						href={ templ.SafeURL(item.Href) }
+						onclick="this.blur()"
+						if hxTarget != "" {
+							hx-get={ item.Href }
+							hx-target={ hxTarget }
+							hx-swap="innerHTML"
+							hx-push-url="true"
+						}
+					>
+							if item.Icon != "" {
+								<span class={ "iconify size-4 " + item.Icon }></span>
+							}
+							<span>{ item.Label }</span>
+						</a>
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}
+
+script toggleTheme(lightTheme string, darkTheme string) {
+	var html = document.documentElement;
+	var current = html.getAttribute('data-theme') || lightTheme;
+	var next = current === darkTheme ? lightTheme : darkTheme;
+	html.setAttribute('data-theme', next);
+	document.getElementById('theme-icon-sun').style.display = next === darkTheme ? 'none' : '';
+	document.getElementById('theme-icon-moon').style.display = next === darkTheme ? '' : 'none';
+	try { localStorage.setItem('go-daisy-theme', next); } catch(e) {}
+}

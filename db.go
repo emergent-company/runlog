@@ -216,6 +216,84 @@ ALTER TABLE test_runs ADD COLUMN cost_usd      REAL;
 ALTER TABLE test_runs ADD COLUMN env_vars TEXT;
 `,
 	},
+	{
+		version: 13,
+		sql: `
+-- daemon_runs tracks active test runs registered by the local runlog daemon.
+-- Each row represents one "runlog test" invocation, keyed by PID.
+-- status: active | done | dead
+CREATE TABLE IF NOT EXISTS daemon_runs (
+    id          TEXT    PRIMARY KEY,
+    pid         INTEGER NOT NULL,
+    env_profile TEXT,
+    server_url  TEXT,
+    token       TEXT,
+    status      TEXT    NOT NULL DEFAULT 'active',
+    started_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    finished_at TEXT
+);
+
+-- daemon_resources tracks server-side projects registered by test runs.
+-- When a run dies without cleaning up, the sweeper deletes these resources.
+-- status: active | deleted
+CREATE TABLE IF NOT EXISTS daemon_resources (
+    id          TEXT    PRIMARY KEY,
+    run_id      TEXT    NOT NULL REFERENCES daemon_runs(id),
+    resource_id TEXT    NOT NULL,
+    resource_type TEXT  NOT NULL DEFAULT 'project',
+    server_url  TEXT    NOT NULL,
+    token       TEXT    NOT NULL,
+    status      TEXT    NOT NULL DEFAULT 'active',
+    created_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    deleted_at  TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_daemon_resources_run_id ON daemon_resources(run_id);
+CREATE INDEX IF NOT EXISTS idx_daemon_resources_status ON daemon_resources(status);
+`,
+	},
+	{
+		version: 14,
+		sql: `
+-- skipped column was missing from the initial test_runs schema.
+ALTER TABLE test_runs ADD COLUMN skipped INTEGER NOT NULL DEFAULT 0;
+`,
+	},
+	{
+		version: 15,
+		sql: `
+-- app_version stores the version of the application-under-test (set by test).
+-- test_version stores a unique identifier for the test file contents (SHA256).
+ALTER TABLE test_runs ADD COLUMN app_version  TEXT;
+ALTER TABLE test_runs ADD COLUMN test_version TEXT;
+`,
+	},
+	{
+		version: 16,
+		sql: `
+-- daemon_run_id links test_runs to daemon_runs so that dogfood runs registered
+-- via POST /runs appear in both the daemon monitor and the test dashboard.
+ALTER TABLE test_runs ADD COLUMN daemon_run_id TEXT;
+`,
+	},
+	{
+		version: 17,
+		sql: `
+-- composite index on (test_name, started_at) to speed up tests list page,
+-- which GROUP BY test_name and ORDER BY started_at DESC per test.
+CREATE INDEX IF NOT EXISTS idx_test_runs_name_started ON test_runs(test_name, started_at DESC);
+`,
+	},
+	{
+		version: 18,
+		sql: `
+-- timeout_seconds stores the per-test timeout duration set by the test via
+-- RunLog.SetTimeout().  NULL means no timeout.  The background timeout worker
+-- compares started_at + timeout_seconds against the current time to detect
+-- runs that have exceeded their deadline and marks them as timed out.
+ALTER TABLE test_runs ADD COLUMN timeout_seconds REAL;
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,6 +339,13 @@ func (rdb *RunDB) Close() error {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 	return rdb.db.Close()
+}
+
+// RawDB returns the underlying *sql.DB handle.
+// Use sparingly — caller is responsible for safe concurrent access.
+// This is used by the daemon to execute queries directly against the DB.
+func (rdb *RunDB) RawDB() *sql.DB {
+	return rdb.db
 }
 
 // applyMigrations runs any migrations whose version is not yet in
@@ -334,7 +419,7 @@ func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string,
 	}
 	res, err := rdb.db.Exec(
 		`INSERT INTO test_runs(test_name, started_at, runner, env_name, env_vars) VALUES (?, ?, ?, ?, ?)`,
-		testName, startedAt.UTC().Format(time.RFC3339), runnerVal, envNameVal, envVarsVal,
+		testName, startedAt.UTC().Format(time.RFC3339Nano), runnerVal, envNameVal, envVarsVal,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("rundb: InsertRun: %w", err)
@@ -390,13 +475,44 @@ func (rdb *RunDB) UpdateRunExperiment(id int64, experiment string) error {
 	return err
 }
 
+// UpdateRunAppVersion stores app_version on the test_runs row identified by id.
+func (rdb *RunDB) UpdateRunAppVersion(id int64, version string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET app_version = ? WHERE id = ?`, version, id,
+	)
+	return err
+}
+
+// UpdateRunTestVersion stores test_version on the test_runs row identified by id.
+func (rdb *RunDB) UpdateRunTestVersion(id int64, version string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET test_version = ? WHERE id = ?`, version, id,
+	)
+	return err
+}
+
+// UpdateRunTimeout stores the timeout duration (in seconds) on the test_runs row.
+func (rdb *RunDB) UpdateRunTimeout(id int64, timeoutSeconds float64) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET timeout_seconds = ? WHERE id = ?`, timeoutSeconds, id,
+	)
+	return err
+}
+
 // RunOutcome represents the final state of a test run.
 type RunOutcome int
 
 const (
-	OutcomeFail RunOutcome = 0 // test failed
-	OutcomePass RunOutcome = 1 // test passed
-	OutcomeSkip RunOutcome = 2 // test was skipped (t.Skip)
+	OutcomeFail    RunOutcome = 0 // test failed
+	OutcomePass    RunOutcome = 1 // test passed
+	OutcomeSkip    RunOutcome = 2 // test was skipped (t.Skip)
+	OutcomeTimeout RunOutcome = 3 // test timed out
 )
 
 // FinishRun sets finished_at, passed, and optionally reason on an existing
@@ -409,9 +525,27 @@ func (rdb *RunDB) FinishRun(id int64, finishedAt time.Time, outcome RunOutcome, 
 
 // FinishRunWithCost is like FinishRun but also records token usage and cost.
 // Pass 0 for inputTokens, outputTokens, costUSD to leave those columns NULL.
+// If the run has no events, synthetic state_change events ("test started" /
+// "test finished") are automatically inserted so the run always has a
+// meaningful timeline.
 func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunOutcome, reason string, inputTokens, outputTokens int64, costUSD float64) error {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
+
+	// Check if run has any events — if not, insert synthetic ones.
+	var eventCount int
+	_ = rdb.db.QueryRow(`SELECT COUNT(*) FROM run_events WHERE run_id = ?`, id).Scan(&eventCount)
+	if eventCount == 0 {
+		var startedStr string
+		if err := rdb.db.QueryRow(`SELECT started_at FROM test_runs WHERE id = ?`, id).Scan(&startedStr); err == nil {
+			if started, err := time.Parse(time.RFC3339Nano, startedStr); err == nil {
+				elapsed := finishedAt.Sub(started).Seconds()
+				rdb.insertEventLocked(id, 1, started, 0, "state_change", "test started", nil, nil)
+				rdb.insertEventLocked(id, 2, finishedAt, elapsed, "state_change", "test finished", nil, nil)
+			}
+		}
+	}
+
 	var reasonVal any
 	if reason != "" {
 		reasonVal = reason
@@ -428,7 +562,7 @@ func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunO
 	}
 	_, err := rdb.db.Exec(
 		`UPDATE test_runs SET finished_at = ?, passed = ?, reason = ?, input_tokens = ?, output_tokens = ?, cost_usd = ? WHERE id = ?`,
-		finishedAt.UTC().Format(time.RFC3339), int(outcome), reasonVal, inputTokVal, outputTokVal, costVal, id,
+		finishedAt.UTC().Format(time.RFC3339Nano), int(outcome), reasonVal, inputTokVal, outputTokVal, costVal, id,
 	)
 	return err
 }
@@ -436,7 +570,7 @@ func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunO
 // ListStaleRuns returns all runs where finished_at IS NULL — i.e. runs that
 // were never properly closed, typically because the test process was killed.
 func (rdb *RunDB) ListStaleRuns() ([]RunRow, error) {
-	return rdb.ListRuns(time.Time{}) // we filter in the caller
+	return rdb.ListRuns(time.Time{}, 0) // we filter in the caller
 }
 
 // ReapStaleRuns marks all unfinished runs (finished_at IS NULL) as failed with
@@ -472,8 +606,31 @@ func (rdb *RunDB) InsertEvent(
 	return rdb.insertEvent(runID, seq, occurredAt, elapsedS, kind, message, details, nil)
 }
 
+// marshalDetailsJSON converts an arbitrary details value to a *string of JSON.
+// Returns nil for nil or non-marshalable values.
+func marshalDetailsJSON(details any) *string {
+	if details == nil {
+		return nil
+	}
+	var b []byte
+	var err error
+	switch v := details.(type) {
+	case []byte:
+		b = v
+	case string:
+		b = []byte(v)
+	default:
+		b, err = json.Marshal(details)
+		if err != nil {
+			return nil
+		}
+	}
+	s := string(b)
+	return &s
+}
+
 // insertEvent is the internal implementation shared by InsertEvent and
-// InsertChildEvent.
+// InsertChildEvent.  It acquires rdb.mu before inserting.
 func (rdb *RunDB) insertEvent(
 	runID int64,
 	seq int,
@@ -483,27 +640,24 @@ func (rdb *RunDB) insertEvent(
 	details any,
 	parentID *int64,
 ) error {
-	var detailsJSON *string
-	if details != nil {
-		var b []byte
-		var err error
-		switch v := details.(type) {
-		case []byte:
-			b = v
-		case string:
-			b = []byte(v)
-		default:
-			b, err = json.Marshal(details)
-			if err != nil {
-				return fmt.Errorf("rundb: InsertEvent marshal details: %w", err)
-			}
-		}
-		s := string(b)
-		detailsJSON = &s
-	}
-
+	detailsJSON := marshalDetailsJSON(details)
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
+	return rdb.insertEventLocked(runID, seq, occurredAt, elapsedS, kind, message, detailsJSON, parentID)
+}
+
+// insertEventLocked is like insertEvent but assumes rdb.mu is already held.
+// Callers that already hold the lock (e.g. FinishRunWithCost) must use this
+// instead of insertEvent to avoid deadlock.
+func (rdb *RunDB) insertEventLocked(
+	runID int64,
+	seq int,
+	occurredAt time.Time,
+	elapsedS float64,
+	kind, message string,
+	detailsJSON *string,
+	parentID *int64,
+) error {
 	_, err := rdb.db.Exec(
 		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message, details, parent_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -587,6 +741,8 @@ type RunRow struct {
 	TokenSummary *RunTokenSummary  // nil if PrintTokenSummary was never called
 	Tags         []string          // nil if no tags set; decoded from JSON array
 	Experiment   *string           // nil if not set
+	AppVersion   *string           // nil if not set; application-under-test version
+	TestVersion  *string           // nil if not set; unique test file identifier
 	Runner       *string           // nil for older rows; "host" or "docker"
 	Reason       *string           // nil for passes and older rows; skip/fail reason
 	EnvName      *string           // nil for older rows; environment profile name from MEMORY_TEST_ENV
@@ -619,13 +775,12 @@ type EventRow struct {
 }
 
 // ListRuns returns test_runs rows with started_at >= since, newest first.
-// It also populates EventCount via a JOIN.
-func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
+// It also populates EventCount via a JOIN. If limit > 0, at most limit rows are returned.
+func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 
-	rows, err := rdb.db.Query(`
-        SELECT
+	q := `SELECT
             r.id,
             r.test_name,
             r.started_at,
@@ -641,13 +796,20 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
             r.input_tokens,
             r.output_tokens,
             r.cost_usd,
-            r.env_vars
+            r.env_vars,
+            r.app_version,
+            r.test_version
         FROM test_runs r
         LEFT JOIN run_events e ON e.run_id = r.id
         WHERE r.started_at >= ?
         GROUP BY r.id
-        ORDER BY r.started_at DESC
-    `, since.UTC().Format(time.RFC3339))
+        ORDER BY r.started_at DESC`
+	args := []any{since.UTC().Format(time.RFC3339)}
+	if limit > 0 {
+		q += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := rdb.db.Query(q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("rundb: ListRuns: %w", err)
 	}
@@ -669,6 +831,7 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 		var outputTokens *int64
 		var costUSD *float64
 		var envVarsJSON *string
+		var appVersion, testVersion *string
 		if err := rows.Scan(
 			&row.ID,
 			&row.TestName,
@@ -686,12 +849,14 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 			&outputTokens,
 			&costUSD,
 			&envVarsJSON,
+			&appVersion,
+			&testVersion,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListRuns scan: %w", err)
 		}
-		row.StartedAt, _ = time.Parse(time.RFC3339, startedStr)
+		row.StartedAt, _ = time.Parse(time.RFC3339Nano, startedStr)
 		if finishedStr != nil {
-			t, _ := time.Parse(time.RFC3339, *finishedStr)
+			t, _ := time.Parse(time.RFC3339Nano, *finishedStr)
 			row.FinishedAt = &t
 		}
 		if passedInt != nil {
@@ -722,6 +887,8 @@ func (rdb *RunDB) ListRuns(since time.Time) ([]RunRow, error) {
 		row.InputTokens = inputTokens
 		row.OutputTokens = outputTokens
 		row.CostUSD = costUSD
+		row.AppVersion = appVersion
+		row.TestVersion = testVersion
 		if envVarsJSON != nil && *envVarsJSON != "" {
 			var envVars map[string]string
 			if json.Unmarshal([]byte(*envVarsJSON), &envVars) == nil {
@@ -1037,7 +1204,7 @@ func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
 // experiment value across all test_runs rows, sorted newest-first by LastRunAt.
 // It re-uses ListRuns with a zero time to get every run, then groups in memory.
 func (rdb *RunDB) ListExperiments() ([]ExperimentSummary, error) {
-	rows, err := rdb.ListRuns(time.Time{})
+	rows, err := rdb.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return nil, fmt.Errorf("rundb: ListExperiments: %w", err)
 	}
@@ -1321,11 +1488,11 @@ func (rdb *RunDB) ListTracesForRun(runID int64) ([]AnalyzerTraceRow, error) {
 		if err := rows.Scan(&tr.ID, &tr.SuggestionKey, &tr.RunID, &startedStr, &finishedStr); err != nil {
 			return nil, fmt.Errorf("rundb: ListTracesForRun scan: %w", err)
 		}
-		if t, err := time.Parse(time.RFC3339, startedStr); err == nil {
+		if t, err := time.Parse(time.RFC3339Nano, startedStr); err == nil {
 			tr.StartedAt = t
 		}
 		if finishedStr != nil {
-			if t, err := time.Parse(time.RFC3339, *finishedStr); err == nil {
+			if t, err := time.Parse(time.RFC3339Nano, *finishedStr); err == nil {
 				tr.FinishedAt = &t
 			}
 		}

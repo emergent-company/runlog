@@ -1,0 +1,117 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ActionMenuItem is a single entry in an action menu.
+type ActionMenuItem struct {
+	Label     string
+	Href      string // if set and no HX* mutation fields, renders as <a>
+	Icon      string // Lucide icon suffix, e.g. "lucide--pencil"
+	Danger    bool   // renders item in error color
+	HXGet     string // if set, sends hx-get (HTMX navigation)
+	HXTarget  string // hx-target selector used with HXGet
+	HXPushURL bool   // adds hx-push-url="true" when HXGet is set
+	HXPost    string // if set, sends hx-post
+	HXPatch   string // if set, sends hx-patch
+	HXDelete  string // if set, sends hx-delete
+	Confirm   string // if set, shows a confirm dialog before the action
+}
+
+// ActionMenu renders a DaisyUI dropdown with an ellipsis trigger.
+templ ActionMenu(items []ActionMenuItem) {
+	<div class="dropdown dropdown-end" { devmode.Attrs(ctx, "ui/ActionMenu")... }>
+		<button tabindex="0" type="button" class="btn btn-ghost btn-sm btn-square">
+			<span class="iconify lucide--ellipsis-vertical size-5"></span>
+		</button>
+		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 z-50 w-44 p-1 mt-1">
+		for _, item := range items {
+			<li>
+				if item.HXGet != "" {
+					<a
+						hx-get={ item.HXGet }
+						if item.HXTarget != "" {
+							hx-target={ item.HXTarget }
+						}
+						if item.HXPushURL {
+							hx-push-url="true"
+						}
+						href={ templ.URL(item.HXGet) }
+						class={ "flex items-center gap-2 text-sm",
+							templ.KV("text-error", item.Danger) }
+					>
+						if item.Icon != "" {
+							<span class={ "iconify size-4 " + item.Icon }></span>
+						}
+						{ item.Label }
+					</a>
+				} else if item.HXPost != "" {
+						<button
+							type="button"
+							class={ "flex items-center gap-2 text-sm",
+								templ.KV("text-error", item.Danger) }
+							hx-post={ item.HXPost }
+							if item.Confirm != "" {
+								hx-confirm={ item.Confirm }
+							}
+						>
+					if item.Icon != "" {
+							<span class={ "iconify size-4 " + item.Icon }></span>
+						}
+						{ item.Label }
+					</button>
+				} else if item.HXPatch != "" {
+					<button
+						type="button"
+						class={ "flex items-center gap-2 text-sm",
+							templ.KV("text-error", item.Danger) }
+						hx-patch={ item.HXPatch }
+						if item.Confirm != "" {
+							hx-confirm={ item.Confirm }
+						}
+					>
+						if item.Icon != "" {
+							<span class={ "iconify size-4 " + item.Icon }></span>
+						}
+						{ item.Label }
+					</button>
+				} else if item.HXDelete != "" {
+					<button
+						type="button"
+						class={ "flex items-center gap-2 text-sm",
+							templ.KV("text-error", item.Danger) }
+						hx-delete={ item.HXDelete }
+						if item.Confirm != "" {
+							hx-confirm={ item.Confirm }
+						}
+					>
+						if item.Icon != "" {
+							<span class={ "iconify size-4 " + item.Icon }></span>
+						}
+						{ item.Label }
+					</button>
+				} else {
+					<a
+						href={ templ.URL(item.Href) }
+						class={ "flex items-center gap-2 text-sm",
+							templ.KV("text-error", item.Danger) }
+					>
+						if item.Icon != "" {
+							<span class={ "iconify size-4 " + item.Icon }></span>
+						}
+							{ item.Label }
+						</a>
+					}
+				</li>
+			}
+		</ul>
+	</div>
+}
+
+// CRUDActions returns a standard View / Edit / Delete action list.
+func CRUDActions(viewHref, editHref, deleteURL, deleteConfirm string) []ActionMenuItem {
+	return []ActionMenuItem{
+		{Label: "View", Href: viewHref, Icon: "lucide--eye"},
+		{Label: "Edit", Href: editHref, Icon: "lucide--pencil"},
+		{Label: "Delete", HXDelete: deleteURL, Icon: "lucide--trash-2", Danger: true, Confirm: deleteConfirm},
+	}
+}

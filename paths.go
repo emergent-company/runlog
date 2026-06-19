@@ -45,3 +45,9 @@ func RunlogDir() string {
 	// 3. Fallback to current working directory
 	return filepath.Join(wd, ".runlog")
 }
+
+// DaemonPidFile returns the path to the daemon PID file.
+// The file lives in the .runlog directory of the current project.
+func DaemonPidFile() string {
+	return filepath.Join(RunlogDir(), "daemon.pid")
+}

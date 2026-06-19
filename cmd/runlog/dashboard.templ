@@ -1,0 +1,67 @@
+package main
+
+import "fmt"
+
+templ DashboardPage(data dashboardData) {
+	<div data-testid="dashboard-page">
+		@AppPage(fmt.Sprintf("Runlog - %s - Dashboard", appName()), sidebarGroups) {
+			<div data-testid="dashboard-content">
+				<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+				@statsGrid([]statItem{
+					{Label: "Total Tests", Value: fmt.Sprintf("%d", data.TotalTests)},
+					{Label: "Total Runs", Value: fmt.Sprintf("%d", data.TotalRuns)},
+					{Label: "Passed", Value: fmt.Sprintf("%d", data.PassCount)},
+					{Label: "Failed", Value: fmt.Sprintf("%d", data.FailCount)},
+					{Label: "Skipped", Value: fmt.Sprintf("%d", data.SkipCount)},
+				}, 5)
+				if len(data.RecentRuns) > 0 {
+					<div class="mb-8">
+						@sectionHeading("Recent Runs")
+						@runsTable(data.RecentRuns, runsTableOpts{})
+					</div>
+				}
+				if len(data.Categories) > 0 {
+					<div class="mb-8">
+						@sectionHeading("Categories")
+						<div class={ statsGridClass(3) } data-testid="category-cards">
+							for _, cat := range data.Categories {
+								<div class="cursor-pointer" hx-get={ "/ui/tests?category=" + cat.Name } hx-target="#main-content" hx-swap="innerHTML" hx-push-url="true" hx-sync="#main-content:replace">
+									@statItemCard(statItem{Label: cat.Name, Value: fmt.Sprintf("%d tests", cat.TestCount)})
+								</div>
+							}
+						</div>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ DashboardContent(data dashboardData) {
+	<div data-testid="dashboard-content">
+		<h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+		@statsGrid([]statItem{
+			{Label: "Total Tests", Value: fmt.Sprintf("%d", data.TotalTests)},
+			{Label: "Total Runs", Value: fmt.Sprintf("%d", data.TotalRuns)},
+			{Label: "Passed", Value: fmt.Sprintf("%d", data.PassCount)},
+			{Label: "Failed", Value: fmt.Sprintf("%d", data.FailCount)},
+			{Label: "Skipped", Value: fmt.Sprintf("%d", data.SkipCount)},
+		}, 5)
+		if len(data.RecentRuns) > 0 {
+			<div class="mb-8">
+				@sectionHeading("Recent Runs")
+				@runsTable(data.RecentRuns, runsTableOpts{})
+			</div>
+		}
+		if len(data.Categories) > 0 {
+			<div class="mb-8">
+				@sectionHeading("Categories")
+				<div class={ statsGridClass(3) } data-testid="category-cards">
+					for _, cat := range data.Categories {
+						@statItemCard(statItem{Label: cat.Name, Value: fmt.Sprintf("%d tests", cat.TestCount)})
+					}
+				</div>
+			</div>
+		}
+	</div>
+}

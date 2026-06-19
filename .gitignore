@@ -9,6 +9,9 @@
 logs/
 *.log
 
+# Node.js / Playwright
+tests/web/node_modules/
+
 # OS files
 .DS_Store
 Thumbs.db

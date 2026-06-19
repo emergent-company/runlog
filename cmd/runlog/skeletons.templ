@@ -1,0 +1,197 @@
+package main
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+
+templ DashboardSkeleton() {
+	<div class="space-y-6">
+		<div class="skeleton h-8 w-48"></div>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+			for range [5]struct{}{} {
+				<div class="card bg-base-100 border border-base-200 shadow-sm">
+					<div class="card-body p-4 space-y-3">
+						<div class="skeleton h-4 w-20"></div>
+						<div class="skeleton h-6 w-12"></div>
+					</div>
+				</div>
+			}
+		</div>
+		<div class="skeleton h-6 w-32"></div>
+		@_skeletonTableRows(4, 4)
+		<div class="skeleton h-6 w-32"></div>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+			for range [3]struct{}{} {
+				<div class="card bg-base-100 border border-base-200 shadow-sm">
+					<div class="card-body p-4 space-y-3">
+						<div class="skeleton h-4 w-24"></div>
+						<div class="skeleton h-6 w-16"></div>
+					</div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+templ TestsSkeleton() {
+	<div class="space-y-4">
+		<div class="skeleton h-8 w-32"></div>
+		<div class="skeleton h-9 w-48 rounded-select"></div>
+		@_skeletonTableRows(8, 5)
+	</div>
+}
+
+// ── All Runs ───────────────────────────────────────────────────────────────
+
+templ AllRunsSkeleton() {
+	<div class="space-y-4">
+		<div class="skeleton h-8 w-40"></div>
+		<div class="flex flex-wrap gap-3">
+			for range [6]struct{}{} {
+				<div class="space-y-1">
+					<div class="skeleton h-3 w-16"></div>
+					<div class="skeleton h-9 w-36 rounded-select"></div>
+				</div>
+			}
+		</div>
+		<div class="skeleton h-4 w-24"></div>
+		@_skeletonTableRows(8, 6)
+	</div>
+}
+
+// ── Test Detail ────────────────────────────────────────────────────────────
+
+templ TestDetailSkeleton() {
+	<div class="space-y-6">
+		<div class="flex items-center gap-4">
+			<div class="skeleton h-8 w-20"></div>
+			<div class="skeleton h-8 w-64 grow"></div>
+			<div class="skeleton h-8 w-28 rounded-btn"></div>
+		</div>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			for range [4]struct{}{} {
+				<div class="card bg-base-100 border border-base-200 shadow-sm">
+					<div class="card-body p-4 space-y-3">
+						<div class="skeleton h-4 w-24"></div>
+						<div class="skeleton h-6 w-16"></div>
+					</div>
+				</div>
+			}
+		</div>
+		<div class="skeleton h-16 w-full rounded-box"></div>
+		<div class="flex items-center justify-between">
+			<div class="skeleton h-4 w-20"></div>
+			<div class="skeleton h-8 w-40 rounded-input"></div>
+		</div>
+		@_skeletonTableRows(5, 5)
+	</div>
+}
+
+// ── Run Detail ─────────────────────────────────────────────────────────────
+
+templ RunDetailSkeleton() {
+	<div class="space-y-6">
+		<div class="flex items-center gap-4">
+			<div class="skeleton h-8 w-20"></div>
+			<div class="skeleton h-8 w-48 grow"></div>
+			<div class="skeleton h-8 w-28 rounded-btn"></div>
+		</div>
+		<div class="space-y-1">
+			<div class="skeleton h-3 w-48"></div>
+			<div class="skeleton h-6 w-72"></div>
+		</div>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+			for range [3]struct{}{} {
+				<div class="card bg-base-100 border border-base-200 shadow-sm">
+					<div class="card-body p-4 space-y-3">
+						<div class="skeleton h-4 w-16"></div>
+						<div class="skeleton h-6 w-24"></div>
+					</div>
+				</div>
+			}
+		</div>
+		<div class="flex items-center justify-between">
+			<div class="skeleton h-6 w-24"></div>
+			<div class="skeleton h-6 w-16 rounded-btn"></div>
+		</div>
+		@_skeletonTableRows(5, 4)
+	</div>
+}
+
+// ── Experiments ────────────────────────────────────────────────────────────
+
+templ ExperimentsSkeleton() {
+	<div class="space-y-4">
+		<div class="skeleton h-8 w-48"></div>
+		@_skeletonTableRows(5, 5)
+	</div>
+}
+
+// ── Experiment Detail ──────────────────────────────────────────────────────
+
+templ ExperimentDetailSkeleton() {
+	<div class="space-y-6">
+		<div class="flex items-center gap-4">
+			<div class="skeleton h-8 w-20"></div>
+			<div class="skeleton h-8 w-48 grow"></div>
+		</div>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			for range [4]struct{}{} {
+				<div class="card bg-base-100 border border-base-200 shadow-sm">
+					<div class="card-body p-4 space-y-3">
+						<div class="skeleton h-4 w-20"></div>
+						<div class="skeleton h-6 w-12"></div>
+					</div>
+				</div>
+			}
+		</div>
+		<div class="skeleton h-4 w-12"></div>
+		<div class="flex gap-2">
+			for range [3]struct{}{} {
+				<div class="skeleton h-6 w-20 rounded-badge"></div>
+			}
+		</div>
+		<div class="skeleton h-6 w-24"></div>
+		@_skeletonTableRows(5, 5)
+	</div>
+}
+
+// ── Events Reference ───────────────────────────────────────────────────────
+
+templ EventsReferenceSkeleton() {
+	<div class="space-y-6">
+		<div class="skeleton h-8 w-48"></div>
+		<div class="skeleton h-4 w-full max-w-2xl"></div>
+		<div class="skeleton h-4 w-full max-w-xl"></div>
+		@_skeletonTableRows(8, 4)
+	</div>
+}
+
+// ── Shared: skeleton table rows ────────────────────────────────────────────
+
+templ _skeletonTableRows(rows int, cols int) {
+	<div class="overflow-x-auto rounded-box border border-base-200">
+		<table class="table table-sm w-full">
+			<thead>
+				<tr>
+					for i := 0; i < cols; i++ {
+						<th>
+							<div class="skeleton h-4 w-full max-w-24"></div>
+						</th>
+					}
+				</tr>
+			</thead>
+			<tbody>
+				for i := 0; i < rows; i++ {
+					<tr>
+						for j := 0; j < cols; j++ {
+							<td>
+								<div class="skeleton h-4 w-full"></div>
+							</td>
+						}
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}

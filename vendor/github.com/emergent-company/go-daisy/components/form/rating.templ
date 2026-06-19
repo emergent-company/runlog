@@ -1,0 +1,33 @@
+package form
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// RatingShape controls the shape of rating inputs.
+type RatingShape string
+
+const (
+	RatingStar  RatingShape = "mask-star-2"
+	RatingHeart RatingShape = "mask-heart"
+)
+
+// Rating renders a star/heart rating input.
+// value: currently selected (1-based), max: total options
+// color: "bg-orange-400", "bg-red-400" etc.
+// size: "" | "rating-sm" | "rating-lg"
+templ Rating(name string, value int, max int, shape RatingShape, color string, size string) {
+	<div class={ "rating", size } { devmode.Attrs(ctx, "form/Rating")... }>
+		for i := 1; i <= max; i++ {
+			<input
+				type="radio"
+				name={ name }
+				class={ "mask", string(shape), color }
+				value={ strconv.Itoa(i) }
+				checked?={ i == value }
+			/>
+		}
+	</div>
+}

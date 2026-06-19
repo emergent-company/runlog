@@ -1,0 +1,84 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// NotificationItem holds the data for a single notification entry.
+type NotificationItem struct {
+	// IconClass is the Tailwind class for the icon background (e.g. "bg-primary/10").
+	IconClass string
+	// IconTextClass is the text color for the icon (e.g. "text-primary").
+	IconTextClass string
+	// IconName is the Iconify icon identifier (e.g. "lucide--briefcase").
+	IconName string
+	// Title is the bold notification heading.
+	Title string
+	// Body is the secondary description text.
+	Body string
+	// Time is the relative timestamp string (e.g. "2 min ago").
+	Time string
+	// Unread highlights this row with a dot indicator.
+	Unread bool
+}
+
+// NotificationRow renders a single notification list item.
+templ NotificationRow(item NotificationItem) {
+	<li class={ "flex gap-3 px-4 py-3", templ.KV("bg-primary/5", item.Unread) } { devmode.Attrs(ctx, "ui/NotificationRow")... }>
+		<div class={ "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", item.IconClass }>
+			<span class={ "iconify size-4", item.IconName, item.IconTextClass } aria-hidden="true"></span>
+		</div>
+		<div class="min-w-0 flex-1">
+			<p class="text-sm font-medium text-base-content">{ item.Title }</p>
+			<p class="text-xs text-base-content/60 mt-0.5">{ item.Body }</p>
+			<p class="text-xs text-base-content/50 mt-1">{ item.Time }</p>
+		</div>
+		if item.Unread {
+			<span class="mt-1 size-2 shrink-0 rounded-full bg-primary"></span>
+		}
+	</li>
+}
+
+// NotificationPanel renders a tab-based notification center with All / Unread tabs
+// and a children slot for notification items.
+templ NotificationPanel(unreadCount int, viewAllHref string) {
+	<div class="bg-base-100 border border-base-200 rounded-box shadow-lg w-80" { devmode.Attrs(ctx, "ui/NotificationPanel")... }>
+		<div class="flex items-center justify-between px-4 pt-4 pb-2">
+			<p class="font-semibold text-sm">Notifications</p>
+			<button class="btn btn-ghost btn-xs text-primary">Mark all read</button>
+		</div>
+		<div role="tablist" class="tabs tabs-border px-4">
+			<a role="tab" class="tab tab-active tab-sm">All</a>
+			<a role="tab" class="tab tab-sm">
+				Unread
+				if unreadCount > 0 {
+					<span class="badge badge-xs badge-primary ml-1">{ intStr(unreadCount) }</span>
+				}
+			</a>
+		</div>
+		<ul class="divide-y divide-base-200">
+			{ children... }
+		</ul>
+		<div class="px-4 py-3 border-t border-base-200">
+			<a href={ templ.URL(viewAllHref) } class="text-xs text-primary hover:underline">View all notifications</a>
+		</div>
+	</div>
+}
+
+// intStr converts an int to a string for use inside templ templates.
+func intStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	s := ""
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	if neg {
+		return "-" + s
+	}
+	return s
+}

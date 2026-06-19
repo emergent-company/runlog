@@ -1,0 +1,92 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ClipboardCopyItem holds one copy-able field for the ClipboardCopy component.
+type ClipboardCopyItem struct {
+	// ID must be unique on the page.
+	ID string
+	// Label is the section heading shown above the field.
+	Label string
+	// Value is the text to copy.
+	Value string
+	// ButtonLabel is the copy button text (default "Copy").
+	ButtonLabel string
+	// ButtonClass is extra DaisyUI classes for the button (e.g. "btn-primary").
+	ButtonClass string
+	// Mono renders the value in a monospace <code> badge instead of an <input>.
+	Mono bool
+}
+
+// ClipboardCopy renders one or more click-to-copy fields with visual feedback.
+// Uses vanilla JS navigator.clipboard — no library needed.
+templ ClipboardCopy(items []ClipboardCopyItem) {
+	<div class="space-y-4" { devmode.Attrs(ctx, "form/ClipboardCopy")... }>
+		for _, item := range items {
+			<div>
+				if item.Label != "" {
+					<p class="text-xs text-base-content/60 mb-2 font-semibold uppercase">{ item.Label }</p>
+				}
+				<div class="flex items-center gap-2">
+					if item.Mono {
+						<code class="bg-base-200 text-base-content px-3 py-1.5 rounded text-sm font-mono flex-1">{ item.Value }</code>
+					} else {
+						<input
+							id={ item.ID }
+							type="text"
+							value={ item.Value }
+							readonly
+							class="input input-bordered input-sm flex-1 font-mono text-sm"
+						/>
+					}
+					<button
+						class={ "btn btn-sm btn-outline", item.ButtonClass }
+						onclick={ clipboardOnClick(item.ID, item.Value, item.Mono) }
+					>
+						<span class="iconify lucide--copy size-4" aria-hidden="true"></span>
+						if item.ButtonLabel != "" {
+							{ item.ButtonLabel }
+						} else {
+							Copy
+						}
+					</button>
+				</div>
+			</div>
+		}
+	</div>
+	@clipboardScript()
+}
+
+func clipboardOnClick(id string, value string, mono bool) templ.ComponentScript {
+	if mono {
+		return templ.JSFuncCall("clipboardCopyText", value)
+	}
+	return templ.JSFuncCall("clipboardCopyInput", id)
+}
+
+templ clipboardScript() {
+	<script>
+	if (!window._clipboardInit) {
+	  window._clipboardInit = true;
+	  window.clipboardCopyInput = function(inputId) {
+	    var el = document.getElementById(inputId);
+	    if (!el) return;
+	    var btn = event.currentTarget;
+	    navigator.clipboard.writeText(el.value).then(function() {
+	      var orig = btn.innerHTML;
+	      btn.innerHTML = '✓ Copied!';
+	      btn.disabled = true;
+	      setTimeout(function() { btn.innerHTML = orig; btn.disabled = false; }, 2000);
+	    });
+	  };
+	  window.clipboardCopyText = function(text) {
+	    var btn = event.currentTarget;
+	    navigator.clipboard.writeText(text).then(function() {
+	      var orig = btn.innerHTML;
+	      btn.innerHTML = '✓';
+	      setTimeout(function() { btn.innerHTML = orig; }, 2000);
+	    });
+	  };
+	}
+	</script>
+}

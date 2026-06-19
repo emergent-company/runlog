@@ -1,0 +1,44 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// FABAction holds the data for a single action in the FAB sub-menu.
+type FABAction struct {
+	// Label is the tooltip text shown next to the action button.
+	Label string
+	// Icon is the Iconify icon identifier (e.g. "lucide--briefcase").
+	Icon string
+	// Href is the target URL. Defaults to "#".
+	Href string
+}
+
+// FAB renders a CSS-only floating action button with an expandable sub-menu.
+// The FAB appears in the bottom-right of its nearest positioned ancestor.
+// No JS is required — the sub-menu opens via DaisyUI dropdown focus.
+templ FAB(icon string, actions []FABAction) {
+	<div class="absolute bottom-4 end-4 z-10" { devmode.Attrs(ctx, "ui/FAB")... }>
+		<div class="dropdown dropdown-top dropdown-end">
+			<div tabindex="0" role="button" class="btn btn-primary btn-lg btn-circle shadow-lg">
+				<span class={ "iconify size-6", icon } aria-hidden="true"></span>
+			</div>
+			<div tabindex="0" class="dropdown-content mb-3 space-y-2 flex flex-col items-end">
+				for _, action := range actions {
+					<div class="flex items-center gap-2">
+						<span class="bg-base-100 text-xs font-medium px-2 py-1 rounded shadow text-base-content/70">{ action.Label }</span>
+						<a
+							href={ templ.URL(func() string {
+								if action.Href == "" {
+									return "#"
+								}
+								return action.Href
+							}()) }
+							class="btn btn-sm btn-circle btn-outline bg-base-100 shadow"
+						>
+							<span class={ "iconify size-4", action.Icon } aria-hidden="true"></span>
+						</a>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}

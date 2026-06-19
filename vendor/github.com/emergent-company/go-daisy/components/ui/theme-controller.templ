@@ -1,0 +1,51 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ThemeInputType determines the HTML input type for a theme controller.
+type ThemeInputType string
+
+const (
+	ThemeCheckbox ThemeInputType = "checkbox"
+	ThemeRadio    ThemeInputType = "radio"
+)
+
+// ThemeController renders a DaisyUI theme-controller input.
+// Checking or selecting this input changes the page theme to match the value.
+// inputType should be ThemeCheckbox (single toggle) or ThemeRadio (one of many).
+// theme is the DaisyUI theme name (e.g. "dark", "cupcake", "synthwave").
+// label is the human-readable text shown next to the control.
+// checked sets the initial checked/selected state (useful for pre-selecting the active theme).
+templ ThemeController(theme string, inputType ThemeInputType, label string, checked bool) {
+	<div class="form-control" { devmode.Attrs(ctx, "ui/ThemeController")... }>
+		<label class="label cursor-pointer gap-3">
+			<span class="label-text">{ label }</span>
+			<input
+				type={ string(inputType) }
+				name="theme-controller"
+				class="theme-controller"
+				value={ theme }
+				checked?={ checked }
+			/>
+		</label>
+	</div>
+}
+
+// ThemeControllerBtn renders a DaisyUI theme-controller as a styled pill button.
+// Useful for building a theme picker grid. type is always radio.
+// checked sets the initial selected state.
+templ ThemeControllerBtn(theme string, checked bool) {
+	<div
+		class="outline outline-2 outline-base-content outline-offset-2 overflow-hidden rounded-lg"
+		{ devmode.Attrs(ctx, "ui/ThemeControllerBtn")... }
+	>
+		<input
+			type="radio"
+			name="theme-controller"
+			class="theme-controller btn btn-sm"
+			aria-label={ theme }
+			value={ theme }
+			checked?={ checked }
+		/>
+	</div>
+}

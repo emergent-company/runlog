@@ -1,0 +1,38 @@
+package ui
+
+import (
+	"fmt"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// Hover3DCard renders a DaisyUI hover-3d card that tilts and rotates on mouse hover.
+// extraClass is appended to the outer wrapper (e.g. "rounded-2xl w-64 h-40 bg-primary").
+// Children are rendered inside the inner hover-3d-layer element.
+templ Hover3DCard(extraClass string) {
+	<div
+		class={ "hover-3d", templ.KV(extraClass, extraClass != "") }
+		{ devmode.Attrs(ctx, "ui/Hover3DCard")... }
+	>
+		<div class="hover-3d-layer">
+			{ children... }
+		</div>
+	</div>
+}
+
+// Hover3DCardLayered renders a DaisyUI hover-3d card with multiple named layers for
+// parallax depth. Pass one templ.Component per layer; they are rendered as
+// hover-3d-layer-1, hover-3d-layer-2, etc. (up to the number DaisyUI supports).
+// extraClass is appended to the outer wrapper.
+templ Hover3DCardLayered(extraClass string, layers []templ.Component) {
+	<div
+		class={ "hover-3d", templ.KV(extraClass, extraClass != "") }
+		{ devmode.Attrs(ctx, "ui/Hover3DCardLayered")... }
+	>
+		for i, layer := range layers {
+			<div class={ fmt.Sprintf("hover-3d-layer-%d", i+1) }>
+				@layer
+			</div>
+		}
+	</div>
+}

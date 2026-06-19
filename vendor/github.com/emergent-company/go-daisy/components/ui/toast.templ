@@ -1,0 +1,61 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ToastType maps to a DaisyUI alert class.
+type ToastType string
+
+const (
+	ToastSuccess ToastType = "alert-success"
+	ToastError   ToastType = "alert-error"
+	ToastWarning ToastType = "alert-warning"
+	ToastInfo    ToastType = "alert-info"
+)
+
+// ToastScript renders a single global script that auto-dismisses any element
+// with the "toast-auto-dismiss" class. Include once in the page layout.
+templ ToastScript() {
+	<script>
+		(function(){
+			function dismissToast(el){
+				var d = parseInt(el.dataset.duration)||4000;
+				setTimeout(function(){
+					el.style.opacity='0';
+					el.style.transition='opacity 0.3s';
+					setTimeout(function(){ el.remove(); }, 300);
+				}, d);
+			}
+			document.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);
+			var obs = new MutationObserver(function(mutations){
+				mutations.forEach(function(m){
+					m.addedNodes.forEach(function(n){
+						if(n.nodeType===1){
+							if(n.classList && n.classList.contains('toast-auto-dismiss')) dismissToast(n);
+							n.querySelectorAll && n.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);
+						}
+					});
+				});
+			});
+			obs.observe(document.body, {childList:true, subtree:true});
+		})();
+	</script>
+}
+
+// Toast renders a single auto-dismissing toast notification.
+templ Toast(typ ToastType, message string) {
+	<div
+		class={ "alert text-sm shadow-md toast-auto-dismiss", string(typ) }
+		role="alert"
+		data-duration="4000"
+		{ devmode.Attrs(ctx, "ui/Toast")... }
+	>
+		<span>{ message }</span>
+	</div>
+}
+
+// ToastOOB renders a toast using HTMX out-of-band swap to append to #toast-container.
+templ ToastOOB(typ ToastType, message string) {
+	<div hx-swap-oob="beforeend:#toast-container" { devmode.Attrs(ctx, "ui/ToastOOB")... }>
+		@Toast(typ, message)
+	</div>
+}

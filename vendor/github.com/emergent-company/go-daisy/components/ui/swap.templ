@@ -1,0 +1,17 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Swap renders a checkbox-based swap toggle with two visual states.
+// onContent is shown when checked, offContent when unchecked.
+templ Swap(rotate bool, onContent templ.Component, offContent templ.Component) {
+	<label class={ "swap", templ.KV("swap-rotate", rotate) } { devmode.Attrs(ctx, "ui/Swap")... }>
+		<input type="checkbox"/>
+		<div class="swap-on">
+			@onContent
+		</div>
+		<div class="swap-off">
+			@offContent
+		</div>
+	</label>
+}

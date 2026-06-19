@@ -1,0 +1,77 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// InputSpinner renders a numeric increment/decrement input with +/− buttons.
+// It includes a small inline <script> to handle button clicks — no library needed.
+// id must be unique on the page.
+templ InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnClass string, inputClass string) {
+	<div class="flex items-center gap-3" { devmode.Attrs(ctx, "form/InputSpinner")... }>
+		<button
+			type="button"
+			class={ "btn btn-square", btnClass }
+			onclick={ templ.JSFuncCall("spinnerDecrement", id) }
+		>
+			<span class="iconify lucide--minus size-4" aria-hidden="true"></span>
+		</button>
+		<input
+			id={ id }
+			type="number"
+			value={ spinnerIntStr(value) }
+			if hasMinMax {
+				min={ spinnerIntStr(min) }
+				max={ spinnerIntStr(max) }
+			}
+			class={ "input input-bordered text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inputClass }
+		/>
+		<button
+			type="button"
+			class={ "btn btn-square", btnClass }
+			onclick={ templ.JSFuncCall("spinnerIncrement", id) }
+		>
+			<span class="iconify lucide--plus size-4" aria-hidden="true"></span>
+		</button>
+	</div>
+	@spinnerScript()
+}
+
+// spinnerScript emits the shared spinner JS once per page (deduplicated by templ).
+templ spinnerScript() {
+	<script>
+	if (!window._spinnerInit) {
+	  window._spinnerInit = true;
+	  window.spinnerGet = function(id) { return document.getElementById(id); };
+	  window.spinnerIncrement = function(id, step) {
+	    var el = spinnerGet(id); if (!el) return;
+	    var v = parseFloat(el.value)||0, s = step||1;
+	    var max = el.max !== '' ? parseFloat(el.max) : Infinity;
+	    el.value = Math.min(v + s, max);
+	  };
+	  window.spinnerDecrement = function(id, step) {
+	    var el = spinnerGet(id); if (!el) return;
+	    var v = parseFloat(el.value)||0, s = step||1;
+	    var min = el.min !== '' ? parseFloat(el.min) : -Infinity;
+	    el.value = Math.max(v - s, min);
+	  };
+	}
+	</script>
+}
+
+func spinnerIntStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	s := ""
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	if neg {
+		return "-" + s
+	}
+	return s
+}

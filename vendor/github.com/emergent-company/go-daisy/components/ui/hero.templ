@@ -1,0 +1,33 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Hero renders a DaisyUI hero section.
+templ Hero() {
+	<div class="hero" { devmode.Attrs(ctx, "ui/Hero")... }>
+		{ children... }
+	</div>
+}
+
+// HeroSection renders a hero section with a configurable min-height and background.
+templ HeroSection(minHeight string) {
+	<div class={ "hero", minHeight, "bg-base-200" } { devmode.Attrs(ctx, "ui/HeroSection")... }>
+		{ children... }
+	</div>
+}
+
+// HeroContent wraps the inner hero-content div.
+templ HeroContent(centered bool) {
+	<div class={ "hero-content", templ.KV("text-center", centered) } { devmode.Attrs(ctx, "ui/HeroContent")... }>
+		{ children... }
+	</div>
+}
+
+// HeroBody renders the standard hero body: heading, subtitle paragraph, and CTA button.
+templ HeroBody(title string, subtitle string, ctaLabel string) {
+	<div class="max-w-md" { devmode.Attrs(ctx, "ui/HeroBody")... }>
+		<h1 class="text-4xl font-bold">{ title }</h1>
+		<p class="py-4 text-base-content/60">{ subtitle }</p>
+		<button class="btn btn-primary">{ ctaLabel }</button>
+	</div>
+}

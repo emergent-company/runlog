@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -241,8 +242,7 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 		return nil, fmt.Errorf("test %q is already running", testName)
 	}
 
-	tmpl := lm.config.TestCommandOrDefault()
-	expanded := expandCommand(tmpl, testName, "")
+	expanded := lm.config.BuildTestCommand(testName)
 	now := time.Now()
 
 	cmd := exec.Command("sh", "-c", expanded)
@@ -288,6 +288,12 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 		for scanner.Scan() {
 			line := scanner.Text()
 			al.broadcast(line)
+			// Skip t.Log() lines (file.go:line: prefix) — these are already
+			// persisted by the test's rl.Printf() → dbEvent() path. Keeping
+			// them would create duplicate events for every Printf call.
+			if skipLogLine(line) {
+				continue
+			}
 			seq++
 			if al.RunID != 0 {
 				_ = lm.db.InsertEvent(al.RunID, seq, time.Now(), time.Since(al.Started).Seconds(), "log", line, nil)
@@ -373,36 +379,6 @@ func (al *ActiveLaunch) Unsubscribe(ch chan string) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-func expandCommand(tmpl, name, env string) string {
-	s := tmpl
-	// Use a simple for loop to replace placeholders.
-	// We don't need regex for basic {name} and {env} substitution.
-	buf := make([]byte, 0, len(s)*2)
-	for i := 0; i < len(s); i++ {
-		if s[i] == '{' {
-			end := i + 1
-			for end < len(s) && s[end] != '}' {
-				end++
-			}
-			if end < len(s) {
-				key := s[i+1 : end]
-				switch key {
-				case "name":
-					buf = append(buf, name...)
-				case "env":
-					buf = append(buf, env...)
-				default:
-					buf = append(buf, s[i:end+1]...)
-				}
-				i = end
-				continue
-			}
-		}
-		buf = append(buf, s[i])
-	}
-	return string(buf)
-}
 
 // statusFromRun returns the status string for a RunRow.
 func statusFromRun(r runlog.RunRow) string {
@@ -563,4 +539,33 @@ func (app *WebApp) runTimeoutWorker(ctx context.Context) {
 // reqCtx returns a context with the request context from Echo.
 func reqCtx(c echo.Context) context.Context {
 	return c.Request().Context()
+}
+
+// skipLogLine returns true for lines that should NOT be persisted as run_events.
+// These are lines from go test -v that are already handled by the test's own
+// dbEvent() path (rl.Printf → dbEvent inserts into run_events directly).
+func skipLogLine(line string) bool {
+	// Skip t.Log() output lines: "    file.go:line: message"
+	// These are prefixed with 4+ spaces followed by a .go file reference.
+	// They are duplicates of rl.Printf → dbEvent entries.
+	if len(line) > 4 {
+		trimmed := line
+		i := 0
+		for i < len(trimmed) && trimmed[i] == ' ' {
+			i++
+		}
+		if i >= 4 && i < len(trimmed)-5 {
+			rest := trimmed[i:]
+			// Match "file.go:number: " pattern
+			if dotIdx := strings.Index(rest, ".go:"); dotIdx > 0 && dotIdx < 40 {
+				afterDot := rest[dotIdx+4:]
+				colonIdx := strings.Index(afterDot, ":")
+				if colonIdx > 0 && colonIdx < 10 {
+					// Has .go:digits: prefix — it's a t.Log() line, skip it
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

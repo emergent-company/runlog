@@ -1,0 +1,175 @@
+package main
+
+import (
+	"fmt"
+	"net/url"
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/components/table"
+	"github.com/emergent-company/go-daisy/components/ui"
+)
+
+templ TestsPage(data testListData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - Tests", appName()), sidebarGroups) {
+		@testsContent(data)
+	}
+}
+
+templ TestsContent(data testListData) {
+	@testsContent(data)
+}
+
+templ testsContent(data testListData) {
+	<div data-testid="tests-content">
+		@testsContentInner(data)
+	</div>
+}
+
+templ testsContentInner(data testListData) {
+	<h1 class="text-2xl font-bold mb-4">Tests</h1>
+	<div
+		class="flex flex-wrap gap-3 mb-4 items-end"
+		hx-get="/ui/tests"
+		hx-target="[data-testid='tests-content']"
+		hx-trigger="change from:select"
+	>
+		<select
+			class="select select-bordered select-sm w-full max-w-xs"
+			name="category"
+			data-testid="category-filter"
+		>
+			<option value="">All Categories</option>
+			for _, cat := range data.Categories {
+				if data.ActiveFilter == cat.Name {
+					<option value={ cat.Name } selected>{ cat.Name }</option>
+				} else {
+					<option value={ cat.Name }>{ cat.Name }</option>
+				}
+			}
+		</select>
+		<select
+			class="select select-bordered select-sm w-full max-w-xs"
+			name="status"
+			data-testid="status-filter"
+		>
+			<option value="">All Statuses</option>
+			if data.StatusFilter == "pass" {
+				<option value="pass" selected>Pass</option>
+			} else {
+				<option value="pass">Pass</option>
+			}
+			if data.StatusFilter == "fail" {
+				<option value="fail" selected>Fail</option>
+			} else {
+				<option value="fail">Fail</option>
+			}
+			if data.StatusFilter == "skip" {
+				<option value="skip" selected>Skip</option>
+			} else {
+				<option value="skip">Skip</option>
+			}
+			if data.StatusFilter == "running" {
+				<option value="running" selected>Running</option>
+			} else {
+				<option value="running">Running</option>
+			}
+			if data.StatusFilter == "never_run" {
+				<option value="never_run" selected>Never Run</option>
+			} else {
+				<option value="never_run">Never Run</option>
+			}
+			if data.StatusFilter == "timeout" {
+				<option value="timeout" selected>Timeout</option>
+			} else {
+				<option value="timeout">Timeout</option>
+			}
+		</select>
+	</div>
+	<div id="test-list" data-testid="test-list" class="contents">
+		if len(data.Categories) > 0 {
+			@flatTestTable(data)
+		} else {
+			@emptyState("No tests found in database.")
+		}
+	</div>
+	<script>
+		document.querySelector('[data-testid="tests-content"]')?.addEventListener('click', function(e) {
+			var btn = e.target.closest('[data-run-test]');
+			if (!btn || typeof htmx === 'undefined') return;
+			var name = btn.getAttribute('data-run-test');
+			window.location.href = '/ui/launch/' + name;
+		});
+	</script>
+}
+
+templ flatTestTable(data testListData) {
+	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+		@table.TableHead() {
+			@table.TableHeadRow() {
+				@table.TableHeadCell("Test Name")
+				@table.TableHeadCell("Status")
+				@table.TableHeadCell("Category")
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Runs</th> <!-- lint:allow-raw -->
+				@table.TableHeadCell("Last Run")
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Action</th> <!-- lint:allow-raw -->
+			}
+		}
+		@table.TableBody() {
+			for _, cat := range data.Categories {
+				if data.ActiveFilter == "" || data.ActiveFilter == cat.Name {
+					for _, e := range cat.Tests {
+						<tr
+							id={ "test-" + e.Name }
+							class="hover"
+							hx-get={ "/ui/tests/" + url.PathEscape(e.Name) }
+							hx-target="#main-content"
+							hx-swap="innerHTML"
+							hx-push-url="true"
+							hx-sync="#main-content:replace"
+							hx-trigger="click[!target.closest('.dropdown')]"
+						>
+							@table.TableCell("", nil) {
+								@text(e.Name)
+							}
+							@table.TableCell("", nil) {
+								@statusBadge(e.LastStatus)
+							}
+							@table.TableCell("", nil) {
+								<span class="badge badge-ghost badge-xs">{ cat.Name }</span>
+							}
+							@table.TableCell("text-right w-16", nil) {
+								if e.NeverRun {
+									<span class="text-base-content/30">—</span>
+								} else {
+									@text(strconv.Itoa(e.RunCount))
+								}
+							}
+							@table.TableCell("", nil) {
+								if e.NeverRun {
+									<span class="text-base-content/30">—</span>
+								} else {
+									@text(e.LastRunAt)
+								}
+							}
+							@table.TableCell("text-center w-16", nil) {
+								@ui.Dropdown(ui.DropdownEnd, nil) {
+									<button class="btn btn-ghost btn-xs" tabindex="0">
+										<span class="iconify lucide--ellipsis-vertical size-4"></span>
+									</button>
+									@ui.DropdownMenu(nil) {
+										<li>
+											<button
+												data-run-test={ url.PathEscape(e.Name) }
+												class="w-full text-left px-4 py-2 text-sm"
+											>Run Test</button>
+										</li>
+									}
+								}
+							}
+						</tr>
+					}
+				}
+			}
+		}
+	}
+}

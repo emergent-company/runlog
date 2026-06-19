@@ -1,0 +1,38 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// AlertType maps to a DaisyUI alert modifier class.
+type AlertType string
+
+const (
+	AlertSuccess AlertType = "alert-success"
+	AlertError   AlertType = "alert-error"
+	AlertWarning AlertType = "alert-warning"
+	AlertInfo    AlertType = "alert-info"
+)
+
+// Alert renders a DaisyUI alert banner.
+// Set icon to a Lucide icon suffix (e.g. "lucide--circle-check") to show an icon.
+// Leave icon empty for a text-only alert.
+// attrs is optional; pass nil when not needed.
+templ Alert(typ AlertType, icon string, message string, attrs templ.Attributes) {
+	<div role="alert" class={ "alert", string(typ) } { devmode.Attrs(ctx, "ui/Alert")... } { attrs... }>
+		if icon != "" {
+			<span class={ "iconify size-5 " + icon }></span>
+		}
+		<span>{ message }</span>
+	</div>
+}
+
+// InlineAlert is a backwards-compatible alias for Alert without an icon.
+// Deprecated: use Alert(typ, "", message, nil) directly.
+templ InlineAlert(typ AlertType, message string) {
+	@Alert(typ, "", message, nil)
+}
+
+// InlineAlertWithIcon is a backwards-compatible alias for Alert with an icon.
+// Deprecated: use Alert(typ, icon, message, nil) directly.
+templ InlineAlertWithIcon(typ AlertType, icon string, message string) {
+	@Alert(typ, icon, message, nil)
+}

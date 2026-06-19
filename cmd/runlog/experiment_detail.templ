@@ -1,0 +1,50 @@
+package main
+
+import (
+	"fmt"
+
+	runlog "github.com/emergent-company/runlog"
+)
+
+templ ExperimentDetailPage(exp runlog.ExperimentSummary) {
+	@AppPage(fmt.Sprintf("Runlog - %s - %s", appName(), exp.Name), sidebarGroups) {
+		@experimentDetailContent(exp)
+	}
+}
+
+templ ExperimentDetailContent(exp runlog.ExperimentSummary) {
+	@experimentDetailContent(exp)
+}
+
+templ experimentDetailContent(exp runlog.ExperimentSummary) {
+	<div data-testid="experiment-detail-page">
+		<div class="flex items-center gap-4 mb-6">
+			@backButton("/ui/experiments")
+			<h1 class="text-2xl font-bold">{ exp.Name }</h1>
+		</div>
+		<div class="mb-6">
+			@statsGrid([]statItem{
+				{Label: "Total Runs", Value: fmt.Sprintf("%d", exp.RunCount)},
+				{Label: "Passed", Value: fmt.Sprintf("%d", exp.PassCount)},
+				{Label: "Failed", Value: fmt.Sprintf("%d", exp.FailCount)},
+				{Label: "Skipped", Value: fmt.Sprintf("%d", exp.SkipCount)},
+			}, 4)
+		</div>
+		if len(exp.Tags) > 0 {
+			<div class="mb-6">
+				<h3 class="text-sm font-semibold text-base-content/60 uppercase mb-2">Tags</h3>
+				<div class="flex flex-wrap gap-1">
+					for _, tag := range exp.Tags {
+						<span class="badge badge-ghost badge-sm">{ tag }</span>
+					}
+				</div>
+			</div>
+		}
+		@sectionHeading("Runs")
+		if len(exp.Runs) > 0 {
+			@runsTable(exp.Runs, runsTableOpts{ShowID: true, ShowTags: true})
+		} else {
+			@emptyState("No runs for this experiment.")
+		}
+	</div>
+}

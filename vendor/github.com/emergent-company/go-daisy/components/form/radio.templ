@@ -1,0 +1,29 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// RadioGroup renders a group of radio buttons.
+// options: list of (value, label) pairs
+templ RadioGroup(name string, selected string, options [][2]string, color string) {
+	@Field("", name, "") {
+		for _, opt := range options {
+			@RadioButton(name, opt[0], opt[1], opt[0] == selected, color)
+		}
+	}
+}
+
+// RadioButton renders a single labeled radio input.
+templ RadioButton(name string, value string, label string, checked bool, color string) {
+	<label class="label cursor-pointer justify-start gap-4" { devmode.Attrs(ctx, "form/RadioButton")... }>
+		<input
+			type="radio"
+			name={ name }
+			value={ value }
+			class={ "radio", color }
+			if checked {
+				checked
+			}
+		/>
+		<span class="label-text">{ label }</span>
+	</label>
+}

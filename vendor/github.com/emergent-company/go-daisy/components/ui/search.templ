@@ -1,0 +1,53 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// SearchDropdownItem holds one result row in the search dropdown.
+type SearchDropdownItem struct {
+	// Icon is the Iconify icon identifier shown before the label.
+	Icon string
+	// Label is the display text.
+	Label string
+	// Href is the link target. Defaults to "#".
+	Href string
+}
+
+// SearchDropdownSection is a labelled group of search results.
+type SearchDropdownSection struct {
+	Title string
+	Items []SearchDropdownItem
+}
+
+// SearchDropdown renders a CSS-only search input with a results dropdown.
+// No JS is required — the dropdown opens via DaisyUI focus.
+templ SearchDropdown(placeholder string, sections []SearchDropdownSection) {
+	<div class="dropdown dropdown-bottom w-full max-w-sm" { devmode.Attrs(ctx, "ui/SearchDropdown")... }>
+		<label tabindex="0" class="input input-sm input-bordered flex items-center gap-2 px-2 w-full">
+			<span class="iconify lucide--search size-4 text-base-content/50" aria-hidden="true"></span>
+			<input placeholder={ placeholder } class="grow bg-transparent text-sm focus:outline-none" type="text"/>
+		</label>
+		<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-1 w-full shadow-lg border border-base-200 z-50">
+			<ul class="menu menu-sm w-full p-1">
+				for _, section := range sections {
+					<li><p class="menu-title text-xs text-base-content/50 px-3 py-1">{ section.Title }</p></li>
+					for _, item := range section.Items {
+						<li>
+							<a
+								href={ templ.URL(func() string {
+									if item.Href == "" {
+										return "#"
+									}
+									return item.Href
+								}()) }
+								class="flex items-center gap-2 text-sm"
+							>
+								<span class={ "iconify size-4 text-base-content/50", item.Icon } aria-hidden="true"></span>
+								{ item.Label }
+							</a>
+						</li>
+					}
+				}
+			</ul>
+		</div>
+	</div>
+}

@@ -1,0 +1,322 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+dotenv:
+  - .env
+
+vars:
+  DAEMON_PID_FILE: /tmp/runlog-daemon.pid
+  TEMPL_BIN: "{{.HOME}}/go/bin/templ"
+  # Test server (manual UI review)
+  TS_DB: /tmp/runlog-test.db
+  TS_PORT: "17431"
+  # Memory e2e test server
+  MEMORY_DB: /root/emergent.memory.e2e/.runlog/runs.db
+  MEMORY_PORT: "17432"
+  # Dogfood: runlog tracking its own test runs
+  DOGFOOD_DB: /tmp/runlog-dogfood.db
+  DOGFOOD_PORT: "17433"
+  DOGFOOD_BIN: /tmp/runlog-dogfood-bin
+  DOGFOOD_LOG: /tmp/runlog-dogfood.log
+
+tasks:
+  # Memory e2e test server (emergent.memory.e2e database)
+  #   task test:server:memory          foreground (Ctrl+C to stop)
+  #   task test:server:memory:start    background (http://localhost:17432)
+  #   task test:server:memory:stop
+  #   task test:server:memory:restart
+  #
+  # Uses the existing runs.db from emergent.memory.e2e (54MB, 100+ tests).
+  # The DB is read-only — no seeding.
+
+  test:server:memory:
+    desc: "Run memory e2e test server in foreground with hot-reload (Ctrl+C to stop)"
+    env:
+      RUNLOG_APP_TITLE: emergent.memory
+    cmds:
+      - air -c .air.memory.toml
+
+  test:server:memory:start:
+    desc: "Start memory e2e test server in background (http://localhost:{{.MEMORY_PORT}})"
+    env:
+      RUNLOG_APP_TITLE: emergent.memory
+    cmds:
+      - task: test:server:memory:stop
+      - go run ./cmd/runlog --db {{.MEMORY_DB}} daemon --port {{.MEMORY_PORT}}
+
+  test:server:memory:stop:
+    desc: Stop the memory e2e test server
+    cmds:
+      - |
+        PID=$(fuser {{.MEMORY_PORT}}/tcp 2>/dev/null | tr -d ' ' || true)
+        if [ -n "$PID" ]; then
+          kill "$PID" 2>/dev/null || true
+          echo "Memory test server stopped (PID $PID)"
+        else
+          echo "No process on port {{.MEMORY_PORT}}"
+        fi
+
+  test:server:memory:restart:
+    desc: Restart the memory e2e test server
+    cmds:
+      - task: test:server:memory:stop
+      - task: test:server:memory:start
+
+  # ── Build ─────────────────────────────────────────────────────────────────
+
+  build:
+    desc: Compile all Go binaries
+    cmds:
+      - go build ./...
+
+  templ:
+    desc: Regenerate all templ-generated Go files
+    cmds:
+      - "{{.TEMPL_BIN}} generate ./cmd/runlog/"
+
+  templ:fmt:
+    desc: Format all .templ source files in-place
+    cmds:
+      - "{{.TEMPL_BIN}} fmt ."
+
+  templ:watch:
+    desc: Watch and regenerate templ files on change
+    cmds:
+      - "{{.TEMPL_BIN}} generate --watch ./cmd/runlog/"
+
+  # ── Daemon ─────────────────────────────────────────────────────────────────
+
+  daemon:start:
+    desc: Build and start the daemon in the background (port 7430)
+    silent: true
+    cmds:
+      - |
+        if [ -f {{.DAEMON_PID_FILE}} ] && kill -0 "$(cat {{.DAEMON_PID_FILE}})" 2>/dev/null; then
+          echo "Daemon already running (PID $(cat {{.DAEMON_PID_FILE}}))"
+          exit 0
+        fi
+        go build -o /tmp/runlog-bin ./cmd/runlog
+        nohup /tmp/runlog-bin daemon > /tmp/runlog-daemon.log 2>&1 &
+        echo $! > {{.DAEMON_PID_FILE}}
+        echo "Daemon started (PID $!), http://localhost:7430"
+
+  daemon:stop:
+    desc: Stop the background daemon
+    silent: true
+    cmds:
+      - |
+        if [ ! -f {{.DAEMON_PID_FILE}} ]; then
+          echo "No PID file found — daemon may not be running"
+          exit 0
+        fi
+        PID=$(cat {{.DAEMON_PID_FILE}})
+        if kill -0 "$PID" 2>/dev/null; then
+          kill "$PID"
+          echo "Daemon stopped (PID $PID)"
+        else
+          echo "Process $PID not running"
+        fi
+        rm -f {{.DAEMON_PID_FILE}}
+
+  daemon:restart:
+    desc: Restart the daemon
+    cmds:
+      - task: daemon:stop
+      - task: daemon:start
+
+  daemon:
+    desc: Run the daemon in the foreground (Ctrl+C to stop)
+    cmds:
+      - go run ./cmd/runlog daemon
+
+  # ── Tests ──────────────────────────────────────────────────────────────────
+
+  test:
+    desc: Run all unit tests (no network/credentials required)
+    cmds:
+      - go test ./... -count=1
+
+  test:verbose:
+    desc: Run all unit tests with verbose output
+    cmds:
+      - go test ./... -count=1 -v
+
+  test:race:
+    desc: Run all unit tests with race detector enabled
+    cmds:
+      - go test -race ./... -count=1
+
+  test:cover:
+    desc: Run tests with coverage report
+    cmds:
+      - go test ./... -count=1 -coverprofile=coverage.out
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report written to coverage.html"
+
+  # ── Test Server (manual UI review with seeded data) ─────────────────────────
+  #
+  #   task test:server          foreground + hot-reload (Ctrl+C to stop)
+  #   task test:server:start    background (http://localhost:17431)
+  #   task test:server:stop
+  #   task test:server:restart
+  #
+  # Uses the same seed data as the e2e tests (tests/web/fixture/).
+  # The seed produces: TestPass, TestFail, TestSkip, TestMetrics, TestWithTags.
+  #
+  # Hot-reload: any .go or .templ change rebuilds + restarts automatically.
+
+  test:server:
+    desc: "Run test server in foreground with hot-reload (Ctrl+C to stop)"
+    env:
+      RUNLOG_APP_TITLE: runlog-test
+    cmds:
+      - rm -f {{.TS_DB}}
+      - go run ./tests/web/fixture/ --db {{.TS_DB}}
+      - air -c .air.test.toml
+
+  test:server:start:
+    desc: "Start test server in background (http://localhost:{{.TS_PORT}})"
+    env:
+      RUNLOG_APP_TITLE: runlog-test
+    cmds:
+      - rm -f {{.TS_DB}}
+      - go run ./tests/web/fixture/ --db {{.TS_DB}}
+      - go run ./cmd/runlog --db {{.TS_DB}} daemon --port {{.TS_PORT}}
+
+  test:server:stop:
+    desc: Stop the test server
+    cmds:
+      - |
+        PID=$(fuser {{.TS_PORT}}/tcp 2>/dev/null | tr -d ' ' || true)
+        if [ -n "$PID" ]; then
+          kill "$PID" 2>/dev/null || true
+          echo "Test server stopped (PID $PID)"
+        else
+          echo "No process on port {{.TS_PORT}}"
+        fi
+
+  test:server:restart:
+    desc: Restart the test server
+    cmds:
+      - task: test:server:stop
+      - task: test:server:start
+
+  # ── Dogfood: runlog tracking its own tests ─────────────────────────────────
+  #
+  #   task dogfood:start     start the dogfood daemon (background)
+  #   task dogfood:stop      stop it
+  #   task dogfood:restart   restart
+  #   task dogfood:status    check daemon status
+  #
+  # The dogfood daemon runs on port 17433 with its own DB.  All test commands
+  # set RUNLOG_DAEMON_URL so that runlog itself records its own test runs.
+
+  dogfood:start:
+    desc: Start dogfood runlog daemon (port {{.DOGFOOD_PORT}}) — empty DB, tests populate it
+    cmds:
+      - task: dogfood:stop
+      - rm -f {{.DOGFOOD_DB}}
+      - bash scripts/dogfood-start.sh {{.DOGFOOD_PORT}} {{.DOGFOOD_DB}} {{.DOGFOOD_BIN}} {{.DOGFOOD_LOG}}
+
+  dogfood:stop:
+    desc: Stop dogfood runlog daemon
+    cmds:
+      - |
+        PID=$(fuser {{.DOGFOOD_PORT}}/tcp 2>/dev/null | tr -d ' ' || true)
+        if [ -n "$PID" ]; then
+          kill "$PID" 2>/dev/null || true
+          echo "Dogfood daemon stopped (PID $PID)"
+        else
+          echo "Dogfood daemon not running"
+        fi
+
+  dogfood:restart:
+    desc: Restart dogfood runlog daemon
+    cmds:
+      - task: dogfood:stop
+      - task: dogfood:start
+
+  dogfood:status:
+    desc: Check dogfood daemon status
+    cmds:
+      - curl -s http://localhost:{{.DOGFOOD_PORT}}/status | python3 -m json.tool || echo "Not running"
+
+  dogfood:server:
+    desc: "Run dogfood daemon in foreground with hot-reload (Ctrl+C to stop)"
+    env:
+      RUNLOG_APP_TITLE: "runlog (dogfood)"
+    cmds:
+      - task: dogfood:stop
+      - rm -f {{.DOGFOOD_DB}}
+      - air -c .air.dogfood.toml
+
+  # ── Test: dogfood-wrapped ───────────────────────────────────────────────────
+
+  test:dogfood:
+    desc: Run Go unit tests with dogfood daemon recording results
+    env:
+      RUNLOG_DAEMON_URL: 'http://localhost:{{.DOGFOOD_PORT}}'
+    cmds:
+      - task: dogfood:start
+      - go run ./cmd/runlog test -- --count=1 ./...
+
+  test:dogfood:single:
+    desc: "Run a single Go test with dogfood. Usage: task test:dogfood:single -- TestFoo"
+    env:
+      RUNLOG_DAEMON_URL: 'http://localhost:{{.DOGFOOD_PORT}}'
+    cmds:
+      - task: dogfood:start
+      - go run ./cmd/runlog test {{.CLI_ARGS}} -- --count=1 ./...
+
+  test:e2e:
+    desc: Run Playwright e2e tests on the web UI (dogfood-enabled)
+    dir: tests/web
+    env:
+      RUNLOG_DAEMON_URL: 'http://localhost:{{.DOGFOOD_PORT}}'
+    cmds:
+      - task: dogfood:start
+      - npm ci
+      - npx playwright install chromium
+      - npm run test:e2e
+
+  test:e2e:legacy:
+    desc: Run Playwright e2e tests without dogfood (standalone)
+    dir: tests/web
+    cmds:
+      - npm ci
+      - npx playwright install chromium
+      - npm run test:e2e
+
+  test:single:
+    desc: "Run a single test by name. Usage: task test:single -- TestFooBar"
+    cmds:
+      - go test -v -count=1 -run {{.CLI_ARGS}} ./...
+
+  # ── Lint ───────────────────────────────────────────────────────────────────
+
+  lint:
+    desc: Run all linters (templ-fmt, gofmt, go vet, dead code, secrets, etc.) via lefthook
+    cmds:
+      - lefthook run lint
+
+  secrets:scan:
+    desc: Scan entire working tree for leaked secrets (gitleaks)
+    cmds:
+      - gitleaks dir . --config .gitleaks.toml --no-banner
+
+  # ── Housekeeping ───────────────────────────────────────────────────────────
+
+  fmt:
+    desc: Format all Go source files
+    cmds:
+      - gofmt -w .
+
+  tidy:
+    desc: Tidy go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  clean:
+    desc: Remove test coverage artifacts
+    cmds:
+      - rm -f coverage.out coverage.html

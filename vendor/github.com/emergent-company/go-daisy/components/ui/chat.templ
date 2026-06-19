@@ -1,0 +1,108 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ChatBubble renders a chat conversation bubble.
+//
+// sent=true → chat-end (right), sent=false → chat-start (left)
+// avatarSrc: optional image URL for chat-image slot (squircle avatar)
+// botIcon: when true renders a bot-icon avatar instead of a photo (overrides avatarSrc)
+// bubbleClass: optional modifier e.g. "chat-bubble-primary"
+// showActions: when true renders a hover-reveal action toolbar (Regenerate, Copy, thumbs)
+// attrs: optional extra HTML attributes spread on the root element
+templ ChatBubble(sent bool, author string, timestamp string, avatarSrc string, botIcon bool, bubbleClass string, showActions bool, attrs templ.Attributes) {
+	<div
+		class={ "chat group", templ.KV("chat-end", sent), templ.KV("chat-start", !sent) }
+		{ devmode.Attrs(ctx, "ui/ChatBubble")... }
+		{ attrs... }
+	>
+		if botIcon {
+			<div class="chat-image bg-primary/5 text-primary border-primary/10 flex items-center justify-center rounded-full border p-2">
+				<span class="iconify lucide--bot size-6" aria-hidden="true"></span>
+			</div>
+		} else if avatarSrc != "" {
+			<div class="chat-image avatar">
+				<div class="w-10">
+					<img class="mask mask-squircle bg-base-200 p-0.5" src={ avatarSrc } alt={ author }/>
+				</div>
+			</div>
+		}
+		if author != "" {
+			<div class="chat-header text-xs text-base-content/50 mb-0.5">{ author }</div>
+		}
+		<div class={ "chat-bubble relative", bubbleClass }>
+			{ children... }
+			if showActions {
+				<div class="border-base-300 bg-base-100 absolute end-2 -bottom-8 z-10 flex scale-90 items-center gap-1.5 rounded-full border px-3 py-2 opacity-0 transition-all group-hover:scale-100 group-hover:opacity-100">
+					<button class="btn btn-xs" type="button">Regenerate</button>
+					<button class="btn btn-xs" type="button">Copy</button>
+					<button class="btn btn-xs btn-ghost btn-error btn-circle" type="button" aria-label="Dislike">
+						<span class="iconify lucide--thumbs-down size-3.5" aria-hidden="true"></span>
+					</button>
+					<button class="btn btn-xs btn-ghost btn-success btn-circle" type="button" aria-label="Like">
+						<span class="iconify lucide--thumbs-up size-3.5" aria-hidden="true"></span>
+					</button>
+				</div>
+			}
+		</div>
+		if timestamp != "" {
+			<div class="chat-footer text-xs text-base-content/60 mt-0.5 opacity-50">{ timestamp }</div>
+		}
+	</div>
+}
+
+// AIThinkingIndicator renders the inline "AI is thinking" animated dots pill.
+// Shown while waiting for a response; typically placed at the end of the message list.
+templ AIThinkingIndicator() {
+	<div
+		class="bg-primary/5 text-primary border-primary/10 rounded-box inline-flex items-center border px-4 py-2"
+		{ devmode.Attrs(ctx, "ui/AIThinkingIndicator")... }
+	>
+		<span class="loading loading-dots loading-sm" aria-label="AI is thinking"></span>
+	</div>
+}
+
+// ChatWindow wraps a list of chat bubbles in a scrollable container.
+// heightClass controls the height, e.g. "h-[calc(100vh-220px)]" or "h-96".
+// Use space-y-3 inside for consistent bubble spacing.
+templ ChatWindow(heightClass string, attrs templ.Attributes) {
+	<div
+		class={ "overflow-y-auto", heightClass }
+		{ devmode.Attrs(ctx, "ui/ChatWindow")... }
+		{ attrs... }
+	>
+		<div class="space-y-3 p-4">
+			{ children... }
+		</div>
+	</div>
+}
+
+// ChatInput renders a compact single-line chat input bar.
+// Suitable for real-time messaging (not AI prompt bars).
+// showAttach: show paperclip icon button on the left.
+// placeholder: input placeholder text.
+// attrs: optional extra attributes on the outer wrapper.
+templ ChatInput(showAttach bool, placeholder string, attrs templ.Attributes) {
+	<form
+		class="bg-base-200 flex items-center gap-3 p-4"
+		{ devmode.Attrs(ctx, "ui/ChatInput")... }
+		{ attrs... }
+	>
+		if showAttach {
+			<button class="btn btn-ghost btn-sm btn-circle" aria-label="Attach file" type="button">
+				<span class="iconify lucide--paperclip size-4.5" aria-hidden="true"></span>
+			</button>
+		}
+		<input
+			class="input validator grow"
+			required
+			placeholder={ placeholder }
+			type="text"
+			aria-label="Message"
+			name="message"
+		/>
+		<button class="btn btn-primary btn-circle btn-sm" type="submit" aria-label="Send message">
+			<span class="iconify lucide--send-horizontal size-4.5" aria-hidden="true"></span>
+		</button>
+	</form>
+}

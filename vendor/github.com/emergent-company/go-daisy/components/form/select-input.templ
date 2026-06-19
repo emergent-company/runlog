@@ -1,0 +1,21 @@
+package form
+
+// SelectInput renders a DaisyUI select dropdown with label.
+// options: [][2]string where [0]=value, [1]=label
+templ SelectInput(name string, label string, selected string, options [][2]string, errMsg string, required bool) {
+	@Field(label, name, errMsg) {
+		<select
+			id={ name }
+			name={ name }
+			required?={ required }
+			class={ "select select-bordered w-full", templ.KV("select-error", errMsg != "") }
+		>
+			for _, opt := range options {
+				<option
+					value={ opt[0] }
+					selected?={ opt[0] == selected }
+				>{ opt[1] }</option>
+			}
+		</select>
+	}
+}

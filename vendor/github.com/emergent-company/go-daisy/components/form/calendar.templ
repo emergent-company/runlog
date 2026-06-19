@@ -1,0 +1,88 @@
+package form
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// CalendarVariant controls the calendar display style.
+type CalendarVariant string
+
+const (
+	CalendarDefault CalendarVariant = ""             // single month calendar
+	CalendarRange   CalendarVariant = "calendar-range" // range-selection calendar
+)
+
+// CalendarWrapper wraps a calendar library's output with DaisyUI calendar classes.
+// Children should be the calendar library's HTML (e.g. a <table> produced by Pikaday,
+// Flatpickr, or a plain HTML <table> built manually).
+// variant controls single vs range style.
+templ CalendarWrapper(variant CalendarVariant) {
+	<div
+		class={
+			"calendar",
+			templ.KV(string(variant), variant != CalendarDefault),
+		}
+		{ devmode.Attrs(ctx, "form/CalendarWrapper")... }
+	>
+		{ children... }
+	</div>
+}
+
+// CalendarDemo renders a static HTML month calendar for gallery/demo purposes.
+// month and year are display strings (e.g. "June", "2025").
+// startWeekday is the 0-based day of the week the 1st falls on (0=Sun … 6=Sat).
+// daysInMonth is the total number of days in the month (28–31).
+// today marks which day number to highlight as today (0 to disable).
+// selected marks which day number to highlight as selected (0 to disable).
+templ CalendarDemo(month string, year string, startWeekday int, daysInMonth int, today int, selected int) {
+	<div class="calendar" { devmode.Attrs(ctx, "form/CalendarDemo")... }>
+		<div class="calendar-nav">
+			<button class="btn btn-ghost btn-sm" aria-label="Previous month">&#8249;</button>
+			<span class="font-semibold">{ month } { year }</span>
+			<button class="btn btn-ghost btn-sm" aria-label="Next month">&#8250;</button>
+		</div>
+		<table class="calendar-table">
+			<thead>
+				<tr>
+					<th>Su</th>
+					<th>Mo</th>
+					<th>Tu</th>
+					<th>We</th>
+					<th>Th</th>
+					<th>Fr</th>
+					<th>Sa</th>
+				</tr>
+			</thead>
+			<tbody>
+				@calendarRows(startWeekday, daysInMonth, today, selected)
+			</tbody>
+		</table>
+	</div>
+}
+
+// calendarRows generates the <tr>/<td> grid for CalendarDemo.
+templ calendarRows(startWeekday int, daysInMonth int, today int, selected int) {
+	{{ day := 1 }}
+	for day <= daysInMonth {
+		<tr>
+			for c := 0; c < 7; c++ {
+				if (day == 1 && c < startWeekday) || day > daysInMonth {
+					<td></td>
+				} else {
+					<td>
+						<button
+							class={
+								"btn btn-sm btn-ghost btn-square",
+								templ.KV("btn-primary", day == selected),
+								templ.KV("btn-outline", day == today && day != selected),
+							}
+						>{ strconv.Itoa(day) }</button>
+					</td>
+					{{ day++ }}
+				}
+			}
+		</tr>
+	}
+}

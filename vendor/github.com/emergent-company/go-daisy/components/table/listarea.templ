@@ -1,0 +1,56 @@
+package table
+
+import (
+	"fmt"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// ListArea renders a self-contained filterable+paginated (or scroll-load) list area.
+templ ListArea(props ListAreaProps) {
+	<div id={ props.ID } class="rounded-box border border-base-200 bg-base-100" { devmode.Attrs(ctx, "table/ListArea")... }>
+		<form
+			id={ props.ID + "-form" }
+			hx-get={ props.URL }
+			hx-target={ "#" + props.ID }
+			hx-swap="outerHTML"
+			hx-push-url="true"
+		>
+			{ children... }
+			if !props.ScrollLoad && props.TotalPages > 1 {
+				@ui.PaginationWithProps(ui.PaginationProps{
+					CurrentPage: props.CurrentPage,
+					TotalPages:  props.TotalPages,
+					TotalItems:  props.TotalItems,
+					PageSize:    props.PageSize,
+					BaseURL:     props.URL + "?",
+					TargetID:    props.ID,
+				})
+			}
+		</form>
+		if props.ScrollLoad && props.CurrentPage < props.TotalPages {
+			@ListAreaSentinel(ScrollSentinelProps{
+				ID:       props.ID,
+				URL:      props.URL,
+				NextPage: props.CurrentPage + 1,
+				ColSpan:  props.ColSpan,
+			})
+		}
+	</div>
+}
+
+// ListAreaSentinel renders the scroll-load trigger element.
+templ ListAreaSentinel(props ScrollSentinelProps) {
+	<div
+		id={ props.ID + "-sentinel" }
+		hx-get={ fmt.Sprintf("%s?page=%d&scroll=1", props.URL, props.NextPage) }
+		hx-trigger="intersect once"
+		hx-swap="outerHTML"
+		hx-include={ "#" + props.ID + "-form" }
+		class="flex justify-center py-4"
+		{ devmode.Attrs(ctx, "table/ListAreaSentinel")... }
+	>
+		<span class="loading loading-spinner loading-sm text-base-content/40"></span>
+	</div>
+}

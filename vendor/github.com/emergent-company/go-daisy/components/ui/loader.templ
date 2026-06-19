@@ -1,0 +1,107 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Loader renders a DaisyUI loading spinner.
+// variant controls the layout: centered (default), inline, or overlay.
+templ Loader(variant LoaderVariant) {
+	switch variant {
+	case LoaderInline:
+		<span class="loading loading-spinner loading-sm text-primary" { devmode.Attrs(ctx, "ui/Loader")... }></span>
+	case LoaderOverlay:
+		<div class="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10" { devmode.Attrs(ctx, "ui/Loader")... }>
+			<span class="loading loading-spinner loading-lg text-primary"></span>
+		</div>
+	default:
+		<div class="flex items-center justify-center py-12" { devmode.Attrs(ctx, "ui/Loader")... }>
+			<span class="loading loading-spinner loading-lg text-primary"></span>
+		</div>
+	}
+}
+
+// HTMXIndicator renders a hidden spinner revealed by HTMX during requests.
+templ HTMXIndicator(id string) {
+	<span id={ id } class="htmx-indicator" { devmode.Attrs(ctx, "ui/HTMXIndicator")... }>
+		<span class="loading loading-spinner loading-sm"></span>
+	</span>
+}
+
+// Tooltip wraps children with a DaisyUI tooltip.
+templ Tooltip(tip string) {
+	<div class="tooltip" data-tip={ tip } { devmode.Attrs(ctx, "ui/Tooltip")... }>
+		{ children... }
+	</div>
+}
+
+// TooltipPositioned wraps children with a DaisyUI tooltip with an optional position modifier.
+// position: "" (default), "top", "bottom", "left", "right"
+templ TooltipPositioned(tip string, position string) {
+	<div class={ "tooltip", templ.KV("tooltip-"+position, position != "") } data-tip={ tip } { devmode.Attrs(ctx, "ui/TooltipPositioned")... }>
+		{ children... }
+	</div>
+}
+
+// SectionHeader renders a section label with a DaisyUI divider.
+templ SectionHeader(title string) {
+	<div class="divider divider-start text-xs font-semibold text-base-content/50 uppercase tracking-wide my-2" { devmode.Attrs(ctx, "ui/SectionHeader")... }>{ title }</div>
+}
+
+// NoPermissions renders a permission-denied placeholder.
+templ NoPermissions() {
+	<div class="flex flex-col items-center justify-center py-16 text-center" { devmode.Attrs(ctx, "ui/NoPermissions")... }>
+		<span class="iconify lucide--lock size-10 text-base-content/20 mb-3"></span>
+		<p class="text-base-content/50 text-sm">You don't have permission to view this.</p>
+	</div>
+}
+
+// Skeleton renders a DaisyUI skeleton placeholder block.
+templ Skeleton(classes string) {
+	<div class={ "skeleton", classes } { devmode.Attrs(ctx, "ui/Skeleton")... }></div>
+}
+
+// SkeletonDashboardBlock holds the label and grid-column span for a dashboard placeholder block.
+type SkeletonDashboardBlock struct {
+	Label   string
+	ColSpan string // e.g. "col-span-12 lg:col-span-8"
+	Height  string // e.g. "h-64"
+}
+
+// SkeletonDashboard renders a dashed placeholder grid for planning dashboard layouts.
+// Pass nil to use a default 4-stat + chart + table layout.
+templ SkeletonDashboard(blocks []SkeletonDashboardBlock) {
+	<div class="p-6 space-y-4" { devmode.Attrs(ctx, "ui/SkeletonDashboard")... }>
+		if len(blocks) == 0 {
+			<!-- default layout -->
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				for range [4]struct{}{} {
+					<div class="border-base-300/80 bg-base-200/20 rounded-box flex h-28 flex-col items-center justify-center border border-dashed text-center">
+						<p class="text-base-content/80 font-medium text-sm">Stats</p>
+						<p class="text-base-content/50 text-xs">1 / 4</p>
+					</div>
+				}
+			</div>
+			<div class="grid grid-cols-12 gap-4">
+				<div class="border-base-300/80 bg-base-200/20 rounded-box col-span-12 flex h-64 flex-col items-center justify-center border border-dashed text-center lg:col-span-8">
+					<p class="text-base-content/80 font-medium text-sm">Primary Chart</p>
+					<p class="text-base-content/50 text-xs">8 / 12</p>
+				</div>
+				<div class="border-base-300/80 bg-base-200/20 rounded-box col-span-12 flex h-64 flex-col items-center justify-center border border-dashed text-center lg:col-span-4">
+					<p class="text-base-content/80 font-medium text-sm">Side Panel</p>
+					<p class="text-base-content/50 text-xs">4 / 12</p>
+				</div>
+			</div>
+			<div class="border-base-300/80 bg-base-200/20 rounded-box flex h-48 flex-col items-center justify-center border border-dashed text-center">
+				<p class="text-base-content/80 font-medium text-sm">Full-Width Table</p>
+				<p class="text-base-content/50 text-xs">12 / 12</p>
+			</div>
+		} else {
+			<div class="grid grid-cols-12 gap-4">
+				for _, b := range blocks {
+					<div class={ "border-base-300/80 bg-base-200/20 rounded-box flex flex-col items-center justify-center border border-dashed text-center", b.ColSpan, b.Height }>
+						<p class="text-base-content/80 font-medium text-sm">{ b.Label }</p>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}

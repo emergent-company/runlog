@@ -1,0 +1,201 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"html"
+	"io"
+)
+
+// EventChildrenPartial renders expanded event children (HTMX partial).
+templ EventChildrenPartial(data eventChildrenData) {
+	<td colspan="4" class="bg-base-200 p-4" data-testid={ fmt.Sprintf("event-children-%d", data.EventID) }>
+		<!-- lint:allow-raw -->
+		if data.Kind == "gantt" && isJSON(data.Details) {
+			@renderGanttChart(data.EventID, data.Details)
+		} else if data.Kind == "http_call" && isJSON(data.Details) {
+			@renderHttpCall(data.Details)
+		} else if data.Kind == "artifact" && isJSON(data.Details) {
+			@renderArtifact(data.Details)
+		} else if len(data.Children) > 0 {
+			<div class="text-sm">
+				<table class="table table-xs w-full" data-testid={ fmt.Sprintf("child-table-%d", data.EventID) }>
+					<thead>
+						<!-- lint:allow-raw -->
+						<tr>
+							<!-- lint:allow-raw -->
+							<th class="w-16">Kind</th> <!-- lint:allow-raw -->
+							<th>Message</th> <!-- lint:allow-raw -->
+							<th class="w-20">Elapsed</th> <!-- lint:allow-raw -->
+						</tr>
+					</thead>
+					<tbody>
+						<!-- lint:allow-raw -->
+						for _, c := range data.Children {
+							<tr>
+								<!-- lint:allow-raw -->
+								<td><span class="badge badge-ghost badge-sm">{ c.Kind }</span></td> <!-- lint:allow-raw -->
+								<td class="font-mono text-xs whitespace-pre-wrap max-w-lg">{ c.Message }</td> <!-- lint:allow-raw -->
+								<td>{ fmtElapsed(c.ElapsedS) }</td> <!-- lint:allow-raw -->
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		} else if data.Details != "" {
+			@renderedDetails(data.Details)
+		} else {
+			@emptyState("No details")
+		}
+	</td>
+}
+
+templ renderGanttChart(eventID int64, details string) {
+	<div
+		class="gantt-chart-container"
+		data-details={ details }
+		style="max-width:100%;overflow-x:auto"
+	></div>
+	<script>
+		(function() {
+			var el = document.currentScript && document.currentScript.previousElementSibling;
+			if (!el) return;
+			try {
+				var raw = el.getAttribute("data-details");
+				if (!raw) return;
+				var data = JSON.parse(raw);
+				if (!data.rows || !Array.isArray(data.rows) || data.rows.length === 0) return;
+				var tasks = data.rows.map(function(row, i) {
+					var startS = row.start_s || 0;
+					var endS = row.end_s || (startS + 1);
+					var now = new Date();
+					var startDate = new Date(now.getTime() + startS * 1000);
+					var endDate = new Date(now.getTime() + endS * 1000);
+					return {
+						id: "task-" + i,
+						name: row.agent_name || "step " + i,
+						start: startDate.toISOString().slice(0, 10),
+						end: endDate.toISOString().slice(0, 10),
+						progress: row.status === "pass" ? 100 : row.status === "fail" ? 0 : 50,
+						dependencies: i > 0 ? "task-" + (i - 1) : ""
+					};
+				});
+				el.innerHTML = '<svg></svg>';
+				new Gantt(el.querySelector("svg"), tasks, {
+					view_mode: "Day",
+					date_format: "MM-DD HH:mm",
+					bar_height: 24,
+					padding: 12,
+					container_height: Math.max(tasks.length * 36 + 40, 60)
+				});
+			} catch(e) {
+				var msg = e && e.message ? e.message : String(e);
+				el.innerHTML = '<pre class="font-mono text-xs whitespace-pre-wrap bg-base-300 p-2 rounded">Failed to render gantt: ' + msg + '</pre>';
+			}
+		})();
+	</script>
+}
+
+func mapToJSON(v any) string {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(b)
+}
+
+templ renderedDetails(details string) {
+	if isJSON(details) {
+		<div class="text-sm">
+			<pre class="font-mono text-xs whitespace-pre-wrap max-w-2xl max-h-64 overflow-auto bg-base-300 p-2 rounded">{ formatJSON(details) }</pre>
+		</div>
+	} else {
+		<div class="text-sm font-mono text-xs whitespace-pre-wrap max-w-2xl max-h-64 overflow-auto bg-base-300 p-2 rounded">{ details }</div>
+	}
+}
+
+func renderHttpCall(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	method := getStrField(details, "method")
+	url := getStrField(details, "url")
+	statusCode := getFloatField(details, "status_code")
+	statusClass := "badge-success"
+	if statusCode >= 400 {
+		statusClass = "badge-error"
+	} else if statusCode >= 300 {
+		statusClass = "badge-warning"
+	}
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm %s">%.0f</span><span class="badge badge-sm badge-ghost font-mono">%s</span><span class="font-mono text-xs break-all">%s</span></div>`, statusClass, statusCode, html.EscapeString(method), html.EscapeString(url))
+		if err != nil { return err }
+		if headers, ok := details["headers"].(map[string]any); ok && len(headers) > 0 {
+			hJSON := mapToJSON(headers)
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box"><summary class="collapse-title text-xs font-semibold">Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(headers), html.EscapeString(hJSON))
+			if err != nil { return err }
+		}
+		if body, ok := details["response_body"]; ok && body != nil {
+			bJSON := mapToJSON(body)
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box"><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto">%s</pre></div></details>`, html.EscapeString(bJSON))
+			if err != nil { return err }
+		}
+		_, err = fmt.Fprint(w, `</div>`)
+		return err
+	})
+}
+
+func renderArtifact(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	artType := getStrField(details, "type")
+	artURL := getStrField(details, "url")
+	mime := getStrField(details, "mime")
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm badge-primary">%s</span><span class="text-xs text-base-content/50">%s</span></div>`, html.EscapeString(artType), html.EscapeString(mime))
+		if err != nil { return err }
+		if mime == "image/png" || mime == "image/jpeg" || mime == "image/webp" {
+			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" rel="noopener noreferrer"><img src="%s" class="max-w-full max-h-96 rounded-box border border-base-300 cursor-pointer hover:opacity-90 transition-opacity" alt="artifact"/></a>`, html.EscapeString(artURL), html.EscapeString(artURL))
+		} else {
+			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" class="btn btn-ghost btn-sm"><span class="iconify lucide--download size-4"></span> Download artifact</a>`, html.EscapeString(artURL))
+		}
+		if err != nil { return err }
+		_, err = fmt.Fprint(w, `</div>`)
+		return err
+	})
+}
+
+func parseEventDetails(s string) map[string]any {
+	var details map[string]any
+	if err := json.Unmarshal([]byte(s), &details); err != nil {
+		return map[string]any{}
+	}
+	return details
+}
+
+func getStrField(d map[string]any, key string) string {
+	v, _ := d[key].(string)
+	return v
+}
+
+func getFloatField(d map[string]any, key string) float64 {
+	v, _ := d[key].(float64)
+	return v
+}
+
+func isJSON(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	return s[0] == '{' || s[0] == '['
+}
+
+func formatJSON(s string) string {
+	var anyVal any
+	if err := json.Unmarshal([]byte(s), &anyVal); err != nil {
+		return s
+	}
+	formatted, err := json.MarshalIndent(anyVal, "", "  ")
+	if err != nil {
+		return s
+	}
+	return string(formatted)
+}

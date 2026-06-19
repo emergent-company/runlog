@@ -1,0 +1,43 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Diff renders a DaisyUI diff comparison container with two side-by-side panels.
+templ Diff() {
+	<div class="diff" { devmode.Attrs(ctx, "ui/Diff")... }>
+		{ children... }
+	</div>
+}
+
+// DiffContainer renders a sized, styled diff wrapper for the gallery.
+templ DiffContainer() {
+	<div class="diff aspect-[16/6] w-full max-w-lg rounded-box overflow-hidden border border-base-200" { devmode.Attrs(ctx, "ui/DiffContainer")... }>
+		{ children... }
+	</div>
+}
+
+// DiffItem1 renders the first (left/before) panel of a Diff.
+templ DiffItem1() {
+	<div class="diff-item-1" { devmode.Attrs(ctx, "ui/DiffItem1")... }>
+		{ children... }
+	</div>
+}
+
+// DiffItem2 renders the second (right/after) panel of a Diff.
+templ DiffItem2() {
+	<div class="diff-item-2" { devmode.Attrs(ctx, "ui/DiffItem2")... }>
+		{ children... }
+	</div>
+}
+
+// DiffResizer renders the draggable resizer handle inside a Diff.
+templ DiffResizer() {
+	<div class="diff-resizer" { devmode.Attrs(ctx, "ui/DiffResizer")... }></div>
+}
+
+// DiffItemContent renders labelled content inside a DiffItem panel.
+templ DiffItemContent(text string, bold bool) {
+	<div class={ "flex items-center justify-center p-4 text-sm", templ.KV("font-medium", bold), templ.KV("text-base-content/60", !bold) } { devmode.Attrs(ctx, "ui/DiffItemContent")... }>
+		{ text }
+	</div>
+}

@@ -1,0 +1,106 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StatCardProps configures a summary stat widget.
+type StatCardProps struct {
+	Label     string           // short descriptor, e.g. "Active Sessions"
+	Value     string           // e.g. "12"
+	Icon      string           // Lucide icon suffix, e.g. "lucide--briefcase"
+	IconColor string           // Tailwind classes for icon container, e.g. "bg-primary/10 text-primary"
+	Attrs     templ.Attributes // optional extra HTML attributes, e.g. {"data-testid": "stat-sessions"}
+}
+
+// StatCard renders a compact summary widget: icon + big number + label.
+templ StatCard(p StatCardProps) {
+	@CardRaw("border border-base-content/10 shadow-sm h-full", "p-4 flex flex-row items-center gap-3 h-full", p.Attrs) {
+		<div class={ "rounded-xl p-2.5 shrink-0 flex items-center justify-center", p.IconColor }>
+			@IconSpan(p.Icon, "size-5")
+		</div>
+		<div class="min-w-0">
+			<p class="text-xl font-bold text-base-content leading-none">{ p.Value }</p>
+			<p class="text-xs text-base-content/60 mt-1 whitespace-nowrap">{ p.Label }</p>
+		</div>
+	}
+}
+
+// StatCards renders a responsive grid of StatCard widgets.
+templ StatCards(cards []StatCardProps) {
+	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 py-4 items-stretch" { devmode.Attrs(ctx, "ui/StatCards")... }>
+		for _, c := range cards {
+			@StatCard(c)
+		}
+	</div>
+}
+
+// ProgressStat is a single label/value pair in a ProgressCard stats row.
+type ProgressStat struct {
+	Label string
+	Value string
+}
+
+// ProgressCardProps configures a ProgressCard component.
+type ProgressCardProps struct {
+	Title         string
+	Subtitle      string
+	ProgressValue int              // 0–100
+	ProgressLabel string           // text shown next to the progress bar
+	Stats         []ProgressStat
+	GradientClass string           // optional Tailwind gradient utility classes for the header
+	Horizontal    bool             // if true, renders title+progress inline (compact row)
+	Attrs         templ.Attributes // optional extra HTML attributes, e.g. {"data-testid": "progress-card"}
+}
+
+// ProgressCard renders a card with a progress bar and optional stats row.
+// Set Horizontal=true for a compact inline layout.
+templ ProgressCard(props ProgressCardProps) {
+	if props.Horizontal {
+		@CardRaw("shadow-sm border border-base-content/10 overflow-hidden", "px-4 py-3 flex items-center justify-between gap-3", props.Attrs) {
+			<div>
+				<p class="text-sm font-semibold text-base-content">{ props.Title }</p>
+				if props.Subtitle != "" {
+					<p class="text-xs text-base-content/60">{ props.Subtitle }</p>
+				}
+			</div>
+			<div class="flex items-center gap-2 min-w-0">
+				<progress class="progress progress-primary w-24" value={ strconv.Itoa(props.ProgressValue) } max="100"></progress>
+				<span class="text-xs font-medium text-base-content/70 whitespace-nowrap">{ strconv.Itoa(props.ProgressValue) }%</span>
+			</div>
+		}
+	} else {
+		@CardRaw("shadow-sm border border-base-content/10 overflow-hidden", "p-0 gap-0", props.Attrs) {
+			<div class={ "p-4", props.GradientClass }>
+				<h3 class="text-base font-semibold text-base-content">{ props.Title }</h3>
+				if props.Subtitle != "" {
+					<p class="text-sm text-base-content/50 mt-0.5">{ props.Subtitle }</p>
+				}
+			</div>
+			<div class="p-4 pt-3 flex flex-col gap-3">
+				<div class="flex items-center gap-3">
+					<progress
+						class="progress progress-primary flex-1"
+						value={ strconv.Itoa(props.ProgressValue) }
+						max="100"
+					></progress>
+					if props.ProgressLabel != "" {
+						<span class="text-sm font-medium text-base-content/60 whitespace-nowrap">{ props.ProgressLabel }</span>
+					}
+				</div>
+				if len(props.Stats) > 0 {
+					<div class="flex flex-wrap gap-4">
+						for _, s := range props.Stats {
+							<div class="flex flex-col">
+								<span class="text-xs text-base-content/50">{ s.Label }</span>
+								<span class="text-sm font-semibold text-base-content">{ s.Value }</span>
+							</div>
+						}
+					</div>
+				}
+			</div>
+		}
+	}
+}

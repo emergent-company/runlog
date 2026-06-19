@@ -1,0 +1,50 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// LabelProps configures a DaisyUI label component.
+type LabelProps struct {
+	// Text is the primary label text shown on the left of the label row.
+	Text string
+	// AltText is secondary text shown on the right of the label row (e.g. hints, character count).
+	AltText string
+	// For links the label to an input by id (sets the HTML for= attribute).
+	For string
+}
+
+// Label renders a DaisyUI label with optional primary and alt text.
+// Use it to wrap form inputs and provide accessible field labeling.
+// Children (the input element) are rendered below the top label row.
+templ Label(props LabelProps) {
+	<div class="form-control" { devmode.Attrs(ctx, "form/Label")... }>
+		if props.Text != "" || props.AltText != "" {
+			<label
+				class="label pb-1"
+				if props.For != "" {
+					for={ props.For }
+				}
+			>
+				if props.Text != "" {
+					<span class="label-text">{ props.Text }</span>
+				}
+				if props.AltText != "" {
+					<span class="label-text-alt">{ props.AltText }</span>
+				}
+			</label>
+		}
+		{ children... }
+	</div>
+}
+
+// LabelAlt renders a bottom label row — typically used for hints or error text below an input.
+// text appears on the left (hint), altText appears on the right (e.g. character count or secondary note).
+templ LabelAlt(text string, altText string) {
+	<div class="label" { devmode.Attrs(ctx, "form/LabelAlt")... }>
+		if text != "" {
+			<span class="label-text-alt">{ text }</span>
+		}
+		if altText != "" {
+			<span class="label-text-alt">{ altText }</span>
+		}
+	</div>
+}

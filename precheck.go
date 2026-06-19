@@ -88,7 +88,7 @@ func checkHealth(t *testing.T, rl *RunLog) {
 	var h struct {
 		Status string `json:"status"`
 	}
-	if err := json.Unmarshal(body, &h); err == nil && h.Status != "" && h.Status != "healthy" {
+	if err := json.Unmarshal(body, &h); err == nil && h.Status != "" && h.Status != "healthy" && h.Status != "degraded" {
 		DoSkipf(t, rl, "pre-check: server reports status %q (not healthy) at %s", h.Status, srv)
 	}
 

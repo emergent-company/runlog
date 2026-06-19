@@ -1,0 +1,111 @@
+package main
+
+import (
+	"fmt"
+
+	form "github.com/emergent-company/go-daisy/components/form"
+	runlog "github.com/emergent-company/runlog"
+)
+
+const runsPerPage = 50
+
+templ AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) {
+	@AppPage(fmt.Sprintf("Runlog - %s - All Runs", appName()), sidebarGroups) {
+		@allRunsContent(rows, catMap, total, f, categories)
+	}
+}
+
+templ AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) {
+	@allRunsContent(rows, catMap, total, f, categories)
+}
+
+templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) {
+	<div data-testid="all-runs-page">
+		<h1 class="text-2xl font-bold mb-6">All Runs</h1>
+		<div class="flex flex-wrap gap-3 mb-4 items-end" data-testid="runs-filters">
+			{{
+				catOpts := [][2]string{{"", "All"}}
+				for _, cat := range categories {
+					catOpts = append(catOpts, [2]string{cat, cat})
+				}
+			}}
+			@form.FormSelect("category", "Category", f.Category, catOpts, "", form.LabelAbove, "", "", templ.Attributes{
+				"hx-get": "/ui/runs",
+				"hx-target": "#runs-table",
+				"hx-trigger": "change",
+				"hx-push-url": "true",
+				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-category",
+			})
+			@form.FormSelect("status", "Status", f.Status, [][2]string{
+				{"", "All"},
+				{"pass", "Pass"},
+				{"fail", "Fail"},
+				{"skip", "Skip"},
+				{"running", "Running"},
+			}, "", form.LabelAbove, "", "", templ.Attributes{
+				"hx-get": "/ui/runs",
+				"hx-target": "#runs-table",
+				"hx-trigger": "change",
+				"hx-push-url": "true",
+				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-status",
+			})
+			@form.FormSelect("since", "Since", f.Since, [][2]string{
+				{"", "All time"},
+				{"1h", "Last hour"},
+				{"24h", "Last 24h"},
+				{"7d", "Last 7 days"},
+				{"30d", "Last 30 days"},
+			}, "", form.LabelAbove, "", "", templ.Attributes{
+				"hx-get": "/ui/runs",
+				"hx-target": "#runs-table",
+				"hx-trigger": "change",
+				"hx-push-url": "true",
+				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-since",
+			})
+			@form.FormInput("search", "Test name", f.Search, "Search by name...", form.LabelAbove, "", "", templ.Attributes{
+				"hx-get": "/ui/runs",
+				"hx-target": "#runs-table",
+				"hx-trigger": "keyup changed delay:500ms",
+				"hx-push-url": "true",
+				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-search",
+			})
+			@form.FormInput("tags", "Tags", f.Tags, "Filter by tag...", form.LabelAbove, "", "", templ.Attributes{
+				"hx-get": "/ui/runs",
+				"hx-target": "#runs-table",
+				"hx-trigger": "keyup changed delay:500ms",
+				"hx-push-url": "true",
+				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-tags",
+			})
+			@form.FormCheckbox("has_cost", "Has cost data", f.HasCost, "", templ.Attributes{
+				"value": "1",
+				"hx-get": "/ui/runs",
+				"hx-target": "#runs-table",
+				"hx-trigger": "change",
+				"hx-push-url": "true",
+				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-cost",
+			})
+		</div>
+		<p class="text-sm text-base-content/60 mb-4">{ fmt.Sprintf("%d run(s)", total) }</p>
+		<div id="runs-table" data-testid="runs-table">
+			@runsTableContent(rows, catMap, total, f)
+		</div>
+	</div>
+}
+
+// runsTableContent is the HTMX partial — only the table + pagination, no filters/title.
+templ runsTableContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters) {
+	if len(rows) > 0 {
+		@runsTable(rows, runsTableOpts{ShowID: true, ShowCategory: true, Categories: catMap})
+		if f.Offset+runsPerPage < total {
+			@loadMoreButton(fmt.Sprintf("/ui/runs?offset=%d&category=%s&status=%s&since=%s&search=%s&tags=%s&has_cost=%s", f.Offset+runsPerPage, f.Category, f.Status, f.Since, f.Search, f.Tags, boolToOneZeroStr(f.HasCost)), "#runs-table")
+		}
+	} else {
+		@emptyState("No runs match filters.")
+	}
+}

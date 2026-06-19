@@ -1,0 +1,29 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// maxHoverGalleryImages is the DaisyUI limit for hover-gallery children.
+const maxHoverGalleryImages = 10
+
+// HoverGalleryImage is a single image entry in a HoverGallery.
+type HoverGalleryImage struct {
+	// Src is the image URL.
+	Src string
+	// Alt is the accessible alt text for the image.
+	Alt string
+}
+
+// HoverGallery renders a DaisyUI hover-gallery component.
+// The first image is visible by default; hovering horizontally reveals subsequent images.
+// images is capped at 10 entries (DaisyUI limit); an empty slice renders nothing.
+templ HoverGallery(images []HoverGalleryImage) {
+	if len(images) > 0 {
+		{{ capped := images }}
+		{{ if len(capped) > maxHoverGalleryImages { capped = capped[:maxHoverGalleryImages] } }}
+		<div class="hover-gallery" { devmode.Attrs(ctx, "ui/HoverGallery")... }>
+			for _, img := range capped {
+				<img src={ img.Src } alt={ img.Alt } loading="lazy"/>
+			}
+		</div>
+	}
+}

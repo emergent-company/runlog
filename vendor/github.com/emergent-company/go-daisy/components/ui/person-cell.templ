@@ -1,0 +1,33 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// PersonCellProps holds data for a PersonCell.
+type PersonCellProps struct {
+	// Name is the primary label (also drives avatar initials when no Src/Icon is set).
+	Name string
+	// Subtitle is optional secondary text (e.g. email, role, department).
+	Subtitle string
+	// Src is an optional avatar image URL.
+	Src string
+	// Icon is an optional Iconify icon name used as the avatar placeholder (e.g. "lucide--user").
+	Icon string
+	// Size controls the avatar size. Defaults to AvatarSM when zero-value.
+	Size AvatarSize
+}
+
+// PersonCell renders an avatar next to a name and optional subtitle as a
+// horizontal flex unit. It can be used as a ListRow Leading slot, a table
+// cell, or anywhere a compact person identity block is needed.
+templ PersonCell(p PersonCellProps) {
+	{{ size := p.Size; if size == "" { size = AvatarSM } }}
+	<div class="flex items-center gap-3" { devmode.Attrs(ctx, "ui/PersonCell")... }>
+		@Avatar(p.Name, p.Src, p.Icon, size, nil)
+		<div class="min-w-0">
+			<div class="font-medium text-sm leading-tight truncate">{ p.Name }</div>
+			if p.Subtitle != "" {
+				<div class="text-xs text-base-content/50 leading-tight truncate">{ p.Subtitle }</div>
+			}
+		</div>
+	</div>
+}

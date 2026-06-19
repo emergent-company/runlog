@@ -1,0 +1,48 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+type DropdownAlign string
+
+const (
+	DropdownEnd    DropdownAlign = "dropdown-end"
+	DropdownTop    DropdownAlign = "dropdown-top"
+	DropdownBottom DropdownAlign = "dropdown-bottom"
+	DropdownLeft   DropdownAlign = "dropdown-left"
+	DropdownRight  DropdownAlign = "dropdown-right"
+)
+
+// Dropdown wraps a trigger + dropdown-content menu.
+// attrs is optional; pass nil when not needed.
+templ Dropdown(align DropdownAlign, attrs templ.Attributes) {
+	<div class={ "dropdown", string(align) } { devmode.Attrs(ctx, "ui/Dropdown")... } { attrs... }>
+		{ children... }
+	</div>
+}
+
+// DropdownTrigger renders a standard button trigger for a Dropdown.
+// attrs is optional; pass nil when not needed.
+templ DropdownTrigger(label string, variant string, attrs templ.Attributes) {
+	<div tabindex="0" role="button" class={ "btn", "btn-sm", "m-1", variant } { devmode.Attrs(ctx, "ui/DropdownTrigger")... } { attrs... }>
+		{ label }
+		<span class="iconify lucide--chevron-down size-3.5"></span>
+	</div>
+}
+
+// DropdownMenu renders the dropdown-content menu list.
+// attrs is optional; pass nil when not needed.
+templ DropdownMenu(attrs templ.Attributes) {
+	<ul tabindex="0" class="dropdown-content z-[1] menu menu-sm p-1 bg-base-100 border border-base-200 rounded-box shadow-lg w-40 mt-1" { devmode.Attrs(ctx, "ui/DropdownMenu")... } { attrs... }>
+		{ children... }
+	</ul>
+}
+
+// DropdownItem renders a single menu item inside a dropdown.
+// attrs is optional; pass nil when not needed.
+templ DropdownItem(active bool, danger bool, attrs templ.Attributes) {
+	<li { devmode.Attrs(ctx, "ui/DropdownItem")... } { attrs... }>
+		<a class={ templ.KV("active", active), templ.KV("text-error", danger) }>
+			{ children... }
+		</a>
+	</li>
+}

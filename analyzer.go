@@ -679,7 +679,7 @@ func (a *Analyzer) RunByRunID(ctx context.Context, runID int64) ([]SuggestionRow
 
 // getRunTestName returns the test name for a run ID, or "" if not found.
 func (a *Analyzer) getRunTestName(runID int64) string {
-	allRuns, err := a.db.ListRuns(time.Time{})
+	allRuns, err := a.db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return ""
 	}
@@ -697,7 +697,7 @@ func (a *Analyzer) getRunTestName(runID int64) string {
 // message so the LLM has everything in one shot.
 func (a *Analyzer) buildRunContext(runID int64) (string, error) {
 	// Fetch run row.
-	allRuns, err := a.db.ListRuns(time.Time{})
+	allRuns, err := a.db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return "", fmt.Errorf("list runs: %w", err)
 	}
@@ -918,7 +918,7 @@ type getExpSummaryResult struct {
 func (a *Analyzer) toolGetExperimentSummary(_ tool.Context, args getExpSummaryArgs) (getExpSummaryResult, error) {
 	// When analysing a single test, compute summary from runs filtered by test name.
 	if a.filterByTestName {
-		allRuns, err := a.db.ListRuns(time.Time{})
+		allRuns, err := a.db.ListRuns(time.Time{}, 0)
 		if err != nil {
 			return getExpSummaryResult{Result: fmt.Sprintf("error: %v", err)}, nil
 		}
@@ -1010,7 +1010,7 @@ type listRunsResult struct {
 }
 
 func (a *Analyzer) toolListRuns(_ tool.Context, args listRunsArgs) (listRunsResult, error) {
-	allRuns, err := a.db.ListRuns(time.Time{})
+	allRuns, err := a.db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return listRunsResult{Result: fmt.Sprintf("error: %v", err)}, nil
 	}
@@ -1133,7 +1133,7 @@ type getRunLogResult struct {
 
 func (a *Analyzer) toolGetRunLog(_ tool.Context, args getRunLogArgs) (getRunLogResult, error) {
 	// Fetch the run row to get its test name and start time.
-	allRuns, err := a.db.ListRuns(time.Time{})
+	allRuns, err := a.db.ListRuns(time.Time{}, 0)
 	if err != nil {
 		return getRunLogResult{Result: fmt.Sprintf("error fetching runs: %v", err)}, nil
 	}

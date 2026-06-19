@@ -1,0 +1,29 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// CountdownDigit renders a single countdown digit cell with label.
+templ CountdownDigit(value int, label string) {
+	<div class="flex flex-col items-center" { devmode.Attrs(ctx, "ui/CountdownDigit")... }>
+		<span class="countdown font-mono text-4xl">
+			<span style={ "--value:" + strconv.Itoa(value) }></span>
+		</span>
+		if label != "" {
+			<span class="text-xs text-base-content/50 mt-1">{ label }</span>
+		}
+	</div>
+}
+
+// Countdown renders a row of day/hour/minute/second digits.
+templ Countdown(days, hours, minutes, seconds int) {
+	<div class="flex gap-5 text-center" { devmode.Attrs(ctx, "ui/Countdown")... }>
+		@CountdownDigit(days, "days")
+		@CountdownDigit(hours, "hours")
+		@CountdownDigit(minutes, "min")
+		@CountdownDigit(seconds, "sec")
+	</div>
+}

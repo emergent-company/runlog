@@ -23,6 +23,9 @@ type TestOpts struct {
 	Project string
 	// Tags are variant tags applied at creation (e.g. "model:gemini").
 	Tags []string
+	// AppVersion records the version of the application-under-test.  When set,
+	// it is stored in test_runs.app_version and emitted as an app_version event.
+	AppVersion string
 	// Binary is the CLI binary to execute in Step.CLI calls.
 	// Defaults to "memory" when empty.
 	Binary string
@@ -82,6 +85,11 @@ func NewTest(t *testing.T, opts TestOpts) *TestContext {
 	// Apply tags.
 	if len(opts.Tags) > 0 {
 		rl.Tag(opts.Tags...)
+	}
+
+	// Set app version (if provided).
+	if opts.AppVersion != "" {
+		rl.SetAppVersion(opts.AppVersion)
 	}
 
 	tc := &TestContext{

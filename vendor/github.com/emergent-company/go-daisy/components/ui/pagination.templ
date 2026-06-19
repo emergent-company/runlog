@@ -1,0 +1,109 @@
+package ui
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// PaginationProps holds all data needed to render a full pagination strip.
+type PaginationProps struct {
+	CurrentPage int
+	TotalPages  int
+	TotalItems  int64
+	PageSize    int
+	BaseURL     string           // include all query params except "page", e.g. "/app/cases?status=active"
+	TargetID    string
+	Attrs       templ.Attributes // optional extra HTML attributes on the outer wrapper, e.g. {"data-testid": "pagination"}
+}
+
+// StartItem returns the 1-based index of the first item on the current page.
+func (p PaginationProps) StartItem() int64 {
+	if p.TotalItems == 0 {
+		return 0
+	}
+	return int64((p.CurrentPage-1)*p.PageSize) + 1
+}
+
+// EndItem returns the 1-based index of the last item on the current page.
+func (p PaginationProps) EndItem() int64 {
+	end := int64(p.CurrentPage * p.PageSize)
+	if end > p.TotalItems {
+		return p.TotalItems
+	}
+	return end
+}
+
+// pageURL appends or replaces the page param in a URL string.
+func pageURL(base string, page int) string {
+	return fmt.Sprintf("%s&page=%d", base, page)
+}
+
+// Pagination renders a join-based pagination strip.
+templ Pagination(currentPage int, totalPages int, baseURL string, targetID string) {
+	if totalPages > 1 {
+		<div class="join" { devmode.Attrs(ctx, "ui/Pagination")... }>
+			<a
+				class={ "btn btn-square btn-sm btn-outline border-base-300 join-item",
+					templ.KV("btn-disabled", currentPage <= 1) }
+				if currentPage > 1 {
+					href={ templ.URL(pageURL(baseURL, currentPage-1)) }
+					hx-get={ pageURL(baseURL, currentPage-1) }
+					hx-target={ "#" + targetID }
+					hx-swap="outerHTML"
+					hx-push-url="true"
+				}
+				aria-label="Previous page"
+			>
+				<span class="iconify lucide--arrow-left size-4"></span>
+			</a>
+			for p := 1; p <= totalPages; p++ {
+				<a
+					class={ "btn btn-square btn-sm btn-outline border-base-300 join-item",
+						templ.KV("btn-active", p == currentPage) }
+					href={ templ.URL(pageURL(baseURL, p)) }
+					hx-get={ pageURL(baseURL, p) }
+					hx-target={ "#" + targetID }
+					hx-swap="outerHTML"
+					hx-push-url="true"
+				>
+					{ strconv.Itoa(p) }
+				</a>
+			}
+			<a
+				class={ "btn btn-square btn-sm btn-outline border-base-300 join-item",
+					templ.KV("btn-disabled", currentPage >= totalPages) }
+				if currentPage < totalPages {
+					href={ templ.URL(pageURL(baseURL, currentPage+1)) }
+					hx-get={ pageURL(baseURL, currentPage+1) }
+					hx-target={ "#" + targetID }
+					hx-swap="outerHTML"
+					hx-push-url="true"
+				}
+				aria-label="Next page"
+			>
+				<span class="iconify lucide--arrow-right size-4"></span>
+			</a>
+		</div>
+	}
+}
+
+// PaginationWithProps renders a pagination bar with item count summary.
+templ PaginationWithProps(props PaginationProps) {
+	if props.TotalPages > 1 {
+		<div class="border-base-200 flex flex-wrap items-center justify-between gap-2 border-t border-dashed p-5" { devmode.Attrs(ctx, "ui/PaginationWithProps")... } { props.Attrs... }>
+			<p class="text-base-content/70 text-sm">
+				if props.TotalItems == 0 {
+					No entries
+				} else {
+					Showing
+					<span class="text-base-content font-medium">{ strconv.FormatInt(props.StartItem(), 10) }–{ strconv.FormatInt(props.EndItem(), 10) }</span>
+					out of
+					<span class="text-base-content font-medium">{ strconv.FormatInt(props.TotalItems, 10) }</span>
+				}
+			</p>
+			@Pagination(props.CurrentPage, props.TotalPages, props.BaseURL, props.TargetID)
+		</div>
+	}
+}

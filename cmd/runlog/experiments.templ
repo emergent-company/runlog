@@ -1,0 +1,118 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/emergent-company/go-daisy/components/table"
+	runlog "github.com/emergent-company/runlog"
+)
+
+templ ExperimentsPage(experiments []runlog.ExperimentSummary) {
+	@AppPage(fmt.Sprintf("Runlog - %s - Experiments", appName()), sidebarGroups) {
+		<div data-testid="experiments-page">
+			<h1 class="text-2xl font-bold mb-6">Experiments</h1>
+			if len(experiments) > 0 {
+				@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+					@table.TableHead() {
+						@table.TableHeadRow() {
+							@table.TableHeadCell("Experiment")
+							@table.TableHeadCell("Runs")
+							@table.TableHeadCell("Pass Rate")
+							@table.TableHeadCell("Last Run")
+							@table.TableHeadCell("Tags")
+						}
+					}
+					@table.TableBody() {
+						for _, exp := range experiments {
+							<tr
+								id={ "exp-" + exp.Name }
+								class="hover"
+								hx-get={ "/ui/experiments/" + exp.Name }
+								hx-target="#main-content"
+								hx-swap="innerHTML"
+								hx-push-url="true"
+								hx-sync="#main-content:replace"
+							>
+								@table.TableCell("", nil) {
+									@text(exp.Name)
+								}
+								@table.TableCell("text-right", nil) {
+									@text(fmt.Sprintf("%d", exp.RunCount))
+								}
+								@table.TableCell("", nil) {
+									if exp.RunCount > 0 {
+										@text(fmt.Sprintf("%.0f%%", float64(exp.PassCount)/float64(exp.RunCount)*100))
+									} else {
+										@text("-")
+									}
+								}
+								@table.TableCell("", nil) {
+									@text(formatTime(exp.LastRunAt, TimeFull))
+								}
+								@table.TableCell("", nil) {
+									@runTagPills(exp.Tags)
+								}
+							</tr>
+						}
+					}
+				}
+			} else {
+				@emptyState("No experiments recorded.")
+			}
+		</div>
+	}
+}
+
+templ ExperimentsContent(experiments []runlog.ExperimentSummary) {
+	<div data-testid="experiments-content">
+		<h1 class="text-2xl font-bold mb-6">Experiments</h1>
+		if len(experiments) > 0 {
+			@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+				@table.TableHead() {
+					@table.TableHeadRow() {
+						@table.TableHeadCell("Experiment")
+						@table.TableHeadCell("Runs")
+						@table.TableHeadCell("Pass Rate")
+						@table.TableHeadCell("Last Run")
+						@table.TableHeadCell("Tags")
+					}
+				}
+				@table.TableBody() {
+					for _, exp := range experiments {
+						<tr
+							id={ "exp-" + exp.Name }
+							class="hover"
+							hx-get={ "/ui/experiments/" + exp.Name }
+							hx-target="#main-content"
+							hx-swap="innerHTML"
+							hx-push-url="true"
+							hx-sync="#main-content:replace"
+						>
+							@table.TableCell("", nil) {
+								@text(exp.Name)
+							}
+							@table.TableCell("text-right", nil) {
+								@text(fmt.Sprintf("%d", exp.RunCount))
+							}
+							@table.TableCell("", nil) {
+								if exp.RunCount > 0 {
+									@text(fmt.Sprintf("%.0f%%", float64(exp.PassCount)/float64(exp.RunCount)*100))
+								} else {
+									@text("-")
+								}
+							}
+							@table.TableCell("", nil) {
+								@text(formatTime(exp.LastRunAt, TimeFull))
+							}
+							@table.TableCell("", nil) {
+								@runTagPills(exp.Tags)
+							}
+						</tr>
+					}
+				}
+			}
+		} else {
+			@emptyState("No experiments recorded.")
+		}
+	</div>
+}

@@ -1,0 +1,316 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// PromptBarProps configures a PromptBar component.
+type PromptBarProps struct {
+	// Placeholder is the textarea placeholder text.
+	Placeholder string
+	// ShowTokenCounter shows a token count display if true.
+	ShowTokenCounter bool
+	// TokenCurrent is the current token count (displayed in error colour when near max).
+	TokenCurrent int
+	// TokenMax is the token limit.
+	TokenMax int
+	// ShowAttach adds an attach-file icon button to the toolbar.
+	ShowAttach bool
+	// ShowImage adds an insert-image icon button to the toolbar.
+	ShowImage bool
+	// ShowVoice adds a voice-input icon button to the toolbar.
+	ShowVoice bool
+	// Loading disables the textarea and send button and shows a spinner while the AI responds.
+	Loading bool
+	// Attrs are extra HTML attributes spread on the root element.
+	Attrs templ.Attributes
+}
+
+// PromptBar renders a minimal AI prompt / chat input with optional toolbar icons,
+// a token counter, and a send button.
+templ PromptBar(props PromptBarProps) {
+	<div class="card bg-base-100 card-border w-full max-w-2xl" { devmode.Attrs(ctx, "form/PromptBar")... } { props.Attrs... }>
+		<div class="card-body p-3">
+			<textarea
+				class="textarea w-full h-28 resize-none border-0 p-1 text-base focus:outline-none m-0"
+				placeholder={ props.Placeholder }
+				disabled?={ props.Loading }
+			></textarea>
+			<div class="mt-2 flex items-end justify-between">
+				<div class="flex items-center gap-0.5">
+					if props.ShowAttach {
+						<button type="button" class="btn btn-sm btn-square btn-ghost" aria-label="Attach file" disabled?={ props.Loading }>
+							<span class="iconify lucide--paperclip size-4 text-base-content/60" aria-hidden="true"></span>
+						</button>
+					}
+					if props.ShowImage {
+						<button type="button" class="btn btn-sm btn-square btn-ghost" aria-label="Insert image" disabled?={ props.Loading }>
+							<span class="iconify lucide--image-plus size-4 text-base-content/60" aria-hidden="true"></span>
+						</button>
+					}
+				</div>
+				if props.ShowTokenCounter && props.TokenMax > 0 {
+					<span class="text-xs">
+						<span class="text-base-content/80">Tokens:</span>
+						<span class={ templ.KV("text-error font-medium", props.TokenCurrent >= props.TokenMax*80/100) }>{ promptIntStr(props.TokenCurrent) }</span>
+						<span class="text-base-content/60">/{ promptIntStr(props.TokenMax) }</span>
+					</span>
+				}
+				<div class="flex items-center gap-1">
+					if props.ShowVoice {
+						<button type="button" class="btn btn-sm btn-square btn-ghost" aria-label="Voice input" disabled?={ props.Loading }>
+							<span class="iconify lucide--mic size-4 text-base-content/60" aria-hidden="true"></span>
+						</button>
+					}
+					<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ props.Loading }>
+						if props.Loading {
+							<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+						} else {
+							<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+						}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// PromptBarActionItem is a labelled quick-action button shown above the send button.
+type PromptBarActionItem struct {
+	// Label is the button text.
+	Label string
+	// Icon is the Iconify icon identifier.
+	Icon string
+}
+
+// PromptBarAction renders an AI prompt input with quick-action labelled buttons.
+templ PromptBarAction(placeholder string, actions []PromptBarActionItem, loading bool, attrs templ.Attributes) {
+	<div class="card bg-base-100 card-border w-full max-w-2xl" { devmode.Attrs(ctx, "form/PromptBarAction")... } { attrs... }>
+		<div class="card-body p-3">
+			<textarea
+				class="textarea w-full h-28 resize-none border-0 p-1 text-base focus:outline-none m-0"
+				placeholder={ placeholder }
+				disabled?={ loading }
+			></textarea>
+			<div class="mt-2 flex items-end justify-between">
+				<div class="flex items-center gap-2">
+					for _, action := range actions {
+						<button type="button" class="btn btn-sm btn-outline border-base-300 text-base-content/80 gap-1" disabled?={ loading }>
+							<span class={ "iconify size-4", action.Icon } aria-hidden="true"></span>
+							{ action.Label }
+						</button>
+					}
+				</div>
+				<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ loading }>
+					if loading {
+						<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+					} else {
+						<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+					}
+				</button>
+			</div>
+		</div>
+	</div>
+}
+
+// PromptBarModelSelectorItem is a model listed in the model-selector dropdown.
+type PromptBarModelSelectorItem struct {
+	// Label is the display name for the model.
+	Label string
+	// Value is the model identifier (e.g. "gpt-4o").
+	Value string
+	// Icon is an optional Iconify icon identifier.
+	Icon string
+}
+
+// PromptBarModelSelectorProps configures a PromptBarModelSelector.
+type PromptBarModelSelectorProps struct {
+	// Placeholder is the textarea placeholder text.
+	Placeholder string
+	// Models is the list of available models.
+	Models []PromptBarModelSelectorItem
+	// SelectedModel is the label shown on the model-selector button.
+	SelectedModel string
+	// ShowTokenCounter shows a token count display.
+	ShowTokenCounter bool
+	// TokenCurrent is the current token count.
+	TokenCurrent int
+	// TokenMax is the token limit.
+	TokenMax int
+	// InfoBanner shows a dismissible info banner above the card when non-empty.
+	InfoBanner string
+	// Loading disables the textarea and send button while the AI responds.
+	Loading bool
+	// Attrs are extra HTML attributes spread on the root element.
+	Attrs templ.Attributes
+}
+
+// PromptBarModelSelector renders a prompt bar with a model-selector dropdown in the toolbar.
+// Based on the Nexus "model chooser" variant.
+templ PromptBarModelSelector(props PromptBarModelSelectorProps) {
+	<div class="w-full max-w-2xl" { devmode.Attrs(ctx, "form/PromptBarModelSelector")... } { props.Attrs... }>
+		if props.InfoBanner != "" {
+			<div class="card bg-primary/10 mb-0">
+				<div class="flex items-center gap-2 px-4 py-1.5">
+					<span class="iconify lucide--info text-primary size-3.5" aria-hidden="true"></span>
+					<p class="text-primary grow text-xs">{ props.InfoBanner }</p>
+					<button class="btn btn-xs btn-circle btn-ghost hover:bg-primary/20 border-0" type="button" aria-label="Dismiss">
+						<span class="iconify lucide--x text-primary/60 size-4" aria-hidden="true"></span>
+					</button>
+				</div>
+			</div>
+		}
+		<div class={ "card bg-base-100 card-border", templ.KV("border-t-0 rounded-t-none", props.InfoBanner != "") }>
+			<div class="card-body p-3">
+				<textarea
+					class="textarea w-full h-28 resize-none border-0 p-1 text-base focus:outline-none m-0"
+					placeholder={ props.Placeholder }
+					disabled?={ props.Loading }
+				></textarea>
+				<div class="mt-2 flex items-end justify-between">
+					<div class="flex items-center">
+						if len(props.Models) > 0 {
+							<div class="dropdown dropdown-start">
+								<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2" aria-label="Model selector">
+									<span class="iconify lucide--cpu size-4 text-base-content/60" aria-hidden="true"></span>
+									<span>{ props.SelectedModel }</span>
+									<span class="iconify lucide--chevron-down size-3.5 text-base-content/60" aria-hidden="true"></span>
+								</div>
+								<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
+									for _, m := range props.Models {
+										<li>
+											<a>
+												if m.Icon != "" {
+													<span class={ "iconify size-4", m.Icon } aria-hidden="true"></span>
+												}
+												{ m.Label }
+											</a>
+										</li>
+									}
+								</ul>
+							</div>
+						}
+					</div>
+					if props.ShowTokenCounter && props.TokenMax > 0 {
+						<span class="text-xs">
+							<span class={ templ.KV("text-error font-medium", props.TokenCurrent >= props.TokenMax*80/100) }>{ promptIntStr(props.TokenCurrent) }</span>
+							<span class="text-base-content/60"> / { promptIntStr(props.TokenMax) } tokens</span>
+						</span>
+					}
+					<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ props.Loading }>
+						if props.Loading {
+							<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+						} else {
+							<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+						}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// PromptBarAbilityItem is an ability listed in the ability-selector dropdown.
+type PromptBarAbilityItem struct {
+	// Label is the display name.
+	Label string
+	// Icon is the Iconify icon identifier.
+	Icon string
+}
+
+// PromptBarAbilityProps configures a PromptBarAbility component.
+type PromptBarAbilityProps struct {
+	// Placeholder is the textarea placeholder text.
+	Placeholder string
+	// Abilities lists available abilities in the dropdown.
+	Abilities []PromptBarAbilityItem
+	// SelectedAbility is the label shown on the ability-selector button.
+	SelectedAbility string
+	// TokensLeft is the remaining token budget shown in the header strip. 0 = hidden.
+	TokensLeft int
+	// SavedLabel is text shown in the header strip left side (e.g. "Saved to Library"). Empty = hidden.
+	SavedLabel string
+	// Loading disables the textarea and send button while the AI responds.
+	Loading bool
+	// Attrs are extra HTML attributes spread on the root element.
+	Attrs templ.Attributes
+}
+
+// PromptBarAbility renders a prompt bar with an ability-selector dropdown and an optional
+// header strip showing library save status and token balance.
+// Based on the Nexus "ability chooser" variant.
+templ PromptBarAbility(props PromptBarAbilityProps) {
+	<div class="w-full max-w-2xl" { devmode.Attrs(ctx, "form/PromptBarAbility")... } { props.Attrs... }>
+		if props.SavedLabel != "" || props.TokensLeft > 0 {
+			<div class="bg-base-200/50 rounded-t-box flex items-center justify-between gap-2 px-3 py-2.5">
+				if props.SavedLabel != "" {
+					<p class="text-base-content/80 text-sm">{ props.SavedLabel }</p>
+				}
+				if props.TokensLeft > 0 {
+					<p class="text-base-content/60 text-xs font-medium ms-auto">
+						<span class="text-error">{ promptIntStr(props.TokensLeft) }</span> Tokens left
+					</p>
+				}
+			</div>
+		}
+		<div class={ "card bg-base-100 card-border shadow-xs", templ.KV("rounded-t-none border-t-0", props.SavedLabel != "" || props.TokensLeft > 0) }>
+			<div class="card-body p-3">
+				<textarea
+					class="textarea w-full h-28 resize-none border-0 p-1 text-base focus:outline-none m-0"
+					placeholder={ props.Placeholder }
+					disabled?={ props.Loading }
+				></textarea>
+				<div class="mt-2 flex items-end justify-between">
+					<div class="flex items-center gap-0.5">
+						if len(props.Abilities) > 0 {
+							<div class="dropdown dropdown-start">
+								<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2" aria-label="Ability selector">
+									<span class="iconify lucide--zap size-4 text-base-content/60" aria-hidden="true"></span>
+									<span>{ props.SelectedAbility }</span>
+									<span class="iconify lucide--chevron-down size-3.5 text-base-content/60" aria-hidden="true"></span>
+								</div>
+								<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
+									for _, a := range props.Abilities {
+										<li>
+											<a>
+												if a.Icon != "" {
+													<span class={ "iconify size-4", a.Icon } aria-hidden="true"></span>
+												}
+												{ a.Label }
+											</a>
+										</li>
+									}
+								</ul>
+							</div>
+						}
+					</div>
+					<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ props.Loading }>
+						if props.Loading {
+							<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
+						} else {
+							<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+						}
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// promptIntStr converts an int to a string for use inside templ templates.
+func promptIntStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	s := ""
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	for n > 0 {
+		s = string(rune('0'+n%10)) + s
+		n /= 10
+	}
+	if neg {
+		s = "-" + s
+	}
+	return s
+}

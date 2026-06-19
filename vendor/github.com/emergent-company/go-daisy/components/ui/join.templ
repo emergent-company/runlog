@@ -1,0 +1,20 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Join renders a DaisyUI join container (fuses children into a single group).
+templ Join(vertical bool) {
+	<div class={ "join", templ.KV("join-vertical", vertical) } { devmode.Attrs(ctx, "ui/Join")... }>
+		{ children... }
+	</div>
+}
+
+// JoinButton renders a button with the join-item class.
+templ JoinButton(label string, variant ButtonVariant, active bool) {
+	<button class={ "join-item", "btn", "btn-sm", string(variant), templ.KV("btn-active", active) } { devmode.Attrs(ctx, "ui/JoinButton")... }>{ label }</button>
+}
+
+// JoinInputPlaceholder renders a text input with the join-item class.
+templ JoinInputPlaceholder(placeholder string) {
+	<input class="join-item input input-bordered input-sm" placeholder={ placeholder } { devmode.Attrs(ctx, "ui/JoinInputPlaceholder")... }/>
+}

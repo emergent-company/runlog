@@ -1,0 +1,43 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ValidatorInput wraps an input with the DaisyUI `validator` class for
+// built-in HTML5 validation colour feedback (green on valid, red on invalid).
+// Children should be the raw <input> element.
+templ ValidatorInput() {
+	<div class="validator" { devmode.Attrs(ctx, "form/ValidatorInput")... }>
+		{ children... }
+	</div>
+}
+
+// ValidatorHint renders the hint text shown when an input is in an invalid state.
+// It uses `validator-hint` which is hidden until the field becomes invalid.
+templ ValidatorHint(text string) {
+	<p class="validator-hint" { devmode.Attrs(ctx, "form/ValidatorHint")... }>{ text }</p>
+}
+
+// ValidatedField is a convenience wrapper that combines a label, a ValidatorInput slot,
+// and a ValidatorHint into a single form-control block.
+// inputName wires the label's for= attribute to the input for accessibility.
+// Children should be the raw <input> element.
+templ ValidatedField(labelText string, hintText string, inputName string) {
+	<div class="form-control mb-3" { devmode.Attrs(ctx, "form/ValidatedField")... }>
+		if labelText != "" {
+			<label
+				class="label pb-1"
+				if inputName != "" {
+					for={ inputName }
+				}
+			>
+				<span class="label-text font-medium text-sm text-base-content/70">{ labelText }</span>
+			</label>
+		}
+		@ValidatorInput() {
+			{ children... }
+		}
+		if hintText != "" {
+			@ValidatorHint(hintText)
+		}
+	</div>
+}

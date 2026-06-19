@@ -1,0 +1,20 @@
+services:
+  feedback-overlay:
+    image: ghcr.io/emergent-company/feedback-overlay:latest
+    restart: unless-stopped
+    ports:
+      - "3014:8080"
+    volumes:
+      - feedback-data:/data
+      - ./gh-app.pem:/run/secrets/gh-app.pem:ro
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  feedback-data:

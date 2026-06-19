@@ -1,0 +1,100 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// WizardStep holds data for one step in the wizard indicator.
+type WizardStep struct {
+	// Label is the step name shown next to the dot (hidden on small screens).
+	Label string
+}
+
+// WizardStepPanel holds the content for one wizard panel.
+type WizardStepPanel struct {
+	// Title is the heading shown inside the panel.
+	Title string
+	// Content is the HTML content rendered inside the panel body.
+	Content string
+}
+
+// WizardStepper renders a multi-step form wizard with step indicators,
+// next/prev navigation, and a finish action. Implemented with vanilla JS.
+// id must be unique on the page when multiple wizards are embedded.
+templ WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) {
+	<div class="max-w-lg mx-auto" id={ id } { devmode.Attrs(ctx, "form/WizardStepper")... }>
+		<!-- Step indicator -->
+		<div class="flex items-center gap-2 mb-6">
+			for i, step := range steps {
+				<div class="wizard-step-indicator flex items-center gap-2 cursor-pointer" data-step={ spinnerIntStr(i+1) } onclick={ templ.JSFuncCall("wizardGoTo_"+id, i+1) }>
+					<div
+						id={ id + "-dot-" + spinnerIntStr(i+1) }
+						class={ "flex size-7 items-center justify-center rounded-full font-semibold text-sm", templ.KV("bg-primary text-primary-content", i == 0), templ.KV("bg-base-200 text-base-content/50", i != 0) }
+					>{ spinnerIntStr(i + 1) }</div>
+					<span class={ "font-medium text-sm max-lg:hidden", templ.KV("text-base-content/50", i != 0) }>{ step.Label }</span>
+				</div>
+				if i < len(steps)-1 {
+					<div class="h-px flex-1 bg-base-300"></div>
+				}
+			}
+		</div>
+		<!-- Step panels -->
+		<div class="bg-base-100 border border-base-300 rounded-box p-5 min-h-40">
+			for i, panel := range panels {
+				<div id={ id + "-panel-" + spinnerIntStr(i+1) } class={ templ.KV("hidden", i != 0) }>
+					<h3 class="font-semibold mb-3">{ panel.Title }</h3>
+					@templ.Raw(panel.Content)
+				</div>
+			}
+		</div>
+		<!-- Navigation -->
+		<div class="mt-4 flex justify-between">
+			<button id={ id + "-prev" } class="btn btn-ghost btn-sm" onclick={ templ.JSFuncCall("wizardPrev_"+id) } disabled>
+				<span class="iconify lucide--chevron-left size-4" aria-hidden="true"></span>
+				Back
+			</button>
+			<button id={ id + "-next" } class="btn btn-primary btn-sm" onclick={ templ.JSFuncCall("wizardNext_"+id) }>
+				Next
+				<span class="iconify lucide--chevron-right size-4" aria-hidden="true"></span>
+			</button>
+		</div>
+	</div>
+	@wizardScript(id, len(steps))
+}
+
+templ wizardScript(id string, total int) {
+	<script>
+	(function() {
+	  var wid = { templ.JSONString(id) };
+	  var current = 1, total = { templ.JSONString(spinnerIntStr(total)) } * 1;
+	  function goTo(n) {
+	    document.getElementById(wid+'-panel-'+current).classList.add('hidden');
+	    current = Math.max(1, Math.min(total, n));
+	    document.getElementById(wid+'-panel-'+current).classList.remove('hidden');
+	    for (var i = 1; i <= total; i++) {
+	      var dot = document.getElementById(wid+'-dot-'+i);
+	      if (i < current) {
+	        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-primary text-primary-content';
+	        dot.innerHTML = '<svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+	      } else if (i === current) {
+	        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-primary text-primary-content';
+	        dot.textContent = i;
+	      } else {
+	        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-base-200 text-base-content/50';
+	        dot.textContent = i;
+	      }
+	    }
+	    document.getElementById(wid+'-prev').disabled = current === 1;
+	    var nextBtn = document.getElementById(wid+'-next');
+	    if (current === total) {
+	      nextBtn.textContent = 'Finish';
+	      nextBtn.className = 'btn btn-success btn-sm';
+	    } else {
+	      nextBtn.innerHTML = 'Next <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+	      nextBtn.className = 'btn btn-primary btn-sm';
+	    }
+	  }
+	  window['wizardGoTo_'+wid] = goTo;
+	  window['wizardNext_'+wid] = function() { if (current < total) goTo(current + 1); };
+	  window['wizardPrev_'+wid] = function() { if (current > 1) goTo(current - 1); };
+	})();
+	</script>
+}

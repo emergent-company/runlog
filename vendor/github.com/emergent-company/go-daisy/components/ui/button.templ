@@ -1,0 +1,112 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ButtonVariant controls the visual style of a button.
+type ButtonVariant string
+
+const (
+	ButtonPrimary   ButtonVariant = "btn-primary"
+	ButtonSecondary ButtonVariant = "btn-secondary"
+	ButtonAccent    ButtonVariant = "btn-accent"
+	ButtonGhost     ButtonVariant = "btn-ghost"
+	ButtonError     ButtonVariant = "btn-error"
+	ButtonOutline   ButtonVariant = "btn-outline"
+	ButtonNeutral   ButtonVariant = "btn-neutral"
+)
+
+// ButtonSize controls the size of a button.
+type ButtonSize string
+
+const (
+	ButtonXS ButtonSize = "btn-xs"
+	ButtonSM ButtonSize = "btn-sm"
+	ButtonMD ButtonSize = ""
+	ButtonLG ButtonSize = "btn-lg"
+)
+
+// ButtonType controls the HTML element and type attribute rendered.
+// ButtonTypeLink renders an <a> element instead of <button>.
+type ButtonType string
+
+const (
+	ButtonTypeButton ButtonType = "button"
+	ButtonTypeSubmit ButtonType = "submit"
+	ButtonTypeReset  ButtonType = "reset"
+	ButtonTypeLink   ButtonType = "link"
+)
+
+// ButtonShape controls whether the button is normal, square, or circle.
+type ButtonShape string
+
+const (
+	ButtonShapeDefault ButtonShape = ""
+	ButtonShapeSquare  ButtonShape = "btn-square"
+	ButtonShapeCircle  ButtonShape = "btn-circle"
+)
+
+// SimpleButton renders a DaisyUI button with a plain text label.
+// attrs is optional; pass nil when not needed.
+templ SimpleButton(label string, variant ButtonVariant, size ButtonSize, attrs templ.Attributes) {
+	<button
+		type="button"
+		class={ "btn",
+			templ.KV(string(variant), variant != ""),
+			templ.KV(string(size), size != "") }
+		{ devmode.Attrs(ctx, "ui/SimpleButton")... }
+		{ attrs... }
+	>{ label }</button>
+}
+
+// IconSpan renders an Iconify icon span with a configurable size class.
+// name: full iconify class e.g. "lucide--sun"; size: tailwind size class e.g. "size-8"
+templ IconSpan(name string, size string) {
+	<span class={ "iconify", name, size } { devmode.Attrs(ctx, "ui/IconSpan")... }></span>
+}
+
+// IconSpanColored renders an Iconify icon span with a size and an extra color class.
+templ IconSpanColored(name string, size string, color string) {
+	<span class={ "iconify", name, size, color } { devmode.Attrs(ctx, "ui/IconSpanColored")... }></span>
+}
+
+// Button renders a full-featured DaisyUI button.
+// Set typ=ButtonTypeLink to get an <a> element using href; otherwise renders <button>.
+// Set shape to square/circle for icon-only buttons.
+// attrs is optional; pass nil when not needed.
+templ Button(href string, variant ButtonVariant, size ButtonSize, typ ButtonType, shape ButtonShape, icon string, loading bool, attrs templ.Attributes) {
+	if typ == ButtonTypeLink {
+		<a
+			href={ templ.URL(href) }
+			class={ "btn",
+				templ.KV(string(variant), variant != ""),
+				templ.KV(string(size), size != ""),
+				templ.KV(string(shape), shape != "") }
+			{ devmode.Attrs(ctx, "ui/Button")... }
+			{ attrs... }
+		>
+			if icon != "" {
+				<span class={ "iconify size-4 " + icon }></span>
+			}
+			{ children... }
+		</a>
+	} else {
+		<button
+			type={ string(typ) }
+			class={ "btn",
+				templ.KV(string(variant), variant != ""),
+				templ.KV(string(size), size != ""),
+				templ.KV(string(shape), shape != ""),
+				templ.KV("loading loading-spinner", loading) }
+			disabled?={ loading }
+			{ devmode.Attrs(ctx, "ui/Button")... }
+			{ attrs... }
+		>
+			if icon != "" {
+				<span class={ "iconify size-4 " + icon }></span>
+			}
+			if shape == ButtonShapeDefault {
+				{ children... }
+			}
+		</button>
+	}
+}

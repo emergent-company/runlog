@@ -1,0 +1,189 @@
+package form
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// FormFieldType identifies the type of input to render in a FormField.
+type FormFieldType string
+
+const (
+	FieldText     FormFieldType = "text"
+	FieldTextarea FormFieldType = "textarea"
+	FieldSelect   FormFieldType = "select"
+	FieldCheckbox FormFieldType = "checkbox"
+	FieldDate     FormFieldType = "date"
+	FieldNumber   FormFieldType = "number"
+	FieldEmail    FormFieldType = "email"
+	FieldHidden   FormFieldType = "hidden"
+)
+
+// FormFieldProps configures a unified FormField component.
+type FormFieldProps struct {
+	Type        FormFieldType
+	Name        string
+	Label       string
+	Value       string
+	Placeholder string
+	Required    bool
+	Disabled    bool
+	Error       string
+	Options     []SelectOption
+	Rows        int
+	Class       string
+	Attrs       templ.Attributes // optional extra HTML attributes on the input element, e.g. {"data-testid": "email-input"}
+}
+
+// Field wraps a label + input + error message into a form group.
+templ Field(label string, name string, errMsg string) {
+	<div class="form-control mb-3" { devmode.Attrs(ctx, "form/Field")... }>
+		if label != "" {
+			<label class="label pb-1" for={ name }>
+				<span class="label-text font-medium text-sm text-base-content/70">{ label }</span>
+			</label>
+		}
+		{ children... }
+		if errMsg != "" {
+			<div class="label pt-1">
+				<span class="label-text-alt text-error">{ errMsg }</span>
+			</div>
+		}
+	</div>
+}
+
+// FormField renders a form field based on FormFieldProps.
+templ FormField(props FormFieldProps) {
+	if props.Type == FieldHidden {
+		<input type="hidden" name={ props.Name } value={ props.Value } { devmode.Attrs(ctx, "form/FormField")... } { props.Attrs... }/>
+	} else if props.Type == FieldCheckbox {
+		<div class="form-control mb-3" { devmode.Attrs(ctx, "form/FormField")... }>
+			<label class="label cursor-pointer justify-start gap-3">
+			<input
+				id={ props.Name }
+				name={ props.Name }
+				type="checkbox"
+				checked?={ props.Value == "true" || props.Value == "1" || props.Value == "on" }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "checkbox checkbox-sm", props.Class }
+				{ props.Attrs... }
+			/>
+				if props.Label != "" {
+					<span class="label-text">{ props.Label }</span>
+				}
+			</label>
+			if props.Error != "" {
+				<div class="label pt-1">
+					<span class="label-text-alt text-error">{ props.Error }</span>
+				</div>
+			}
+		</div>
+	} else if props.Type == FieldTextarea {
+		@Field(props.Label, props.Name, props.Error) {
+			{{ rows := props.Rows }}
+			{{ if rows <= 0 { rows = 3 } }}
+			<textarea
+				id={ props.Name }
+				name={ props.Name }
+				placeholder={ props.Placeholder }
+				rows={ strconv.Itoa(rows) }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "textarea textarea-bordered w-full",
+					templ.KV("textarea-error", props.Error != ""),
+					props.Class }
+				{ props.Attrs... }
+			>{ props.Value }</textarea>
+		}
+	} else if props.Type == FieldSelect {
+		@Field(props.Label, props.Name, props.Error) {
+			<select
+				id={ props.Name }
+				name={ props.Name }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "select select-bordered w-full",
+					templ.KV("select-error", props.Error != ""),
+					props.Class }
+				{ props.Attrs... }
+			>
+				for _, opt := range props.Options {
+					<option value={ opt.Value } selected?={ opt.Value == props.Value }>{ opt.Label }</option>
+				}
+			</select>
+		}
+	} else {
+		{{ inputType := string(props.Type) }}
+		{{ if inputType == "" { inputType = "text" } }}
+		@Field(props.Label, props.Name, props.Error) {
+			<input
+				id={ props.Name }
+				name={ props.Name }
+				type={ inputType }
+				value={ props.Value }
+				placeholder={ props.Placeholder }
+				required?={ props.Required }
+				disabled?={ props.Disabled }
+				class={ "input input-bordered w-full",
+					templ.KV("input-error", props.Error != ""),
+					props.Class }
+				{ props.Attrs... }
+			/>
+		}
+	}
+}
+
+// Input renders a DaisyUI text input.
+templ Input(name string, value string, placeholder string, hasError bool) {
+	<input
+		id={ name }
+		name={ name }
+		type="text"
+		value={ value }
+		placeholder={ placeholder }
+		class={ "input input-bordered w-full",
+			templ.KV("input-error", hasError) }
+		{ devmode.Attrs(ctx, "form/Input")... }
+	/>
+}
+
+// PasswordInput renders a password input.
+templ PasswordInput(name string, placeholder string, hasError bool) {
+	<input
+		id={ name }
+		name={ name }
+		type="password"
+		placeholder={ placeholder }
+		class={ "input input-bordered w-full",
+			templ.KV("input-error", hasError) }
+		{ devmode.Attrs(ctx, "form/PasswordInput")... }
+	/>
+}
+
+// Textarea renders a DaisyUI textarea.
+templ Textarea(name string, value string, placeholder string, rows int, hasError bool) {
+	<textarea
+		id={ name }
+		name={ name }
+		placeholder={ placeholder }
+		rows={ strconv.Itoa(rows) }
+		class={ "textarea textarea-bordered w-full",
+			templ.KV("textarea-error", hasError) }
+		{ devmode.Attrs(ctx, "form/Textarea")... }
+	>{ value }</textarea>
+}
+
+// Select renders a DaisyUI select input with children slot.
+templ Select(name string, hasError bool) {
+	<select
+		id={ name }
+		name={ name }
+		class={ "select select-bordered w-full",
+			templ.KV("select-error", hasError) }
+		{ devmode.Attrs(ctx, "form/Select")... }
+	>
+		{ children... }
+	</select>
+}

@@ -1,0 +1,27 @@
+# .air.toml — hot-reload dev server for runlog daemon.
+# Install air: go install github.com/air-verse/air@latest
+# Usage:  air -c .air.toml
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o /tmp/runlog-air ./cmd/runlog"
+  entrypoint = ["/tmp/runlog-air"]
+  args_bin = ["daemon"]
+  include_ext = ["go", "templ"]
+  exclude_dir = ["tmp", "vendor", ".git", "node_modules", "test-results"]
+  exclude_regex = [".*_test.go", ".*_templ.go", ".*tests-result.*"]
+  exclude_file = []
+  delay = 500
+  log = "build-errors.log"
+  send_interrupt = true
+  kill_delay = "500ms"
+
+[log]
+  time = true
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"

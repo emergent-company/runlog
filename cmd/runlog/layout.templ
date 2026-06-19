@@ -1,0 +1,259 @@
+package main
+
+import (
+	"os"
+
+	"github.com/emergent-company/go-daisy/components/layout"
+	"github.com/emergent-company/go-daisy/render"
+)
+
+func appName() string {
+	if n := os.Getenv("RUNLOG_APP_TITLE"); n != "" {
+		return n
+	}
+	return "runlog"
+}
+
+// AppShellContent renders the app shell (sidebar, navbar, main content, footer,
+// scripts) without the outer <html>/<head>/<body> wrapper. Used by both full-page
+// rendering (wrapped in layout.Page) and history-restore partial rendering.
+// Modal/toast containers are NOT included here — layout.Page provides them for
+// full-page loads, and AppPage adds them explicitly for history restore.
+templ AppShellContent(groups []layout.SidebarGroup) {
+	@layout.AppShell(appName()) {
+		@layout.Sidebar(appName(), groups)
+		<div class="flex min-w-0 grow flex-col overflow-hidden">
+			@layout.Navbar(appName()) {
+				<div class="dropdown dropdown-end">
+					<label tabindex="0" class="btn btn-sm btn-circle btn-ghost" data-testid="theme-toggle">
+						<span id="theme-icon-light" class="iconify lucide--sun size-4.5"></span>
+						<span id="theme-icon-dark" class="iconify lucide--moon size-4.5" style="display:none"></span>
+						<span id="theme-icon-system" class="iconify lucide--monitor-dot size-4.5" style="display:none"></span>
+					</label>
+					<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-36 p-2 shadow-sm" data-testid="theme-dropdown">
+						<li><button data-theme-option="light" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--sun size-4"></span>Light<span id="check-light" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
+						<li><button data-theme-option="dark" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--moon size-4"></span>Dark<span id="check-dark" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
+						<li><button data-theme-option="system" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--monitor-dot size-4"></span>System<span id="check-system" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
+					</ul>
+				</div>
+			}
+			<div id="global-loading-bar" class="h-0.5 shrink-0 bg-primary/60 transition-opacity duration-200" style="opacity:0"></div>
+			<main id="main-content" hx-history-elt class="grow overflow-auto bg-base-200 p-6" data-testid="main-content">
+				{ children... }
+			</main>
+			<template id="skeleton-dashboard">@DashboardSkeleton()</template>
+			<template id="skeleton-tests">@TestsSkeleton()</template>
+			<template id="skeleton-test-detail">@TestDetailSkeleton()</template>
+			<template id="skeleton-runs">@AllRunsSkeleton()</template>
+			<template id="skeleton-run-detail">@RunDetailSkeleton()</template>
+			<template id="skeleton-experiments">@ExperimentsSkeleton()</template>
+			<template id="skeleton-experiment-detail">@ExperimentDetailSkeleton()</template>
+			<template id="skeleton-events-reference">@EventsReferenceSkeleton()</template>
+			<footer class="hidden sm:flex border-t border-base-200 bg-base-100 shrink-0">
+				<div class="flex w-full items-center justify-between gap-3 px-4 py-1.5">
+					<div id="footer-status" class="flex items-center gap-2 text-xs">
+						<div class="status status-neutral status-sm"></div>
+						<span class="text-base-content/50">Loading...</span>
+					</div>
+					<span class="text-base-content/40 text-xs">runlog</span>
+				</div>
+			</footer>
+			<script type="text/javascript">
+			(function() {
+				var es = new EventSource('/ui/stream?topic=footer');
+				es.addEventListener('footer-status', function(e) {
+					var el = document.getElementById('footer-status');
+					if (el) el.innerHTML = JSON.parse(e.data).html;
+				});
+				es.onerror = function() {
+					var el = document.getElementById('footer-status');
+					if (el) el.innerHTML = '<div class="status status-error status-sm"></div><span class="text-base-content/50">Disconnected</span>';
+				};
+			})();
+		</script>
+		</div>
+	}
+	// Theme init: check localStorage (light|dark|system) → OS preference → default (system).
+	// Legacy migration: 'go-daisy-theme' stored a theme name; migrate to mode.
+	<script>
+		(function() {
+			function applyTheme(mode) {
+				var themes = { light: 'nord', dark: 'dracula' };
+				var html = document.documentElement;
+				if (mode === 'system') {
+					var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					html.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);
+				} else {
+					html.setAttribute('data-theme', themes[mode] || themes.light);
+				}
+				['light','dark','system'].forEach(function(m) {
+					var el = document.getElementById('theme-icon-' + m);
+					if (el) el.style.display = m === mode ? '' : 'none';
+					var ck = document.getElementById('check-' + m);
+					if (ck) ck.style.display = m === mode ? '' : 'none';
+				});
+				try { localStorage.setItem('runlog-theme', mode); } catch(e) {}
+			}
+			var saved = null;
+			try { saved = localStorage.getItem('runlog-theme'); } catch(e) {}
+			if (!saved) {
+				try {
+					var legacy = localStorage.getItem('go-daisy-theme');
+					if (legacy) {
+						saved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';
+						localStorage.removeItem('go-daisy-theme');
+					}
+				} catch(e) {}
+			}
+			if (!saved) saved = 'system';
+			applyTheme(saved);
+			var mq = window.matchMedia('(prefers-color-scheme: dark)');
+			mq.addEventListener('change', function() {
+				var cur = null;
+				try { cur = localStorage.getItem('runlog-theme'); } catch(e) {}
+				if (cur === 'system') applyTheme('system');
+			});
+			document.addEventListener('htmx:historyRestore', function() {
+				var restored = null;
+				try { restored = localStorage.getItem('runlog-theme'); } catch(e) {}
+				if (restored) applyTheme(restored);
+			});
+			document.addEventListener('mousedown', function(e) {
+				var option = e.target.closest('[data-theme-option]');
+				if (option) { applyTheme(option.getAttribute('data-theme-option')); return; }
+			});
+		})();
+	</script>
+	// Global loading indicator + skeleton injection + error handling.
+	<script>
+		(function() {
+			var bar = document.getElementById('global-loading-bar');
+			var showTimer, hideTimer;
+
+			var skeletonMap = [
+				{ pattern: '/ui/events', skeleton: 'skeleton-events-reference' },
+				{ pattern: '/ui/experiments/', skeleton: 'skeleton-experiment-detail' },
+				{ pattern: '/ui/experiments', skeleton: 'skeleton-experiments' },
+				{ pattern: '/ui/runs/', skeleton: 'skeleton-run-detail' },
+				{ pattern: '/ui/runs', skeleton: 'skeleton-runs' },
+				{ pattern: '/ui/tests/', skeleton: 'skeleton-test-detail' },
+				{ pattern: '/ui/tests', skeleton: 'skeleton-tests' },
+				{ pattern: '/ui/', skeleton: 'skeleton-dashboard' },
+			];
+			var fallbackHtml = '<div class="flex items-center justify-center py-24"><span class="loading loading-spinner loading-lg text-primary"></span></div>';
+
+			function injectSkeleton(href) {
+				var path = new URL(href, location.origin).pathname;
+				for (var i = 0; i < skeletonMap.length; i++) {
+					var entry = skeletonMap[i];
+					if (path === entry.pattern || path.indexOf(entry.pattern) === 0) {
+						var main = document.getElementById('main-content');
+						if (!main) return;
+						var tmpl = document.getElementById(entry.skeleton);
+						if (tmpl && tmpl.innerHTML.trim()) {
+							main.innerHTML = tmpl.innerHTML;
+						} else {
+							main.innerHTML = fallbackHtml;
+						}
+						return;
+					}
+				}
+				var main = document.getElementById('main-content');
+				if (main) main.innerHTML = fallbackHtml;
+			}
+
+			document.addEventListener('htmx:beforeRequest', function(evt) {
+				try {
+					var elt = evt.detail ? evt.detail.elt : null;
+					if (elt && elt.getAttribute && elt.getAttribute('hx-push-url') === 'true') {
+						var href = elt.getAttribute('hx-get') || elt.getAttribute('data-hx-get');
+						if (href) injectSkeleton(href);
+					}
+				} catch(e) { /* skeleton is best-effort */ }
+				clearTimeout(hideTimer);
+				showTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);
+			});
+			document.addEventListener('htmx:afterRequest', function() {
+				clearTimeout(showTimer);
+				if (bar) bar.style.opacity = '0';
+			});
+			document.addEventListener('htmx:responseError', function() {
+				clearTimeout(showTimer);
+				if (bar) {
+					bar.style.background = 'var(--color-error, #ef4444)';
+					bar.style.opacity = '1';
+					setTimeout(function() { bar.style.opacity = '0'; }, 1500);
+					setTimeout(function() { bar.style.background = ''; }, 2000);
+				}
+			});
+			document.addEventListener('htmx:sendError', function() {
+				clearTimeout(showTimer);
+				if (bar) {
+					bar.style.background = 'var(--color-error, #ef4444)';
+					bar.style.opacity = '1';
+					setTimeout(function() { bar.style.opacity = '0'; }, 1500);
+					setTimeout(function() { bar.style.background = ''; }, 2000);
+				}
+			});
+		})();
+	</script>
+	// Event-detail toggle: collapse an expanded detail row on second click.
+	// Uses htmx:before:request delegation so HTMX never fires when already open.
+	<script>
+		document.addEventListener('htmx:before:request', function(evt) {
+			var elt = evt.detail?.ctx?.sourceElement || evt.target;
+			if (!elt || !elt.getAttribute) return;
+			var targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');
+			if (!targetId || !targetId.startsWith('#event-detail-')) return;
+			var det = document.querySelector(targetId);
+			if (det && det.children.length > 0) {
+				det.innerHTML = '';
+				evt.preventDefault();
+			}
+		});
+		// Feedback overlay — loaded after HTMX so the script tag is inside <body>.
+		(function() {
+			var s = document.createElement('script');
+			s.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';
+			s.setAttribute('data-api', 'https://feedback.emergent-company.ai');
+			s.setAttribute('data-repo', 'emergent-company/runlog');
+			s.setAttribute('data-label', 'feedback');
+			s.async = true;
+			document.body.appendChild(s);
+		})();
+	</script>
+	<link rel="stylesheet" href="/static/css/frappe-gantt.css"/>
+	<script src="/static/js/frappe-gantt.js"></script>
+}
+
+// AppPage renders the full HTML shell with sidebar and content area.
+// For HTMX history restore requests, it skips the outer HTML shell and renders
+// only the body content, preserving CSS <link> elements already in document.head.
+// Content is passed as children.
+templ AppPage(title string, groups []layout.SidebarGroup) {
+	<style>
+		tr.hover { cursor: pointer; }
+		tr.hover:hover { background-color: color-mix(in oklab, var(--color-base-200) 80%, transparent); }
+		[data-component="ui/Badge"] { min-width: 5rem; text-align: center; }
+		.htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }
+		.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
+		#events-section .is-debug-event { display: none; }
+		#events-section.debug-visible .is-debug-event { display: table-row; }
+	</style>
+	<div data-testid="app-page">
+		if render.IsHistoryRestoreFromContext(ctx) {
+			<link rel="stylesheet" href="/static/css/app.css"/>
+			<div id="modal-container"></div>
+			<div id="toast-container" class="toast toast-top toast-end z-70"></div>
+			@AppShellContent(groups) {
+				{ children... }
+			}
+		} else {
+			@layout.Page(title, "nord") {
+				@AppShellContent(groups) {
+					{ children... }
+				}
+			}
+		}
+	</div>
+}

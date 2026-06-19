@@ -1,0 +1,109 @@
+# lefthook.yml — project-specific git hooks and lint tasks.
+#
+# Install hooks:   lefthook install
+# Run lint only:   lefthook run lint
+# Run pre-commit:  lefthook run pre-commit
+#
+# Individual contributors can override in lefthook-local.yml (not committed).
+
+# ── Pre-commit hook (blocks the commit on failure) ───────────────────────────
+pre-commit:
+  parallel: true
+  jobs:
+    - name: no-raw-components
+      glob: "*.templ"
+      run: scripts/lint/no-raw-components.sh {staged_files}
+
+    - name: templ-fmt
+      glob: "*.templ"
+      run: scripts/lint/templ-fmt.sh {staged_files}
+
+    - name: templ-generate
+      glob: "*.templ"
+      run: scripts/lint/templ-generate.sh {staged_files}
+
+    - name: gofmt
+      glob: "*.go"
+      run: |
+        files=$(gofmt -l {staged_files})
+        if [ -n "$files" ]; then
+          echo "gofmt: the following files need formatting:"
+          echo "$files"
+          exit 1
+        fi
+
+    - name: go-vet
+      run: go vet ./...
+
+    - name: go-build
+      run: go build ./...
+
+    - name: no-dead-code
+      glob: "*.go"
+      run: scripts/lint/no-dead-code.sh
+
+    - name: check-icons
+      glob: "*.{templ,go}"
+      run: scripts/lint/check-icons.sh --staged
+
+    - name: require-testid
+      glob: "*.templ"
+      run: scripts/lint/require-testid.sh {staged_files}
+
+    - name: no-secrets
+      run: gitleaks git --staged --config .gitleaks.toml --no-banner
+
+    - name: no-panic-in-lib
+      glob: "*.go"
+      run: scripts/lint/no-panic-in-lib.sh --staged
+
+    - name: no-hardcoded-uuids
+      glob: "*.go"
+      run: scripts/lint/no-hardcoded-uuids.sh --staged
+
+# ── Manual lint group (task lint → lefthook run lint) ────────────────────────
+# Runs the same checks against ALL files, not just staged ones.
+lint:
+  parallel: true
+  jobs:
+    - name: no-raw-components
+      run: scripts/lint/no-raw-components.sh
+
+    - name: templ-fmt
+      run: scripts/lint/templ-fmt.sh
+
+    - name: templ-generate
+      run: scripts/lint/templ-generate.sh
+
+    - name: gofmt
+      run: |
+        files=$(gofmt -l $(find . -name "*.go" -not -path "*/vendor/*"))
+        if [ -n "$files" ]; then
+          echo "gofmt: the following files need formatting:"
+          echo "$files"
+          exit 1
+        fi
+
+    - name: go-vet
+      run: go vet ./...
+
+    - name: go-build
+      run: go build ./...
+
+    - name: no-dead-code
+      run: scripts/lint/no-dead-code.sh
+
+    - name: check-icons
+      run: scripts/lint/check-icons.sh
+
+    - name: require-testid
+      run: scripts/lint/require-testid.sh
+
+    - name: no-secrets
+      run: gitleaks dir . --config .gitleaks.toml --no-banner
+
+    - name: no-panic-in-lib
+      run: scripts/lint/no-panic-in-lib.sh
+
+    - name: no-hardcoded-uuids
+      run: scripts/lint/no-hardcoded-uuids.sh

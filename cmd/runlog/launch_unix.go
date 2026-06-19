@@ -5,6 +5,7 @@ package main
 import (
 	"os"
 	"os/exec"
+	"os/signal"
 	"syscall"
 )
 
@@ -31,4 +32,16 @@ func processAlive(pid int) bool {
 		return false
 	}
 	return proc.Signal(syscall.Signal(0)) == nil
+}
+
+// trapSigterm registers a handler that calls fn when SIGTERM or SIGINT
+// (Ctrl+C) is received.  SIGINT is included so foreground-mode daemons
+// shut down cleanly instead of getting "signal: killed".
+func trapSigterm(fn func()) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-ch
+		fn()
+	}()
 }

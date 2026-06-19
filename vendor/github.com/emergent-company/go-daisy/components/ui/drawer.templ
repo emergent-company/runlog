@@ -1,0 +1,57 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// DrawerSide controls which side the drawer panel slides in from.
+type DrawerSide string
+
+const (
+	DrawerLeft  DrawerSide = ""      // default — panel slides from the left
+	DrawerRight DrawerSide = "right" // panel slides from the right
+)
+
+// Drawer renders a DaisyUI drawer layout.
+// id is used to link the toggle checkbox to the drawer.
+// side controls whether the sidebar opens from the left (default) or right.
+// content is the main page content; sidebarContent is what appears inside the open drawer.
+// Pass sidebarWidth as a Tailwind width class (e.g. "w-80") or empty string for the default (w-80).
+templ Drawer(id string, side DrawerSide, content templ.Component, sidebarContent templ.Component, sidebarWidth string) {
+	<div
+		class={ "drawer", templ.KV("drawer-end", side == DrawerRight) }
+		{ devmode.Attrs(ctx, "ui/Drawer")... }
+	>
+		<input id={ id } type="checkbox" class="drawer-toggle"/>
+		<div class="drawer-content">
+			@content
+		</div>
+		<div class="drawer-side">
+			<label for={ id } aria-label="close sidebar" class="drawer-overlay"></label>
+			<div
+				class={
+					"menu bg-base-200 text-base-content min-h-full p-4",
+					templ.KV(sidebarWidth, sidebarWidth != ""),
+					templ.KV("w-80", sidebarWidth == ""),
+				}
+			>
+				@sidebarContent
+			</div>
+		</div>
+	</div>
+}
+
+// DrawerToggle renders a label that opens/closes a drawer when clicked.
+// drawerID must match the id passed to Drawer.
+// variant is an optional extra class on the button (e.g. "btn-primary", "btn-ghost").
+templ DrawerToggle(drawerID string, label string, variant string) {
+	<label
+		for={ drawerID }
+		class={
+			"btn drawer-button",
+			templ.KV(variant, variant != ""),
+			templ.KV("btn-primary", variant == ""),
+		}
+		{ devmode.Attrs(ctx, "ui/DrawerToggle")... }
+	>
+		{ label }
+	</label>
+}

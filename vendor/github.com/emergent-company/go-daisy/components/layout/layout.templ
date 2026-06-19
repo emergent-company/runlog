@@ -1,0 +1,81 @@
+package layout
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Page renders the full HTML shell. themeAttr is the DaisyUI data-theme value
+// (e.g. "nord", "flow", "dark"). Pass "" to use the browser/OS default.
+templ Page(title string, themeAttr string) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme={ themeAttr } class="group/html">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+		<meta name="htmx-config" content='{"implicitInheritance":true,"noSwap":[204,304]}'/>
+		<title>{ title }</title>
+		<link rel="stylesheet" href="/static/css/app.css"/>
+	</head>
+	<body class="bg-base-200 min-h-screen">
+		<!-- Modal container -->
+		<div id="modal-container"></div>
+		<!-- Toast container -->
+		<div id="toast-container" class="toast toast-top toast-end z-70"></div>
+		<!-- Main content slot -->
+		{ children... }
+		<!-- HTMX v4 -->
+		<script src="/static/js/htmx.js"></script>
+	</body>
+	</html>
+}
+
+// AppShell renders the sidebar + topbar + main content layout.
+templ AppShell(appName string) {
+	<div id="app-shell" class="flex h-screen overflow-hidden" { devmode.Attrs(ctx, "layout/AppShell")... }>
+		<input
+			type="checkbox"
+			id="layout-sidebar-toggle-trigger"
+			class="hidden"
+			aria-label="Toggle layout sidebar"
+		/>
+		<label
+			for="layout-sidebar-toggle-trigger"
+			id="layout-sidebar-backdrop"
+		></label>
+		{ children... }
+	</div>
+}
+
+// AppShellContent renders the right column (topbar + scrollable content) inside AppShell.
+templ AppShellContent() {
+	<div class="flex min-w-0 grow flex-col overflow-hidden" { devmode.Attrs(ctx, "layout/AppShellContent")... }>
+		{ children... }
+		<main
+			id="main-content"
+			class="grow overflow-auto"
+		>
+		</main>
+	</div>
+}
+
+// AppShellWithNav is a convenience wrapper combining AppShell + Sidebar + Navbar + main content.
+templ AppShellWithNav(appName string, groups []SidebarGroup) {
+	<div id="app-shell" class="flex h-screen overflow-hidden" { devmode.Attrs(ctx, "layout/AppShellWithNav")... }>
+		<input
+			type="checkbox"
+			id="layout-sidebar-toggle-trigger"
+			class="hidden"
+			aria-label="Toggle layout sidebar"
+		/>
+		<label
+			for="layout-sidebar-toggle-trigger"
+			id="layout-sidebar-backdrop"
+		></label>
+		@Sidebar(appName, groups)
+		<div class="flex min-w-0 grow flex-col overflow-hidden">
+			@Navbar(appName) {
+				{ children... }
+			}
+			<main id="main-content" class="grow overflow-auto bg-base-200">
+			</main>
+		</div>
+	</div>
+}

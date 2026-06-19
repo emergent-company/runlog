@@ -1,0 +1,66 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// TimelineItemProps holds data for a single timeline entry.
+type TimelineItemProps struct {
+	Date    string
+	Label   string
+	Done    bool
+	IconOn  string // iconify class when done, defaults to lucide--circle-check
+	IconOff string // iconify class when pending, defaults to lucide--circle
+}
+
+func (p TimelineItemProps) iconOn() string {
+	if p.IconOn != "" {
+		return p.IconOn
+	}
+	return "lucide--circle-check"
+}
+
+func (p TimelineItemProps) iconOff() string {
+	if p.IconOff != "" {
+		return p.IconOff
+	}
+	return "lucide--circle"
+}
+
+// Timeline renders a DaisyUI vertical timeline container.
+templ Timeline() {
+	<ul class="timeline timeline-vertical" { devmode.Attrs(ctx, "ui/Timeline")... }>
+		{ children... }
+	</ul>
+}
+
+// TimelineItem renders a single timeline list item.
+templ TimelineItem(p TimelineItemProps, first bool, last bool) {
+	<li { devmode.Attrs(ctx, "ui/TimelineItem")... }>
+		if !first {
+			if p.Done {
+				<hr class="bg-primary"/>
+			} else {
+				<hr/>
+			}
+		}
+		<div class="timeline-start text-xs text-base-content/40">{ p.Date }</div>
+		<div class="timeline-middle">
+			if p.Done {
+				<span class={ "iconify size-4 text-primary", p.iconOn() }></span>
+			} else {
+				<span class={ "iconify size-4 text-base-content/30", p.iconOff() }></span>
+			}
+		</div>
+		if p.Done {
+			<div class="timeline-end timeline-box text-sm">{ p.Label }</div>
+		} else {
+			<div class="timeline-end timeline-box text-sm text-base-content/50">{ p.Label }</div>
+		}
+		if !last {
+			if p.Done {
+				<hr class="bg-primary"/>
+			} else {
+				<hr/>
+			}
+		}
+	</li>
+}

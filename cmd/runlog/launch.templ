@@ -1,0 +1,60 @@
+package main
+
+import "net/url"
+
+// LaunchView renders the SSE-connected log viewer after launching a test.
+templ LaunchView(data launchData) {
+	<div class="mt-4 mb-6" data-testid="launch-view" data-sse-url={ data.SSEURL } data-test-name={ data.TestName }>
+		<div class="flex items-center gap-2 mb-2">
+			<span id="launch-status" class="flex items-center gap-2 font-semibold">
+				<span class="loading loading-spinner loading-sm" data-testid="launch-spinner"></span>
+				Running <span data-testid="launch-test-name">{ data.TestName }</span>...
+			</span>
+		</div>
+		<pre
+			id="log-output"
+			class="bg-base-300 text-sm font-mono p-4 rounded-box overflow-auto max-h-96 whitespace-pre-wrap"
+			data-testid="log-output"
+		></pre>
+		@backButton("/ui/tests/" + url.PathEscape(data.TestName))
+	</div>
+	<script type="text/javascript">
+		(function() {
+			var el = document.querySelector('[data-testid="launch-view"]');
+			var sseUrl = el.getAttribute('data-sse-url');
+			var testName = el.getAttribute('data-test-name');
+			var es = new EventSource(sseUrl);
+			var log = document.getElementById('log-output');
+			var status = document.getElementById('launch-status');
+			var spinner = status && status.querySelector('.loading');
+			es.onmessage = function(e) {
+				if (log) log.textContent += e.data + '\n';
+				log.scrollTop = log.scrollHeight;
+			};
+			es.addEventListener('done', function(e) {
+				es.close();
+				if (spinner) spinner.remove();
+				if (status) {
+					var info = JSON.parse(e.data);
+					status.innerHTML = 'Completed <span class="font-bold">' + testName + '</span> (exit code ' + info.exit_code + ')';
+				}
+			});
+			es.onerror = function() {
+				es.close();
+				if (spinner) spinner.remove();
+				if (status) status.textContent = 'Connection closed';
+			};
+		})();
+	</script>
+}
+
+// LaunchButton renders the "Run Test" button.
+templ LaunchButton(testName string) {
+	<button
+		type="button"
+		class="btn btn-primary btn-sm"
+		hx-post={ "/ui/launch/" + url.PathEscape(testName) }
+		hx-target="#launch-area"
+		hx-swap="innerHTML"
+	>Run Test</button>
+}

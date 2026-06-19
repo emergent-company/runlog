@@ -1,0 +1,28 @@
+package ui
+
+import (
+	"fmt"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// TextRotate renders a DaisyUI text-rotate component that cycles through a list
+// of text items with an infinite loop animation.
+// items is the list of strings to rotate through (up to 6 per DaisyUI).
+// An empty items slice renders nothing.
+// duration is a CSS duration value for the full rotation cycle (e.g. "10s"). Empty uses the DaisyUI default.
+templ TextRotate(items []string, duration string) {
+	if len(items) > 0 {
+		<div
+			class="text-rotate"
+			if duration != "" {
+				style={ fmt.Sprintf("--duration:%s;", duration) }
+			}
+			{ devmode.Attrs(ctx, "ui/TextRotate")... }
+		>
+			for _, item := range items {
+				<span>{ item }</span>
+			}
+		</div>
+	}
+}

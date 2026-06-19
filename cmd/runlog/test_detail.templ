@@ -1,0 +1,88 @@
+package main
+
+import (
+	"fmt"
+	"net/url"
+)
+
+templ TestDetailPage(data testDetailData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - %s", appName(), data.TestName), sidebarGroups) {
+		@testDetailContent(data)
+	}
+}
+
+templ TestDetailContent(data testDetailData) {
+	@testDetailContent(data)
+}
+
+templ testDetailContent(data testDetailData) {
+	<div data-testid="test-detail-content">
+		<div class="flex items-center gap-4 mb-6">
+			@backButton("/ui/tests")
+			<h1 class="text-2xl font-bold grow" data-testid="test-name">{ data.TestName }</h1>
+			<button
+				type="button"
+				class="btn btn-primary btn-sm"
+				hx-post={ "/ui/launch/" + url.PathEscape(data.TestName) }
+				data-testid="run-test-btn"
+			><span class="iconify lucide--play size-3.5"></span> Run Test</button>
+		</div>
+		<div id="launch-area" data-testid="launch-area"></div>
+		if data.Stats != nil {
+			<div class="mb-6" data-testid="test-stats">
+				@statsGrid([]statItem{
+					{Label: "Avg Duration", Value: data.Stats.AvgDuration},
+					{Label: "Min", Value: data.Stats.MinDuration},
+					{Label: "Max", Value: data.Stats.MaxDuration},
+					{Label: "Pass Rate", Value: data.Stats.PassRate},
+				}, 4)
+				<div class="flex items-center gap-4 p-4 bg-base-100 border border-base-200 rounded-box">
+					<div class="flex items-center gap-2 shrink-0">
+						<span class="text-sm font-semibold text-base-content/70">Duration Trend</span>
+						if data.Stats.TrendFlat {
+							<span class="text-base-content/30">—</span>
+						} else if data.Stats.TrendUp {
+							<span class="text-error text-lg font-bold">↑</span>
+						} else {
+							<span class="text-success text-lg font-bold">↓</span>
+						}
+					</div>
+					@durationSparkline(data.Stats.TrendData)
+					if data.Stats.HasCostData {
+						<div class="flex items-center gap-2 ml-auto shrink-0">
+							<span class="text-sm font-semibold text-base-content/70">Avg Cost</span>
+							<span class="text-sm font-mono">{ data.Stats.AvgCost }</span>
+						</div>
+					}
+				</div>
+			</div>
+		}
+		<div class="flex items-center justify-between mb-4">
+			<p class="text-sm text-base-content/60">{ fmt.Sprintf("%d", data.TotalRuns) } run(s)</p>
+			<div class="flex items-center gap-2">
+				<input
+					type="text"
+					placeholder="Filter by tag..."
+					class="input input-bordered input-xs w-40"
+					name="tag"
+					hx-get={ fmt.Sprintf("/ui/tests/%s", url.PathEscape(data.TestName)) }
+					hx-target="#main-content"
+					hx-swap="innerHTML"
+					hx-sync="#main-content:replace"
+					hx-trigger="keyup changed delay:500ms"
+					hx-include="this"
+					value={ data.TagFilter }
+					data-testid="tag-filter"
+				/>
+			</div>
+		</div>
+		if len(data.Runs) > 0 {
+			@runsTable(data.Runs, runsTableOpts{ShowID: true, ShowTags: true, ShowCost: data.HasCostData})
+			if len(data.Runs) == data.Limit && data.TotalRuns > data.Offset+len(data.Runs) {
+				@loadMoreButton(fmt.Sprintf("/ui/tests/%s?offset=%d&tag=%s", data.TestName, data.Offset+data.Limit, data.TagFilter), "#main-content")
+			}
+		} else {
+			@emptyState("No runs recorded for this test.")
+		}
+	</div>
+}

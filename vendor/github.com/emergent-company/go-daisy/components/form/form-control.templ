@@ -1,0 +1,134 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// LabelPosition controls label placement relative to the input.
+type LabelPosition string
+
+const (
+	LabelAbove LabelPosition = "above"
+	LabelLeft  LabelPosition = "left"
+)
+
+// FormControl wraps an input with a DaisyUI fieldset, label, and optional error/hint.
+templ FormControl(name string, label string, labelPosition LabelPosition, hint string, errMsg string, attrs templ.Attributes) {
+	if labelPosition == LabelLeft && label != "" {
+		<div class="flex items-center gap-3" { devmode.Attrs(ctx, "form/FormControl")... }>
+			<label for={ name } class="label shrink-0 min-w-24">
+				<span class="label-text font-medium">{ label }</span>
+			</label>
+			<div class="flex-1">
+				{ children... }
+				if hint != "" && errMsg == "" {
+					<p class="label">
+						<span class="label-text-alt text-base-content/60">{ hint }</span>
+					</p>
+				}
+				if errMsg != "" {
+					<p class="label">
+						<span class="label-text-alt text-error">{ errMsg }</span>
+					</p>
+				}
+			</div>
+		</div>
+	} else {
+		<fieldset class="fieldset" { devmode.Attrs(ctx, "form/FormControl")... }>
+			if label != "" {
+				<legend class="fieldset-legend">{ label }</legend>
+			}
+			{ children... }
+			if hint != "" && errMsg == "" {
+				<p class="label">
+					<span class="label-text-alt text-base-content/60">{ hint }</span>
+				</p>
+			}
+			if errMsg != "" {
+				<p class="label">
+					<span class="label-text-alt text-error">{ errMsg }</span>
+				</p>
+			}
+		</fieldset>
+	}
+}
+
+// FormInput renders a labeled text input with DaisyUI fieldset styling and labelPosition.
+templ FormInput(name string, label string, value string, placeholder string, labelPosition LabelPosition, hint string, errMsg string, attrs templ.Attributes) {
+	@FormControl(name, label, labelPosition, hint, errMsg, attrs) {
+		<input
+			id={ name }
+			name={ name }
+			type="text"
+			value={ value }
+			placeholder={ placeholder }
+			class={ "input w-full", templ.KV("input-error", errMsg != "") }
+			{ attrs... }
+		/>
+	}
+}
+
+// FormSelect renders a labeled select dropdown with DaisyUI fieldset styling and labelPosition.
+templ FormSelect(name string, label string, selected string, options [][2]string, placeholder string, labelPosition LabelPosition, hint string, errMsg string, attrs templ.Attributes) {
+	@FormControl(name, label, labelPosition, hint, errMsg, attrs) {
+		<select
+			id={ name }
+			name={ name }
+			class={ "select w-full", templ.KV("select-error", errMsg != "") }
+			{ attrs... }
+		>
+			if placeholder != "" {
+				<option disabled selected value="">{ placeholder }</option>
+			}
+			for _, opt := range options {
+				<option value={ opt[0] } selected?={ opt[0] == selected }>{ opt[1] }</option>
+			}
+		</select>
+	}
+}
+
+// FormCheckbox renders a labeled DaisyUI checkbox with optional HTMX attrs.
+templ FormCheckbox(name string, label string, checked bool, errMsg string, attrs templ.Attributes) {
+	<div class="form-control" { devmode.Attrs(ctx, "form/FormCheckbox")... }>
+		<label class="label cursor-pointer justify-start gap-3">
+			<input
+				type="checkbox"
+				id={ name }
+				name={ name }
+				class="checkbox"
+				checked?={ checked }
+				{ attrs... }
+			/>
+			if label != "" {
+				<span class="label-text">{ label }</span>
+			}
+		</label>
+		if errMsg != "" {
+			<p class="label">
+				<span class="label-text-alt text-error">{ errMsg }</span>
+			</p>
+		}
+	</div>
+}
+
+// FormToggle renders a labeled DaisyUI toggle switch with optional HTMX attrs.
+templ FormToggle(name string, label string, checked bool, errMsg string, attrs templ.Attributes) {
+	<div class="form-control" { devmode.Attrs(ctx, "form/FormToggle")... }>
+		<label class="label cursor-pointer justify-start gap-3">
+			<input
+				type="checkbox"
+				id={ name }
+				name={ name }
+				class="toggle"
+				checked?={ checked }
+				{ attrs... }
+			/>
+			if label != "" {
+				<span class="label-text">{ label }</span>
+			}
+		</label>
+		if errMsg != "" {
+			<p class="label">
+				<span class="label-text-alt text-error">{ errMsg }</span>
+			</p>
+		}
+	</div>
+}

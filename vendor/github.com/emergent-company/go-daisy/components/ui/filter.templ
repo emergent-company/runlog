@@ -1,0 +1,85 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// FilterCardProps configures a FilterCard or CompactFilterBar form wrapper.
+type FilterCardProps struct {
+	Action string
+	Method string // defaults to "get"
+	Target string // hx-target selector
+	Swap   string // hx-swap strategy
+	// Inline renders the bar without a card wrapper (equivalent to CompactFilterBar).
+	Inline bool
+}
+
+func (p FilterCardProps) method() string {
+	if p.Method == "" {
+		return "get"
+	}
+	return p.Method
+}
+
+// FilterCard renders a filter form. When props.Inline is false (default) it
+// wraps the form in a card; when true it renders a plain horizontal flex bar
+// (equivalent to the former CompactFilterBar).
+templ FilterCard(props FilterCardProps) {
+	if props.Inline {
+		<form
+			class="flex flex-wrap gap-3 items-end mb-4"
+			method={ props.method() }
+			action={ templ.URL(props.Action) }
+			if props.Target != "" {
+				hx-get={ props.Action }
+				hx-target={ props.Target }
+				if props.Swap != "" {
+					hx-swap={ props.Swap }
+				}
+			}
+			{ devmode.Attrs(ctx, "ui/FilterCard")... }
+		>
+			{ children... }
+			<div class="flex gap-2">
+				<button type="submit" class="btn btn-primary btn-sm">Filter</button>
+				<a href={ templ.URL(props.Action) } class="btn btn-ghost btn-sm">Clear</a>
+			</div>
+		</form>
+	} else {
+		<div class="card bg-base-100 shadow-sm border border-base-200 mb-4" { devmode.Attrs(ctx, "ui/FilterCard")... }>
+			<div class="card-body p-4">
+				<form
+					method={ props.method() }
+					action={ templ.URL(props.Action) }
+					if props.Target != "" {
+						hx-get={ props.Action }
+						hx-target={ props.Target }
+						if props.Swap != "" {
+							hx-swap={ props.Swap }
+						}
+					}
+				>
+					<div class="flex flex-wrap gap-3 items-end">
+						{ children... }
+						<div class="flex gap-2">
+							<button type="submit" class="btn btn-primary btn-sm">Filter</button>
+							<a href={ templ.URL(props.Action) } class="btn btn-ghost btn-sm">Clear</a>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+// CompactFilterBar is an alias for FilterCard with Inline=true.
+// Deprecated: set FilterCardProps.Inline = true instead.
+templ CompactFilterBar(props FilterCardProps) {
+	@FilterCard(FilterCardProps{
+		Action: props.Action,
+		Method: props.Method,
+		Target: props.Target,
+		Swap:   props.Swap,
+		Inline: true,
+	}) {
+		{ children... }
+	}
+}

@@ -1,0 +1,29 @@
+# .air.dogfood.toml — hot-reload dogfood daemon (port 17433).
+# runlog tracks its own test runs here.
+# Install air: go install github.com/air-verse/air@latest
+# Usage:  task dogfood:server
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "templ generate && go build -o /tmp/runlog-air-dogfood ./cmd/runlog"
+  entrypoint = ["/tmp/runlog-air-dogfood"]
+  args_bin = ["--daemon", "--db", "/tmp/runlog-dogfood.db", "--port", "17433"]
+  include_ext = ["go", "templ"]
+  exclude_dir = ["tmp", "vendor", ".git", "node_modules", "test-results"]
+  exclude_regex = [".*_test.go", ".*_templ.go", ".*tests-result.*"]
+  exclude_file = []
+  delay = 500
+  log = "build-errors.log"
+  send_interrupt = true
+  kill_delay = "2s"
+  stop_on_error = true
+
+[log]
+  time = true
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"

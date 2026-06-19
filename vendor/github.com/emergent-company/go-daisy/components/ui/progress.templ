@@ -1,0 +1,34 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// ProgressColor controls the color of a progress bar.
+type ProgressColor string
+
+const (
+	ProgressPrimary   ProgressColor = "progress-primary"
+	ProgressSecondary ProgressColor = "progress-secondary"
+	ProgressSuccess   ProgressColor = "progress-success"
+	ProgressWarning   ProgressColor = "progress-warning"
+	ProgressError     ProgressColor = "progress-error"
+)
+
+// Progress renders a DaisyUI progress bar. value=-1 for indeterminate.
+// attrs is optional; pass nil when not needed.
+templ Progress(color ProgressColor, value int, max int, attrs templ.Attributes) {
+	if value < 0 {
+		<progress class={ "progress", string(color), "w-full" } { devmode.Attrs(ctx, "ui/Progress")... } { attrs... }></progress>
+	} else {
+		<progress
+			class={ "progress", string(color), "w-full" }
+			value={ strconv.Itoa(value) }
+			max={ strconv.Itoa(max) }
+			{ devmode.Attrs(ctx, "ui/Progress")... }
+			{ attrs... }
+		></progress>
+	}
+}

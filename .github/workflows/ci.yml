@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,11 +19,57 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Vet
+      - name: Install tools
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          go install golang.org/x/tools/cmd/deadcode@latest
+
+      - name: Templ generate
+        run: templ generate ./cmd/runlog/
+
+      - name: Templ fmt
+        run: templ fmt .
+
+      - name: Go vet
         run: go vet ./...
 
-      - name: Build
+      - name: Go build
         run: go build ./...
 
+      - name: Dead code
+        run: deadcode -test -filter github.com/emergent-company/runlog ./cmd/runlog
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Test
-        run: go test -v ./...
+        run: go test -race ./... -count=1
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Playwright
+        working-directory: tests/web
+        run: |
+          npm ci
+          npx playwright install chromium
+
+      - name: E2E tests
+        working-directory: tests/web
+        run: npm run test:e2e

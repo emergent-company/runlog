@@ -42,13 +42,19 @@ func LoadDotEnv() {
 // checkRawGoTest detects when tests are being run via raw 'go test' and provides
 // a helpful error message with instructions to use 'runlog test' instead.
 func checkRawGoTest() {
+	// Only act when the process is 'go test' itself, not 'runlog test'.
+	exe := filepath.Base(os.Args[0])
+	if exe == "runlog" || exe == "runlog.test" || strings.HasPrefix(exe, "runlog-air") {
+		return
+	}
 	// If MEMORY_TEST_ENV is not set AND we're in the e2e tests, this is likely
 	// a raw 'go test' invocation. The runlog wrapper always sets MEMORY_TEST_ENV
 	// (even if empty for the base .env).
 	if os.Getenv("MEMORY_TEST_ENV") == "" && os.Getenv("TEST_RUNNER") == "" {
-		// Only warn if we can detect we're in the e2e repository
+		// Only flag if we can detect we're in the e2e repository
 		if wd, err := os.Getwd(); err == nil && strings.Contains(wd, "emergent.memory.e2e") {
 			printRawGoTestWarning()
+			os.Exit(1)
 		}
 	}
 }

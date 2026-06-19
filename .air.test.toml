@@ -1,0 +1,28 @@
+# .air.test.toml — hot-reload dev server for the test server (port 17431).
+# Install air: go install github.com/air-verse/air@latest
+# Usage:  task test:server
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "templ generate && go build -o /tmp/runlog-air-test ./cmd/runlog"
+  entrypoint = ["/tmp/runlog-air-test"]
+  args_bin = ["--daemon", "--db", "/tmp/runlog-test.db", "--port", "17431"]
+  include_ext = ["go", "templ"]
+  exclude_dir = ["tmp", "vendor", ".git", "node_modules", "test-results"]
+  exclude_regex = [".*_test.go", ".*_templ.go", ".*tests-result.*"]
+  exclude_file = []
+  delay = 500
+  log = "build-errors.log"
+  send_interrupt = true
+  kill_delay = "2s"
+  stop_on_error = true
+
+[log]
+  time = true
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"

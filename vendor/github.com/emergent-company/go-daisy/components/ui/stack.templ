@@ -1,0 +1,15 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Stack renders overlapping stacked elements.
+templ Stack() {
+	<div class="stack" { devmode.Attrs(ctx, "ui/Stack")... }>
+		{ children... }
+	</div>
+}
+
+// StackCard renders a card suitable for use inside a Stack.
+templ StackCard(label string, colorClasses string) {
+	<div class={ "card", "h-24", "w-48", "flex", "items-center", "justify-center", "text-sm", "font-medium", colorClasses } { devmode.Attrs(ctx, "ui/StackCard")... }>{ label }</div>
+}

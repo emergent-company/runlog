@@ -1,0 +1,47 @@
+package ui
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// clampRadialValue clamps v to the range [0, 100].
+func clampRadialValue(v int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
+}
+
+// radialProgressStyle builds the inline style string for a RadialProgress.
+func radialProgressStyle(value int, size string, thickness string) string {
+	s := fmt.Sprintf("--value:%d;", value)
+	if size != "" {
+		s += fmt.Sprintf("--size:%s;", size)
+	}
+	if thickness != "" {
+		s += fmt.Sprintf("--thickness:%s;", thickness)
+	}
+	return s
+}
+
+// RadialProgress renders a DaisyUI radial-progress circular indicator.
+// value is clamped to 0-100. size and thickness are CSS values (e.g. "4rem", "4px").
+// Pass empty strings for size/thickness to use DaisyUI defaults.
+templ RadialProgress(color ProgressColor, value int, size string, thickness string) {
+	{{ clamped := clampRadialValue(value) }}
+	<div
+		class={ "radial-progress", string(color) }
+		style={ radialProgressStyle(clamped, size, thickness) }
+		role="progressbar"
+		aria-valuenow={ strconv.Itoa(clamped) }
+		aria-valuemin="0"
+		aria-valuemax="100"
+		{ devmode.Attrs(ctx, "ui/RadialProgress")... }
+	>{ strconv.Itoa(clamped) }%</div>
+}
