@@ -32,6 +32,7 @@ templ testsContentInner(data testListData) {
 		hx-get="/ui/tests"
 		hx-target="[data-testid='tests-content']"
 		hx-trigger="change from:select"
+		hx-push-url="true"
 	>
 		<select
 			class="select select-bordered select-sm w-full max-w-xs"

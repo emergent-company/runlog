@@ -293,3 +293,13 @@ func (c *Config) CategoryForTest(testName string) string {
 	}
 	return "Uncategorized"
 }
+
+// CategoryForRun returns the category for a RunRow, preferring the DB-stored
+// category (set via RunLog.SetCategory) over config file categories.
+// Falls back to CategoryForTest if no DB category is set.
+func (c *Config) CategoryForRun(r *RunRow) string {
+	if r.Category != nil && *r.Category != "" {
+		return *r.Category
+	}
+	return c.CategoryForTest(r.TestName)
+}

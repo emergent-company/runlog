@@ -105,7 +105,7 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 	catMap := make(map[int64]string, len(page))
 	for i, r := range page {
 		runRows[i] = r
-		catMap[r.ID] = app.config.CategoryForTest(r.TestName)
+		catMap[r.ID] = app.config.CategoryForRun(&r)
 	}
 
 	categories := sortedKeys(app.config.Categories)
@@ -137,12 +137,12 @@ func (app *WebApp) handleTests(c echo.Context) error {
 	// Uses idx_test_runs_name_started composite index for GROUP BY.
 	rows, err := rawDB.Query(`
 		SELECT t.test_name, t.run_count, t.last_started,
-		       t.passed, t.skipped, t.reason
+		       t.passed, t.skipped, t.reason, t.category
 		FROM (
 			SELECT test_name,
 			       COUNT(*)       OVER (PARTITION BY test_name) AS run_count,
 			       MAX(started_at) OVER (PARTITION BY test_name) AS last_started,
-			       passed, skipped, reason,
+			       passed, skipped, reason, category,
 			       ROW_NUMBER()   OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
 			FROM test_runs
 		) t
@@ -158,6 +158,7 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		Name       string
 		RunCount   int
 		LastStarted string
+		Category   *string
 	}
 	var agg []aggRow
 	statusMap := make(map[string]string)
@@ -167,10 +168,15 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		var lastStarted string
 		var passed, skipped sql.NullInt64
 		var reason sql.NullString
-		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped, &reason); err != nil {
+		var category sql.NullString
+		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped, &reason, &category); err != nil {
 			continue
 		}
-		agg = append(agg, aggRow{Name: name, RunCount: runCount, LastStarted: lastStarted})
+		var catPtr *string
+		if category.Valid {
+			catPtr = &category.String
+		}
+		agg = append(agg, aggRow{Name: name, RunCount: runCount, LastStarted: lastStarted, Category: catPtr})
 		switch {
 		case !passed.Valid:
 			statusMap[name] = "running"
@@ -191,7 +197,11 @@ func (app *WebApp) handleTests(c echo.Context) error {
 	// Build entries from DB runs
 	catMap := make(map[string][]testListEntry)
 	for _, a := range agg {
+		// Prefer DB-stored category, fall back to config match.
 		cat := app.config.CategoryForTest(a.Name)
+		if a.Category != nil && *a.Category != "" {
+			cat = *a.Category
+		}
 		if categoryFilter != "" && cat != categoryFilter {
 			continue
 		}
@@ -264,10 +274,19 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		filteredCats = []testListCategory{}
 	}
 
-	// Build ALL categories for the dropdown
+	// Build ALL categories for the dropdown from all sources
 	allCats := make([]testListCategory, 0)
-	for _, name := range sortedKeys(app.config.Categories) {
+	seenCats := make(map[string]bool)
+	// First: categories that have entries from DB or discovery
+	for _, name := range sortedKeys(catMap) {
 		allCats = append(allCats, testListCategory{Name: name, Tests: catMap[name]})
+		seenCats[name] = true
+	}
+	// Then: config-only categories (empty but listed in dropdown)
+	for _, name := range sortedKeys(app.config.Categories) {
+		if !seenCats[name] {
+			allCats = append(allCats, testListCategory{Name: name, Tests: catMap[name]})
+		}
 	}
 	if len(allCats) == 0 {
 		allCats = filteredCats
@@ -754,7 +773,7 @@ func queryRunsForTest(rawDB *sql.DB, testName string, limit, offset int, tagFilt
 		SELECT id, test_name, started_at, finished_at, passed, skipped,
 		       description, tags, experiment, runner, reason, env_name,
 		       input_tokens, output_tokens, cost_usd, env_vars,
-		       app_version, test_version
+		       app_version, test_version, category
 		FROM test_runs
 		WHERE test_name = ?`
 	args := []any{testName}
@@ -776,7 +795,7 @@ func fetchRunByID(rawDB *sql.DB, id int64) *runlog.RunRow {
 		SELECT id, test_name, started_at, finished_at, passed, skipped,
 		       description, tags, experiment, runner, reason, env_name,
 		       input_tokens, output_tokens, cost_usd, env_vars,
-		       app_version, test_version
+		       app_version, test_version, category
 		FROM test_runs WHERE id = ?`, id)
 	if err != nil {
 		return nil
@@ -809,7 +828,7 @@ func scanRunRows(rows *sql.Rows) ([]runlog.RunRow, error) {
 			&descJSON, &tagsJSON, &experiment,
 			&runner, &reason, &envName,
 			&inputTokens, &outputTokens, &costUSD, &envVarsJSON,
-			&appVersion, &testVersion,
+			&appVersion, &testVersion, &r.Category,
 		); err != nil {
 			return nil, fmt.Errorf("scan run row: %w", err)
 		}

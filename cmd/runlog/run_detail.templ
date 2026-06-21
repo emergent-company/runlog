@@ -271,37 +271,62 @@ templ eventsTable(timeline []runlog.EventRow, meta []runlog.EventRow, showDebug 
 }
 
 templ eventRow(e runlog.EventRow, isDebug bool) {
-	if isDebug {
-		<tr
-			id={ fmt.Sprintf("event-%d", e.ID) }
-			class="is-debug-event opacity-50 bg-base-200/60 cursor-pointer hover hover:bg-base-300 transition-colors"
-			hx-get={ fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID) }
-			hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
-			hx-swap="innerHTML"
-			hx-trigger="click"
-		>
-			<!-- lint:allow-raw -->
-			<td class="text-right w-12 italic">{ fmt.Sprintf("%d", e.Seq) }</td>
-			<td>
-				@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent("neutral"), Size: ui.BadgeSizeSM})
-			</td>
-			<td class="italic">{ truncateMessage(e.Message, 80) }</td>
-			<td class="text-right w-20 italic">{ fmtElapsed(e.ElapsedS) }</td>
-		</tr><!-- lint:allow-raw -->
+	if eventHasDetails(e) {
+		if isDebug {
+			<tr
+				id={ fmt.Sprintf("event-%d", e.ID) }
+				class="is-debug-event opacity-50 bg-base-200/60 cursor-pointer hover hover:bg-base-300 transition-colors"
+				hx-get={ fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID) }
+				hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
+				hx-swap="innerHTML"
+				hx-trigger="click"
+			>
+				<!-- lint:allow-raw -->
+				<td class="text-right w-12 italic">{ fmt.Sprintf("%d", e.Seq) }</td>
+				<td>
+					@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent("neutral"), Size: ui.BadgeSizeSM})
+				</td>
+				<td class="italic">{ truncateMessage(e.Message, 80) }</td>
+				<td class="text-right w-20 italic">{ fmtElapsed(e.ElapsedS) }</td>
+			</tr><!-- lint:allow-raw -->
+		} else {
+			<tr
+				id={ fmt.Sprintf("event-%d", e.ID) }
+				class="hover"
+				hx-get={ fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID) }
+				hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
+				hx-swap="innerHTML"
+				hx-trigger="click"
+			>
+				@table.TableCell("text-right w-12", nil) {
+					@text(fmt.Sprintf("%d", e.Seq))
+				}
+				@table.TableCell("", nil) {
+					@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent(eventKindIntent(e.Kind)), Size: ui.BadgeSizeSM})
+				}
+				@table.TableCell("", nil) {
+					@text(truncateMessage(e.Message, 80))
+				}
+				@table.TableCell("text-right w-20", nil) {
+					@text(fmtElapsed(e.ElapsedS))
+				}
+			</tr>
+		}
+		<tr id={ fmt.Sprintf("event-detail-%d", e.ID) }></tr> <!-- lint:allow-raw -->
 	} else {
 		<tr
 			id={ fmt.Sprintf("event-%d", e.ID) }
-			class="hover"
-			hx-get={ fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID) }
-			hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
-			hx-swap="innerHTML"
-			hx-trigger="click"
+			if isDebug {
+				class="is-debug-event opacity-30 bg-base-200/40"
+			} else {
+				class="text-base-content/50"
+			}
 		>
 			@table.TableCell("text-right w-12", nil) {
 				@text(fmt.Sprintf("%d", e.Seq))
 			}
 			@table.TableCell("", nil) {
-				@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent(eventKindIntent(e.Kind)), Size: ui.BadgeSizeSM})
+				@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: ui.BadgeNeutral, Size: ui.BadgeSizeSM, Style: ui.BadgeStyleOutline})
 			}
 			@table.TableCell("", nil) {
 				@text(truncateMessage(e.Message, 80))
@@ -311,7 +336,6 @@ templ eventRow(e runlog.EventRow, isDebug bool) {
 			}
 		</tr>
 	}
-	<tr id={ fmt.Sprintf("event-detail-%d", e.ID) }></tr> <!-- lint:allow-raw -->
 }
 
 func eventKindIntent(kind string) string {

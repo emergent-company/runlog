@@ -95,6 +95,11 @@ templ sectionHeading(text string) {
 	<h2 class="text-xl font-semibold mb-3 mt-8" data-component="main/sectionHeading">{ text }</h2>
 }
 
+// eventHasDetails returns true if an event has expandable content (children or details).
+func eventHasDetails(e runlog.EventRow) bool {
+	return len(e.Children) > 0 || (e.Details != nil && *e.Details != "")
+}
+
 // statusBadge renders a badge for a status string.
 templ statusBadge(status string) {
 	if status == "pass" {

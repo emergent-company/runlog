@@ -151,7 +151,7 @@ func testsContentInner(data testListData) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h1 class=\"text-2xl font-bold mb-4\">Tests</h1><div class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"/ui/tests\" hx-target=\"[data-testid='tests-content']\" hx-trigger=\"change from:select\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"category-filter\"><option value=\"\">All Categories</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h1 class=\"text-2xl font-bold mb-4\">Tests</h1><div class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"/ui/tests\" hx-target=\"[data-testid='tests-content']\" hx-trigger=\"change from:select\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"category-filter\"><option value=\"\">All Categories</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -164,7 +164,7 @@ func testsContentInner(data testListData) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(cat.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 44, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 45, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 				if templ_7745c5c3_Err != nil {
@@ -177,7 +177,7 @@ func testsContentInner(data testListData) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(cat.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 44, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 45, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -195,7 +195,7 @@ func testsContentInner(data testListData) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(cat.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 46, Col: 29}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 47, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -208,7 +208,7 @@ func testsContentInner(data testListData) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(cat.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 46, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 47, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -440,7 +440,7 @@ func flatTestTable(data testListData) templ.Component {
 							var templ_7745c5c3_Var15 string
 							templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue("test-" + e.Name)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 122, Col: 28}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 123, Col: 28}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 							if templ_7745c5c3_Err != nil {
@@ -453,7 +453,7 @@ func flatTestTable(data testListData) templ.Component {
 							var templ_7745c5c3_Var16 string
 							templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue("/ui/tests/" + url.PathEscape(e.Name))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 124, Col: 53}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 125, Col: 53}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 							if templ_7745c5c3_Err != nil {
@@ -526,7 +526,7 @@ func flatTestTable(data testListData) templ.Component {
 								var templ_7745c5c3_Var20 string
 								templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(cat.Name)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 138, Col: 59}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 139, Col: 59}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 								if templ_7745c5c3_Err != nil {
@@ -647,7 +647,7 @@ func flatTestTable(data testListData) templ.Component {
 										var templ_7745c5c3_Var26 string
 										templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(url.PathEscape(e.Name))
 										if templ_7745c5c3_Err != nil {
-											return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 162, Col: 50}
+											return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 163, Col: 50}
 										}
 										_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 										if templ_7745c5c3_Err != nil {

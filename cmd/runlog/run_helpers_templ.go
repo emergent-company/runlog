@@ -252,6 +252,11 @@ func sectionHeading(text string) templ.Component {
 	})
 }
 
+// eventHasDetails returns true if an event has expandable content (children or details).
+func eventHasDetails(e runlog.EventRow) bool {
+	return len(e.Children) > 0 || (e.Details != nil && *e.Details != "")
+}
+
 // statusBadge renders a badge for a status string.
 func statusBadge(status string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -343,7 +348,7 @@ func emptyState(message string) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 119, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 124, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -386,7 +391,7 @@ func backButton(href string) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(href)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 124, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 129, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -430,7 +435,7 @@ func loadMoreButton(url string, target string) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(url)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 131, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 136, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -443,7 +448,7 @@ func loadMoreButton(url string, target string) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.ResolveAttributeValue(target)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 131, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 136, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -486,7 +491,7 @@ func collapseSection(title string) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 138, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 143, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -601,7 +606,7 @@ func statItemCard(item statItem) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 164, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 169, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -614,7 +619,7 @@ func statItemCard(item statItem) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(item.Value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 165, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 170, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -791,7 +796,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 					var templ_7745c5c3_Var29 string
 					templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("run-%d", r.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 205, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 210, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 					if templ_7745c5c3_Err != nil {
@@ -804,7 +809,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 					var templ_7745c5c3_Var30 string
 					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/ui/runs/%d", r.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 207, Col: 46}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 212, Col: 46}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 					if templ_7745c5c3_Err != nil {
@@ -947,7 +952,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 								var templ_7745c5c3_Var37 string
 								templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(opts.Categories[r.ID])
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 233, Col: 72}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 238, Col: 72}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 								if templ_7745c5c3_Err != nil {

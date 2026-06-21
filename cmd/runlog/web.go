@@ -295,8 +295,9 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 				continue
 			}
 			seq++
-			if al.RunID != 0 {
-				_ = lm.db.InsertEvent(al.RunID, seq, time.Now(), time.Since(al.Started).Seconds(), "log", line, nil)
+			kind := lineEventKind(line)
+			if al.RunID != 0 && kind != "" {
+				_ = lm.db.InsertEvent(al.RunID, seq, time.Now(), time.Since(al.Started).Seconds(), kind, line, nil)
 			}
 		}
 		err := cmd.Wait()
@@ -563,8 +564,7 @@ func skipLogLine(line string) bool {
 			}
 		}
 	}
-	// Skip go test framework output lines — these are noise in the event log.
-	// The test's rl.Printf/dbEvent already captures meaningful progress.
+	// Skip go test framework output noise
 	switch {
 	case strings.HasPrefix(line, "=== RUN "):
 		return true
@@ -580,8 +580,16 @@ func skipLogLine(line string) bool {
 		return true
 	case strings.HasPrefix(line, "?   "):
 		return true
+	case strings.HasPrefix(line, "--- SKIP"):
+		return true
 	case strings.HasPrefix(line, "testing: warning"):
 		return true
 	}
 	return false
+}
+
+// lineEventKind detects the event kind from a go test stdout line.
+// Returns "" for lines that should be skipped entirely (handled by skipLogLine).
+func lineEventKind(line string) string {
+	return "log"
 }

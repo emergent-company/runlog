@@ -294,6 +294,15 @@ CREATE INDEX IF NOT EXISTS idx_test_runs_name_started ON test_runs(test_name, st
 ALTER TABLE test_runs ADD COLUMN timeout_seconds REAL;
 `,
 	},
+	{
+		version: 19,
+		sql: `
+-- category stores the test's self-declared category set via RunLog.SetCategory().
+-- NULL means no category was declared.  Used as the primary source for test
+-- categorization in the web UI, falling back to config categories or directory name.
+ALTER TABLE test_runs ADD COLUMN category TEXT;
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -491,6 +500,16 @@ func (rdb *RunDB) UpdateRunTestVersion(id int64, version string) error {
 	defer rdb.mu.Unlock()
 	_, err := rdb.db.Exec(
 		`UPDATE test_runs SET test_version = ? WHERE id = ?`, version, id,
+	)
+	return err
+}
+
+// UpdateRunCategory stores the category on the test_runs row identified by id.
+func (rdb *RunDB) UpdateRunCategory(id int64, category string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET category = ? WHERE id = ?`, category, id,
 	)
 	return err
 }
@@ -750,6 +769,7 @@ type RunRow struct {
 	OutputTokens *int64            // nil if no LLM calls made; total output tokens generated
 	CostUSD      *float64          // nil if no LLM calls made; estimated cost in USD
 	EnvVars      map[string]string // nil if not set; environment variables used during test
+	Category     *string           // nil if not set; self-declared via RunLog.SetCategory()
 }
 
 // ChildEvent is one entry in the `children` JSON array stored on a group event.
@@ -798,7 +818,8 @@ func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
             r.cost_usd,
             r.env_vars,
             r.app_version,
-            r.test_version
+            r.test_version,
+            r.category
         FROM test_runs r
         LEFT JOIN run_events e ON e.run_id = r.id
         WHERE r.started_at >= ?
@@ -851,6 +872,7 @@ func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
 			&envVarsJSON,
 			&appVersion,
 			&testVersion,
+			&row.Category,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListRuns scan: %w", err)
 		}

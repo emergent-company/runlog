@@ -74,6 +74,8 @@ type RunLog struct {
 	testVersion string
 	// Timeout duration set by SetTimeout.
 	timeoutSeconds float64
+	// Category set by SetCategory.
+	category string
 
 	// Outcome reason tracking.
 	// skipReason is set by Skipf() before calling t.Skip().
@@ -381,6 +383,27 @@ func (rl *RunLog) SetExperiment(name string) {
 	if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunExperiment(rl.runID, name); err != nil {
 			rl.t.Logf("warn: RunLog.SetExperiment: DB UpdateRunExperiment: %v", err)
+		}
+	}
+}
+
+// SetCategory declares the test's category for the web UI tests list.
+// Call this at the start of a test to group it under a named category
+// instead of relying on config-file category patterns or directory names.
+func (rl *RunLog) SetCategory(category string) {
+	if category == "" {
+		return
+	}
+
+	rl.mu.Lock()
+	rl.category = category
+	rl.mu.Unlock()
+
+	rl.writef("category: %s\n", category)
+
+	if rl.db != nil && rl.runID != 0 {
+		if err := rl.db.UpdateRunCategory(rl.runID, category); err != nil {
+			rl.t.Logf("warn: RunLog.SetCategory: DB UpdateRunCategory: %v", err)
 		}
 	}
 }
