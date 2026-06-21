@@ -288,9 +288,6 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 		for scanner.Scan() {
 			line := scanner.Text()
 			al.broadcast(line)
-			// Skip t.Log() lines (file.go:line: prefix) — these are already
-			// persisted by the test's rl.Printf() → dbEvent() path. Keeping
-			// them would create duplicate events for every Printf call.
 			if skipLogLine(line) {
 				continue
 			}
@@ -314,6 +311,8 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 			outcome := runlog.OutcomePass
 			if al.exitCode != 0 {
 				outcome = runlog.OutcomeFail
+			} else if lm.db.HasSkipEvent(al.RunID) {
+				outcome = runlog.OutcomeSkip
 			}
 			lm.db.FinishRun(al.RunID, time.Now(), outcome, "")
 		}

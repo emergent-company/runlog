@@ -1589,6 +1589,13 @@ func (rdb *RunDB) DeleteAnalyzerTraces(suggestionKey string) error {
 	return nil
 }
 
+// HasSkipEvent returns true if the run has at least one 'skip' event.
+func (rdb *RunDB) HasSkipEvent(runID int64) bool {
+	var count int
+	_ = rdb.db.QueryRow(`SELECT COUNT(*) FROM run_events WHERE run_id = ? AND kind = 'skip'`, runID).Scan(&count)
+	return count > 0
+}
+
 // ListEvents returns top-level run_events for a given run (parent_id IS NULL),
 // ordered by seq.  Children are decoded from the parent's `children` column.
 func (rdb *RunDB) ListEvents(runID int64) ([]EventRow, error) {
