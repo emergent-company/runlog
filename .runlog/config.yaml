@@ -1,0 +1,8 @@
+work_dir: /root/runlog
+
+env:
+  RUNLOG_DAEMON_URL: http://localhost:17433
+
+test_packages:
+  - ./...
+  - ./cmd/runlog/...

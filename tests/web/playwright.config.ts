@@ -7,6 +7,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:17430/ui/',
     headless: true,
+    screenshot: 'only-on-failure',
     trace: 'on',  // capture trace for every test (viewable at trace.playwright.dev)
   },
   globalSetup: './helpers/global-setup.ts',

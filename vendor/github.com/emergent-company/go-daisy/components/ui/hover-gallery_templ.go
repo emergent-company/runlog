@@ -70,7 +70,7 @@ func HoverGallery(images []HoverGalleryImage) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(img.Src)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/hover-gallery.templ`, Line: 25, Col: 22}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `hover-gallery.templ`, Line: 25, Col: 22}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 				if templ_7745c5c3_Err != nil {
@@ -83,7 +83,7 @@ func HoverGallery(images []HoverGalleryImage) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(img.Alt)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/hover-gallery.templ`, Line: 25, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `hover-gallery.templ`, Line: 25, Col: 38}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 				if templ_7745c5c3_Err != nil {

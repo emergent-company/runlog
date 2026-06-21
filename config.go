@@ -9,14 +9,28 @@ import (
 	"strings"
 )
 
+
+// LinterDef defines a single linter that can be run from the UI.
+type LinterDef struct {
+	Name    string `yaml:"name"`
+	Command string `yaml:"command"`
+}
+
+// knownTopLevelKeys lists all accepted top-level keys in .runlog/config.yaml.
+// Unknown keys cause a parse error to prevent silent misconfiguration.
+var knownTopLevelKeys = map[string]bool{
+	"testCommand":   true,
+	"db":            true,
+	"daemon_port":   true,
+	"work_dir":      true,
+	"env":           true,
+	"test_packages": true,
+	"linters":       true,
+}
+
 // Config holds optional configuration loaded from a .runlog/config.yaml file.
 // All fields are optional — runlog works without any config file.
 type Config struct {
-	// Categories maps category names to lists of test function names.
-	// Tests not listed in any category are grouped under "Uncategorized".
-	// Example: {"cli/install": ["TestCLIInstalled_Version", "TestCLIInstalled_Help"]}
-	Categories map[string][]string `yaml:"categories"`
-
 	// TestCommand is the command template used to launch tests from the TUI.
 	// Use {name} as a placeholder for the test function name.
 	// Deprecated: use WorkDir + Env + TestPackages instead.
@@ -42,6 +56,10 @@ type Config struct {
 	// TestPackages lists the Go packages to test. Default: ["./..."].
 	// Example: ["./tests/api/...", "./tests/integration/..."]
 	TestPackages []string `yaml:"test_packages"`
+
+	// Linters lists the linters available in the UI.
+	// If empty, runlog will attempt to discover linters from lefthook.yml.
+	Linters []LinterDef `yaml:"linters"`
 }
 
 // LoadConfig searches for a config.yaml configuration file and returns the
@@ -95,13 +113,11 @@ func parseConfigFile(path string) (*Config, error) {
 	defer f.Close()
 
 	cfg := &Config{
-		Categories: make(map[string][]string),
-		Env:        make(map[string]string),
+		Env: make(map[string]string),
 	}
 
 	scanner := bufio.NewScanner(f)
-	var currentSection string // "", "categories", "env"
-	var currentCategory string
+	var currentSection string // "", "env", "test_packages"
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -112,91 +128,99 @@ func parseConfigFile(path string) (*Config, error) {
 			continue
 		}
 
-		// Top-level keys
-		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
-			if strings.HasPrefix(trimmed, "testCommand:") {
-				cfg.TestCommand = strings.TrimSpace(strings.TrimPrefix(trimmed, "testCommand:"))
-				cfg.TestCommand = strings.Trim(cfg.TestCommand, "\"'")
-				currentSection = ""
-				continue
-			}
-			if strings.HasPrefix(trimmed, "db:") {
-				cfg.DBPath = strings.TrimSpace(strings.TrimPrefix(trimmed, "db:"))
-				cfg.DBPath = strings.Trim(cfg.DBPath, "\"'")
-				currentSection = ""
-				continue
-			}
-			if strings.HasPrefix(trimmed, "daemon_port:") {
-				raw := strings.TrimSpace(strings.TrimPrefix(trimmed, "daemon_port:"))
-				raw = strings.Trim(raw, "\"'")
-				if p, err := strconv.Atoi(raw); err == nil {
-					cfg.DaemonPort = p
+		// Inside a section: indented content
+		if currentSection != "" && (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) {
+			switch currentSection {
+			case "env":
+				if idx := strings.Index(trimmed, ":"); idx > 0 {
+					key := strings.TrimSpace(trimmed[:idx])
+					value := strings.TrimSpace(trimmed[idx+1:])
+					value = strings.Trim(value, "\"'")
+					cfg.Env[key] = value
 				}
-				currentSection = ""
-				continue
-			}
-			if strings.HasPrefix(trimmed, "work_dir:") {
-				cfg.WorkDir = strings.TrimSpace(strings.TrimPrefix(trimmed, "work_dir:"))
-				cfg.WorkDir = strings.Trim(cfg.WorkDir, "\"'")
-				currentSection = ""
-				continue
-			}
-			if trimmed == "categories:" {
-				currentSection = "categories"
-				currentCategory = ""
-				continue
-			}
-			if trimmed == "env:" {
-				currentSection = "env"
-				continue
-			}
-			if trimmed == "test_packages:" {
-				currentSection = "test_packages"
-				continue
-			}
-			currentSection = ""
-			continue
-		}
-
-		// Inside categories section
-		if currentSection == "categories" {
-			// Category key line: "  cli/install:"
-			if strings.HasSuffix(trimmed, ":") && !strings.HasPrefix(trimmed, "-") {
-				currentCategory = strings.TrimSuffix(trimmed, ":")
-				currentCategory = strings.Trim(currentCategory, "\"'")
-				if cfg.Categories[currentCategory] == nil {
-					cfg.Categories[currentCategory] = []string{}
+			case "test_packages":
+				if strings.HasPrefix(trimmed, "- ") {
+					pkg := strings.TrimPrefix(trimmed, "- ")
+					pkg = strings.Trim(pkg, "\"'")
+					cfg.TestPackages = append(cfg.TestPackages, pkg)
 				}
-				continue
-			}
-			// List item: "    - TestCLIInstalled_Version"
-			if strings.HasPrefix(trimmed, "- ") && currentCategory != "" {
-				name := strings.TrimPrefix(trimmed, "- ")
-				name = strings.Trim(name, "\"'")
-				cfg.Categories[currentCategory] = append(cfg.Categories[currentCategory], name)
-				continue
-			}
-		}
-
-		// Inside env section: "  KEY: value"
-		if currentSection == "env" {
-			if idx := strings.Index(trimmed, ":"); idx > 0 {
-				key := strings.TrimSpace(trimmed[:idx])
-				value := strings.TrimSpace(trimmed[idx+1:])
-				value = strings.Trim(value, "\"'")
-				cfg.Env[key] = value
+			case "linters":
+				// Each linter is a dash-prefixed block with name: and command:
+				if strings.HasPrefix(trimmed, "- ") {
+					// Start of a new linter block; store it temporarily
+					lineWithoutDash := strings.TrimPrefix(trimmed, "- ")
+					if idx := strings.Index(lineWithoutDash, ":"); idx > 0 {
+						key := strings.TrimSpace(lineWithoutDash[:idx])
+						val := strings.TrimSpace(lineWithoutDash[idx+1:])
+						val = strings.Trim(val, "\"'")
+						if key == "name" {
+							cfg.Linters = append(cfg.Linters, LinterDef{Name: val})
+						}
+					}
+				} else if strings.HasPrefix(trimmed, "name:") || strings.HasPrefix(trimmed, "command:") {
+					// Continuation of the current linter block
+					if idx := strings.Index(trimmed, ":"); idx > 0 {
+						key := strings.TrimSpace(trimmed[:idx])
+						val := strings.TrimSpace(trimmed[idx+1:])
+						val = strings.Trim(val, "\"'")
+						if len(cfg.Linters) > 0 {
+							last := &cfg.Linters[len(cfg.Linters)-1]
+							switch key {
+							case "name":
+								last.Name = val
+							case "command":
+								last.Command = val
+							}
+						}
+					}
+				}
 			}
 			continue
 		}
 
-		// Inside test_packages section: "  - ./tests/api/..."
-		if currentSection == "test_packages" {
-			if strings.HasPrefix(trimmed, "- ") {
-				pkg := strings.TrimPrefix(trimmed, "- ")
-				pkg = strings.Trim(pkg, "\"'")
-				cfg.TestPackages = append(cfg.TestPackages, pkg)
+		// Top-level keys (not indented)
+		currentSection = ""
+
+		if strings.HasPrefix(trimmed, "testCommand:") {
+			cfg.TestCommand = strings.TrimSpace(strings.TrimPrefix(trimmed, "testCommand:"))
+			cfg.TestCommand = strings.Trim(cfg.TestCommand, "\"'")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "db:") {
+			cfg.DBPath = strings.TrimSpace(strings.TrimPrefix(trimmed, "db:"))
+			cfg.DBPath = strings.Trim(cfg.DBPath, "\"'")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "daemon_port:") {
+			raw := strings.TrimSpace(strings.TrimPrefix(trimmed, "daemon_port:"))
+			raw = strings.Trim(raw, "\"'")
+			if p, err := strconv.Atoi(raw); err == nil {
+				cfg.DaemonPort = p
 			}
 			continue
+		}
+		if strings.HasPrefix(trimmed, "work_dir:") {
+			cfg.WorkDir = strings.TrimSpace(strings.TrimPrefix(trimmed, "work_dir:"))
+			cfg.WorkDir = strings.Trim(cfg.WorkDir, "\"'")
+			continue
+		}
+		if trimmed == "env:" {
+			currentSection = "env"
+			continue
+		}
+		if trimmed == "test_packages:" {
+			currentSection = "test_packages"
+			continue
+		}
+		if trimmed == "linters:" {
+			currentSection = "linters"
+			continue
+		}
+
+		// Unknown top-level key — reject with error
+		key := strings.SplitN(trimmed, ":", 2)[0]
+		if !knownTopLevelKeys[key] {
+			return nil, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, env, test_packages)", path, key)
 		}
 	}
 
@@ -277,29 +301,4 @@ func (c *Config) DaemonPortOrDefault() int {
 	return 7430
 }
 
-// CategoryForTest returns the category for a test name, or "Uncategorized"
-// if the test is not assigned to any category. Patterns support glob wildcards
-// (* and ?) via filepath.Match, so "login*" matches "login_page_test" etc.
-func (c *Config) CategoryForTest(testName string) string {
-	for cat, tests := range c.Categories {
-		for _, t := range tests {
-			if t == testName {
-				return cat
-			}
-			if matched, _ := filepath.Match(t, testName); matched {
-				return cat
-			}
-		}
-	}
-	return "Uncategorized"
-}
 
-// CategoryForRun returns the category for a RunRow, preferring the DB-stored
-// category (set via RunLog.SetCategory) over config file categories.
-// Falls back to CategoryForTest if no DB category is set.
-func (c *Config) CategoryForRun(r *RunRow) string {
-	if r.Category != nil && *r.Category != "" {
-		return *r.Category
-	}
-	return c.CategoryForTest(r.TestName)
-}

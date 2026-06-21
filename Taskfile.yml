@@ -250,6 +250,43 @@ tasks:
       - rm -f {{.DOGFOOD_DB}}
       - air -c .air.dogfood.toml
 
+  # ── Dogfood: test recording ─────────────────────────────────────────────
+
+  dogfood:record:
+    desc: "Run integration tests that record to dogfood DB"
+    deps: [dogfood:start]
+    env:
+      RUNLOG_DAEMON_URL: http://localhost:17433
+      TEST_RUNS_DB: /tmp/runlog-dogfood.db
+      RUNLOG_APP_TITLE: "runlog (dogfood)"
+    cmds:
+      - go test -v -count=1 -timeout 120s -run 'TestCostTracking_EndToEnd|TestEnvVarsIntegration' ./...
+      - echo "---"
+      - echo "Dogfood DB now has runs. Open:"
+      - echo "  http://mcj-one:17433/ui/tests"
+      - echo "  http://mcj-one:17433/ui/runs"
+
+  dogfood:status:
+    desc: "Show dogfood DB summary"
+    cmds:
+      - |
+        echo "=== Dogfood daemon ==="
+        if curl -sf http://localhost:{{.DOGFOOD_PORT}}/ > /dev/null 2>&1; then
+          echo "  RUNNING (port {{.DOGFOOD_PORT}})"
+        else
+          echo "  NOT RUNNING"
+        fi
+        echo "=== DB ==="
+        echo "  Path: {{.DOGFOOD_DB}}"
+        sqlite3 {{.DOGFOOD_DB}} "SELECT COUNT(*) || ' runs, ' || COUNT(DISTINCT test_name) || ' distinct tests' FROM test_runs;" 2>/dev/null || echo "  (empty/no DB)"
+        echo "=== Recent runs ==="
+        sqlite3 {{.DOGFOOD_DB}} "SELECT id, substr(test_name,1,60), CASE WHEN finished_at IS NULL THEN 'RUNNING' WHEN skipped=1 THEN 'SKIP' WHEN passed=1 THEN 'PASS' ELSE 'FAIL' END FROM test_runs ORDER BY id DESC LIMIT 10;" 2>/dev/null || echo "  (no runs)"
+
+  dogfood:watch:
+    desc: "Watch a dogfood run via CLI. Usage: task dogfood:watch -- <run-id>"
+    cmds:
+      - go run ./cmd/runlog watch {{.CLI_ARGS}} --db /tmp/runlog-dogfood.db
+
   # ── Test: dogfood-wrapped ───────────────────────────────────────────────────
 
   test:dogfood:

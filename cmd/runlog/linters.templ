@@ -1,0 +1,307 @@
+package main
+
+import (
+	"fmt"
+	"net/url"
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/components/table"
+	"github.com/emergent-company/go-daisy/components/ui"
+)
+
+templ LintersPage(data linterListData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - Linters", appName()), sidebarGroups) {
+		@lintersContent(data)
+	}
+}
+
+templ LintersContent(data linterListData) {
+	@lintersContent(data)
+}
+
+templ lintersContent(data linterListData) {
+	<div data-testid="linters-content">
+		<div class="flex items-center justify-between mb-4">
+			<h1 class="text-2xl font-bold">Linters</h1>
+			<button
+				class="btn btn-primary btn-sm"
+				hx-post="/ui/linters/run-all"
+				hx-sync="#main-content:replace"
+			>
+				<span class="iconify lucide--play size-4"></span>
+				Run All
+			</button>
+		</div>
+		<div id="linter-list" data-testid="linter-list" class="contents">
+			@linterTable(data.Linters)
+		</div>
+	</div>
+	<script type="text/javascript">
+	(function() {
+		var es = new EventSource('/ui/linters/events');
+		es.addEventListener('linter-done', function(e) {
+			var data = JSON.parse(e.data);
+			var row = document.getElementById('linter-' + data.name);
+			if (row) {
+				htmx.ajax('GET', '/ui/linters', {target: '[data-testid="linters-content"]', swap: 'innerHTML'});
+			}
+		});
+		es.addEventListener('linter-error', function(e) {
+			es.close();
+		});
+	})();
+	</script>
+}
+
+templ linterTable(entries []linterListEntry) {
+	if len(entries) > 0 {
+		@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+			@table.TableHead() {
+				@table.TableHeadRow() {
+					@table.TableHeadCell("Linter")
+					@table.TableHeadCell("Status")
+					<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Runs</th>
+					@table.TableHeadCell("Last Run")
+					<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Action</th>
+				}
+			}
+			@table.TableBody() {
+				for _, e := range entries {
+					<tr
+						id={ "linter-" + e.Name }
+						class="hover"
+						hx-get={ "/ui/linters/" + url.PathEscape(e.Name) }
+						hx-target="#main-content"
+						hx-swap="innerHTML"
+						hx-push-url="true"
+						hx-sync="#main-content:replace"
+						hx-trigger="click[!target.closest('.dropdown')]"
+					>
+						@table.TableCell("", nil) {
+							@text(e.Name)
+						}
+						@table.TableCell("", nil) {
+							@linterStatusBadge(e.LastStatus)
+						}
+						@table.TableCell("text-right w-16", nil) {
+							if e.NeverRun {
+								<span class="text-base-content/30">—</span>
+							} else {
+								@text(strconv.Itoa(e.RunCount))
+							}
+						}
+						@table.TableCell("", nil) {
+							if e.NeverRun {
+								<span class="text-base-content/30">—</span>
+							} else {
+								@text(e.LastRunAt)
+							}
+						}
+						@table.TableCell("text-center w-16", nil) {
+							@ui.Dropdown(ui.DropdownEnd, nil) {
+								<button class="btn btn-ghost btn-xs" tabindex="0">
+									<span class="iconify lucide--ellipsis-vertical size-4"></span>
+								</button>
+								@ui.DropdownMenu(nil) {
+									<li>
+										<button
+											data-run-linter={ url.PathEscape(e.Name) }
+											class="w-full text-left px-4 py-2 text-sm"
+										>Run Linter</button>
+									</li>
+								}
+							}
+						}
+					</tr>
+				}
+			}
+		}
+	} else {
+		@emptyState("No linters configured. Add a linters: section to .runlog/config.yaml or create a lefthook.yml file.")
+	}
+	<script>
+		document.querySelector('[data-testid="linters-content"]')?.addEventListener('click', function(e) {
+			var btn = e.target.closest('[data-run-linter]');
+			if (!btn || typeof htmx === 'undefined') return;
+			var name = btn.getAttribute('data-run-linter');
+			htmx.ajax('POST', '/ui/linters/' + encodeURIComponent(name) + '/run', {
+				target: '#main-content',
+				swap: 'innerHTML'
+			});
+		});
+	</script>
+}
+
+templ linterStatusBadge(status string) {
+	if status == "passed" {
+		@ui.Badge(ui.BadgeProps{Label: "Pass", Variant: ui.BadgeSuccess, Size: ui.BadgeSizeSM, Style: ui.BadgeStyleOutline})
+	} else if status == "failed" {
+		@ui.Badge(ui.BadgeProps{Label: "Fail", Variant: ui.BadgeError, Size: ui.BadgeSizeSM, Style: ui.BadgeStyleOutline})
+	} else if status == "error" {
+		@ui.Badge(ui.BadgeProps{Label: "Error", Variant: ui.BadgeError, Size: ui.BadgeSizeSM, Style: ui.BadgeStyleOutline})
+	} else if status == "running" {
+		@ui.Badge(ui.BadgeProps{Label: "Running", Variant: ui.BadgeInfo, Size: ui.BadgeSizeSM, Animate: true, Style: ui.BadgeStyleOutline})
+	} else {
+		@ui.Badge(ui.BadgeProps{Label: "Never Run", Variant: ui.BadgeNeutral, Size: ui.BadgeSizeSM, Style: ui.BadgeStyleOutline})
+	}
+}
+
+templ LinterDetailPage(data linterDetailData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - %s", appName(), data.Name), sidebarGroups) {
+		@linterDetailContent(data)
+	}
+}
+
+templ LinterDetailContent(data linterDetailData) {
+	@linterDetailContent(data)
+}
+
+templ linterDetailContent(data linterDetailData) {
+	<div data-testid="linter-detail">
+		@backButton("/ui/linters")
+		<div class="flex items-center justify-between mb-4 mt-2">
+			<div>
+				<h1 class="text-2xl font-bold">{ data.Name }</h1>
+				<p class="text-sm text-base-content/50 font-mono mt-1">{ data.Command }</p>
+			</div>
+			<button
+				class="btn btn-primary btn-sm"
+				hx-post={ "/ui/linters/" + url.PathEscape(data.Name) + "/run" }
+				hx-sync="#main-content:replace"
+			>
+				<span class="iconify lucide--play size-4"></span>
+				Run
+			</button>
+		</div>
+
+		if len(data.Runs) > 0 {
+			<div id="runs-section">
+				@linterRunsTable(data)
+				if data.Offset+data.Limit < data.TotalRuns {
+					@loadMoreButton(
+						fmt.Sprintf("/ui/linters/%s?offset=%d", url.PathEscape(data.Name), data.Offset+data.Limit),
+						"#runs-section",
+					)
+				}
+			</div>
+		} else {
+			@emptyState("No runs yet. Click Run to execute this linter.")
+		}
+	</div>
+
+	<script type="text/javascript">
+		(function() {
+			var el = document.querySelector('[data-testid="linter-detail"]');
+			var runBtn = el && el.querySelector('[hx-post*="/run"]');
+			if (!runBtn) return;
+
+			// After clicking Run, the LinterDetailContent will be replaced by the
+			// launcher view served via the HX-Redirect. This script handles cleanup.
+			function handleRunDone() {
+				// When the run completes and we're back on the detail page,
+				// reload the detail content.
+			}
+		})();
+	</script>
+}
+
+templ linterRunsTable(data linterDetailData) {
+	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+		@table.TableHead() {
+			@table.TableHeadRow() {
+				@table.TableHeadCell("Status")
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Exit Code</th>
+				@table.TableHeadCell("Started")
+				<th class="text-xs font-semibold text-base-content/60 uppercase">Output</th>
+			}
+		}
+		@table.TableBody() {
+			for _, r := range data.Runs {
+				<tr
+					id={ fmt.Sprintf("linter-run-%d", r.ID) }
+					class="hover"
+				>
+					@table.TableCell("", nil) {
+						@linterStatusBadge(r.Status)
+					}
+					@table.TableCell("text-right w-16", nil) {
+						if r.ExitCode != nil {
+							@text(fmt.Sprintf("%d", *r.ExitCode))
+						} else {
+							<span class="text-base-content/30">—</span>
+						}
+					}
+					@table.TableCell("", nil) {
+						@text(formatTime(r.StartedAt, TimeFull))
+					}
+					@table.TableCell("", nil) {
+						if r.Output != "" {
+							<details class="collapse collapse-arrow">
+								<summary class="collapse-title text-sm font-semibold text-base-content/70 min-h-0 p-2">View Output</summary>
+								<div class="collapse-content p-0">
+									<pre class="bg-base-300 text-xs font-mono p-3 rounded-box overflow-auto max-h-64 whitespace-pre-wrap">{ r.Output }</pre>
+								</div>
+							</details>
+						} else {
+							<span class="text-base-content/30">—</span>
+						}
+					}
+				</tr>
+			}
+		}
+	}
+}
+
+templ LinterLauncherView(data linterLauncherData) {
+	<div class="mt-4 mb-6" data-testid="linter-launcher-view" data-sse-url={ data.SSEURL } data-linter-name={ data.LinterName }>
+		<div class="flex items-center gap-2 mb-2">
+			<span id="linter-launch-status" class="flex items-center gap-2 font-semibold">
+				<span class="loading loading-spinner loading-sm" data-testid="linter-launch-spinner"></span>
+				Running <span data-testid="linter-launch-name">{ data.LinterName }</span>...
+			</span>
+		</div>
+		<pre
+			id="linter-log-output"
+			class="bg-base-300 text-sm font-mono p-4 rounded-box overflow-auto max-h-96 whitespace-pre-wrap"
+			data-testid="linter-log-output"
+		></pre>
+		<div class="mt-4">
+			<button class="btn btn-ghost btn-sm" hx-get={ "/ui/linters/" + url.PathEscape(data.LinterName) } hx-target="#main-content" hx-swap="innerHTML" hx-sync="#main-content:replace">← Back to Details</button>
+		</div>
+	</div>
+	<script type="text/javascript">
+		(function() {
+			var el = document.querySelector('[data-testid="linter-launcher-view"]');
+			var sseUrl = el.getAttribute('data-sse-url');
+			var linterName = el.getAttribute('data-linter-name');
+			var es = new EventSource(sseUrl);
+			var log = document.getElementById('linter-log-output');
+			var status = document.getElementById('linter-launch-status');
+			var spinner = status && status.querySelector('.loading');
+			es.onmessage = function(e) {
+				if (log) log.textContent += e.data + '\n';
+				log.scrollTop = log.scrollHeight;
+			};
+			es.addEventListener('done', function(e) {
+				es.close();
+				if (spinner) spinner.remove();
+				if (typeof htmx !== 'undefined') {
+					setTimeout(function() {
+						htmx.ajax('GET', '/ui/linters/' + encodeURIComponent(linterName), {target: '#main-content', swap: 'innerHTML', pushUrl: 'true'});
+					}, 500);
+				}
+			});
+			es.onerror = function() {
+				es.close();
+				if (spinner) spinner.remove();
+				if (status) status.textContent = 'Connection closed';
+			};
+		})();
+	</script>
+}
+
+templ LintersSkeleton() {
+	<div class="flex items-center justify-center py-24">
+		<span class="loading loading-spinner loading-lg text-primary"></span>
+	</div>
+}

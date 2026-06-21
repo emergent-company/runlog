@@ -13,6 +13,20 @@ import (
 // post-run assertions.
 func newTestDB(t *testing.T) string {
 	t.Helper()
+
+	// If TEST_RUNS_DB is already set (dogfood mode), don't override.
+	// Tests write directly to the dogfood DB — no isolation, but that's
+	// expected when running in dogfood mode.
+	if existing := os.Getenv("TEST_RUNS_DB"); existing != "" {
+		// Dogfood mode: create a temp dir with runs.db → dogfood DB symlink
+		// so callers can still do filepath.Join(tmpDir, "runs.db") and get the right path.
+		tmpDir := t.TempDir()
+		os.Symlink(existing, filepath.Join(tmpDir, "runs.db"))
+		resetSharedDB()
+		t.Cleanup(resetSharedDB)
+		return tmpDir
+	}
+
 	tmpDir := t.TempDir()
 
 	dbPath := filepath.Join(tmpDir, "runs.db")

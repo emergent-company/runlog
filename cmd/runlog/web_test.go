@@ -106,6 +106,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestWebApp_ServeHTTP_RoutesExist verifies all major routes return expected HTTP status codes.
 func TestWebApp_ServeHTTP_RoutesExist(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -130,6 +131,7 @@ func TestWebApp_ServeHTTP_RoutesExist(t *testing.T) {
 	}
 }
 
+// TestWebApp_Dashboard_HasTestIDs verifies the dashboard page contains expected data-testid attributes.
 func TestWebApp_Dashboard_HasTestIDs(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -141,6 +143,7 @@ func TestWebApp_Dashboard_HasTestIDs(t *testing.T) {
 	checkTestID(t, body, "main-content")
 }
 
+// TestWebApp_Dashboard_HTMXPartial_NoShell verifies HTMX requests return content without the app-page shell wrapper.
 func TestWebApp_Dashboard_HTMXPartial_NoShell(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -153,6 +156,7 @@ func TestWebApp_Dashboard_HTMXPartial_NoShell(t *testing.T) {
 	checkTestID(t, body, "dashboard-content")
 }
 
+// TestWebApp_Tests_RendersList verifies the tests page renders a list of seeded test runs.
 func TestWebApp_Tests_RendersList(t *testing.T) {
 	app, db := newTestApp(t)
 	seedTestRun(t, db, "TestAlpha", true)
@@ -165,6 +169,7 @@ func TestWebApp_Tests_RendersList(t *testing.T) {
 	checkTestID(t, body, "category-filter")
 }
 
+// TestWebApp_Tests_HTMXPartial verifies the tests page HTMX partial returns content without the app-page shell.
 func TestWebApp_Tests_HTMXPartial(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -177,6 +182,7 @@ func TestWebApp_Tests_HTMXPartial(t *testing.T) {
 	}
 }
 
+// TestWebApp_Tests_FilterByStatus verifies status filters (pass, fail, skip, timeout, running) return only matching badge variants.
 func TestWebApp_Tests_FilterByStatus(t *testing.T) {
 	app, db := newTestApp(t)
 
@@ -228,6 +234,7 @@ func TestWebApp_Tests_FilterByStatus(t *testing.T) {
 	}
 }
 
+// TestWebApp_TestDetail_RendersTestName verifies the test detail page shows the correct test name.
 func TestWebApp_TestDetail_RendersTestName(t *testing.T) {
 	app, db := newTestApp(t)
 	seedTestRun(t, db, "TestDetailFoo", true)
@@ -242,6 +249,7 @@ func TestWebApp_TestDetail_RendersTestName(t *testing.T) {
 	}
 }
 
+// TestWebApp_TestDetail_HTMXPartial verifies the test detail HTMX partial returns content without the shell.
 func TestWebApp_TestDetail_HTMXPartial(t *testing.T) {
 	app, db := newTestApp(t)
 	seedTestRun(t, db, "TestHTMXDetail", true)
@@ -255,6 +263,7 @@ func TestWebApp_TestDetail_HTMXPartial(t *testing.T) {
 	}
 }
 
+// TestWebApp_RunDetail_RendersRun verifies the run detail page shows the test name and event data.
 func TestWebApp_RunDetail_RendersRun(t *testing.T) {
 	app, db := newTestApp(t)
 	id := seedTestRun(t, db, "TestRunView", true)
@@ -270,6 +279,7 @@ func TestWebApp_RunDetail_RendersRun(t *testing.T) {
 	}
 }
 
+// TestWebApp_RunDetail_NonExistentRun verifies requesting a non-existent run ID returns 404.
 func TestWebApp_RunDetail_NonExistentRun(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -279,6 +289,7 @@ func TestWebApp_RunDetail_NonExistentRun(t *testing.T) {
 	}
 }
 
+// TestWebApp_LaunchTest_MissingBinary verifies launching a non-existent test returns a 303 redirect.
 func TestWebApp_LaunchTest_MissingBinary(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -290,6 +301,7 @@ func TestWebApp_LaunchTest_MissingBinary(t *testing.T) {
 	}
 }
 
+// TestWebApp_ExpandCommand_Basic verifies the {name} placeholder is replaced in command templates.
 func TestWebApp_ExpandCommand_Basic(t *testing.T) {
 	got := runlog.ExpandTestCommand("go test -run {name} ./...", "TestFoo", "")
 	want := "go test -run TestFoo ./..."
@@ -298,6 +310,7 @@ func TestWebApp_ExpandCommand_Basic(t *testing.T) {
 	}
 }
 
+// TestWebApp_ExpandCommand_WithEnv verifies the {env} placeholder is replaced with the environment name.
 func TestWebApp_ExpandCommand_WithEnv(t *testing.T) {
 	got := runlog.ExpandTestCommand("go test -run {name} -env {env}", "TestFoo", "staging")
 	want := "go test -run TestFoo -env staging"
@@ -306,6 +319,7 @@ func TestWebApp_ExpandCommand_WithEnv(t *testing.T) {
 	}
 }
 
+// TestWebApp_ExpandCommand_NoPlaceholders verifies commands without placeholders pass through unchanged.
 func TestWebApp_ExpandCommand_NoPlaceholders(t *testing.T) {
 	got := runlog.ExpandTestCommand("go test ./...", "TestFoo", "")
 	want := "go test ./..."
@@ -314,6 +328,7 @@ func TestWebApp_ExpandCommand_NoPlaceholders(t *testing.T) {
 	}
 }
 
+// TestWebApp_LaunchAndPollUpdates verifies launching a real test via the web API and polling events-table until completion.
 func TestWebApp_LaunchAndPollUpdates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E launch test in short mode")
@@ -468,6 +483,7 @@ func runModInit(t *testing.T, dir string) {
 	t.Log("test module compiles OK")
 }
 
+// TestWebApp_StatusFromRun verifies statusFromRun returns correct labels for running, pass, fail, and timeout states.
 func TestWebApp_StatusFromRun(t *testing.T) {
 	now := time.Now()
 	passed := true

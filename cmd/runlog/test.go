@@ -312,35 +312,48 @@ var testFuncRe = regexp.MustCompile(`func\s+(Test\w+)\s*\(\s*t\s*\*?testing\.(T|
 // returns them grouped by category (subdirectory name). Returns an empty map
 // on error. Only functions matching the TestXxx pattern are returned.
 func DiscoverTestFunctions(wd string) map[string][]string {
-	testsDir := filepath.Join(wd, "tests")
-	entries, err := os.ReadDir(testsDir)
-	if err != nil {
-		return nil
-	}
 	result := make(map[string][]string)
-	for _, e := range entries {
-		if !e.IsDir() {
+
+	// Scan tests/*/ directories (conventional test locations).
+	testsDir := filepath.Join(wd, "tests")
+	if entries, err := os.ReadDir(testsDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			cat := e.Name()
+			pkgDir := filepath.Join(testsDir, cat)
+			scanTestFiles(pkgDir, cat, result)
+		}
+	}
+
+	// Scan project root for *test.go files.
+	scanTestFiles(wd, "root", result)
+
+	// Scan cmd/runlog/ for CLI/web handler tests.
+	scanTestFiles(filepath.Join(wd, "cmd", "runlog"), "cli", result)
+
+	return result
+}
+
+// scanTestFiles reads *_test.go files in dir and adds matching TestXxx functions
+// to result under the given category key.
+func scanTestFiles(dir, category string, result map[string][]string) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), "_test.go") {
 			continue
 		}
-		cat := e.Name()
-		pkgDir := filepath.Join(testsDir, cat)
-		files, err := os.ReadDir(pkgDir)
+		data, err := os.ReadFile(filepath.Join(dir, f.Name()))
 		if err != nil {
 			continue
 		}
-		for _, f := range files {
-			if f.IsDir() || !strings.HasSuffix(f.Name(), "_test.go") {
-				continue
-			}
-			data, err := os.ReadFile(filepath.Join(pkgDir, f.Name()))
-			if err != nil {
-				continue
-			}
-			matches := testFuncRe.FindAllStringSubmatch(string(data), -1)
-			for _, m := range matches {
-				result[cat] = append(result[cat], m[1])
-			}
+		matches := testFuncRe.FindAllStringSubmatch(string(data), -1)
+		for _, m := range matches {
+			result[category] = append(result[category], m[1])
 		}
 	}
-	return result
 }

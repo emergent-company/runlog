@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"io"
@@ -31,12 +32,13 @@ var sidebarGroups = []layout.SidebarGroup{
 			{Label: "Dashboard", Href: "/ui/", Icon: "lucide--layout-dashboard"},
 			{Label: "Tests", Href: "/ui/tests", Icon: "lucide--flask-conical"},
 			{Label: "All Runs", Href: "/ui/runs", Icon: "lucide--list"},
+			{Label: "Linters", Href: "/ui/linters", Icon: "lucide--shield"},
 		},
 	},
 	{
 		Label: "Reference",
 		Items: []layout.SidebarItem{
-			{Label: "Events", Href: "/ui/events", Icon: "lucide--file-text"},
+			{Label: "SDK", Href: "/ui/events", Icon: "lucide--file-text"},
 			{Label: "Experiments", Href: "/ui/experiments", Icon: "lucide--layers"},
 		},
 	},
@@ -200,6 +202,36 @@ type eventChildrenData struct {
 type launchData struct {
 	TestName string
 	SSEURL   string
+}
+
+// ── Linter template data types ───────────────────────────────────────────────
+
+type linterListEntry struct {
+	Name       string
+	Command    string
+	LastStatus string // pass / fail / error / never_run
+	LastRunAt  string
+	RunCount   int
+	NeverRun   bool
+}
+
+type linterListData struct {
+	Linters []linterListEntry
+}
+
+type linterDetailData struct {
+	Name      string
+	Command   string
+	Runs      []runlog.LinterRow
+	TotalRuns int
+	Offset    int
+	Limit     int
+}
+
+type linterLauncherData struct {
+	LinterName string
+	SSEURL     string
+	Command    string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -377,6 +409,182 @@ func (al *ActiveLaunch) Unsubscribe(ch chan string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LinterManager — tracks running linter processes, streams output via SSE
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ActiveLinter struct {
+	Name     string
+	Cmd      *exec.Cmd
+	Started  time.Time
+	RunID    int64
+
+	mu        sync.Mutex
+	lines     []string
+	listeners []chan string
+	done      chan struct{}
+	exitCode  int
+}
+
+type LinterManager struct {
+	mu      sync.Mutex
+	runs    map[string]*ActiveLinter
+	db      *runlog.RunDB
+	sse     *SSEBroker
+	workDir string
+}
+
+func NewLinterManager(db *runlog.RunDB, sse *SSEBroker, workDir string) *LinterManager {
+	return &LinterManager{
+		runs:    make(map[string]*ActiveLinter),
+		db:      db,
+		sse:     sse,
+		workDir: workDir,
+	}
+}
+
+func (lm *LinterManager) Lint(name, command string) (*ActiveLinter, error) {
+	lm.mu.Lock()
+	if _, ok := lm.runs[name]; ok {
+		lm.mu.Unlock()
+		return nil, fmt.Errorf("linter %q is already running", name)
+	}
+
+	now := time.Now()
+	cmd := exec.Command("sh", "-c", command)
+	if lm.workDir != "" {
+		cmd.Dir = lm.workDir
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		lm.mu.Unlock()
+		return nil, fmt.Errorf("stdout pipe: %w", err)
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		lm.mu.Unlock()
+		return nil, fmt.Errorf("stderr pipe: %w", err)
+	}
+
+	al := &ActiveLinter{
+		Name:    name,
+		Cmd:     cmd,
+		Started: now,
+		done:    make(chan struct{}),
+	}
+	lm.runs[name] = al
+	lm.mu.Unlock()
+
+	// Create DB row
+	runID, err := lm.db.InsertLinterRun(name, command, now)
+	if err != nil {
+		lm.mu.Lock()
+		delete(lm.runs, name)
+		lm.mu.Unlock()
+		return nil, fmt.Errorf("insert linter run: %w", err)
+	}
+	al.RunID = runID
+
+	if err := cmd.Start(); err != nil {
+		lm.mu.Lock()
+		delete(lm.runs, name)
+		lm.mu.Unlock()
+		return nil, fmt.Errorf("start: %w", err)
+	}
+
+	var outputBuf strings.Builder
+	go func() {
+		mr := io.MultiReader(stdout, stderr)
+		scanner := bufio.NewScanner(mr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			al.broadcast(line)
+			outputBuf.WriteString(line + "\n")
+		}
+		err := cmd.Wait()
+		al.exitCode = 0
+		if err != nil {
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				al.exitCode = exitErr.ExitCode()
+			} else {
+				al.exitCode = -1
+			}
+		}
+		status := "passed"
+		if al.exitCode != 0 {
+			status = "failed"
+		}
+		_ = lm.db.UpdateLinterRunResult(al.RunID, status, al.exitCode, outputBuf.String(), time.Now())
+		close(al.done)
+		if lm.sse != nil {
+			data, _ := json.Marshal(map[string]interface{}{
+				"name":      name,
+				"status":    status,
+				"exit_code": al.exitCode,
+			})
+			lm.sse.Publish("linters", SSEEvent{Event: "linter-done", Data: string(data)})
+		}
+		lm.mu.Lock()
+		delete(lm.runs, name)
+		lm.mu.Unlock()
+	}()
+
+	return al, nil
+}
+
+func (lm *LinterManager) Running() []string {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+	var names []string
+	for name := range lm.runs {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (lm *LinterManager) Get(name string) *ActiveLinter {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+	return lm.runs[name]
+}
+
+func (al *ActiveLinter) broadcast(line string) {
+	al.mu.Lock()
+	al.lines = append(al.lines, line)
+	for _, ch := range al.listeners {
+		select {
+		case ch <- line:
+		default:
+		}
+	}
+	al.mu.Unlock()
+}
+
+func (al *ActiveLinter) Subscribe() chan string {
+	ch := make(chan string, 256)
+	al.mu.Lock()
+	for _, line := range al.lines {
+		select {
+		case ch <- line:
+		default:
+		}
+	}
+	al.listeners = append(al.listeners, ch)
+	al.mu.Unlock()
+	return ch
+}
+
+func (al *ActiveLinter) Unsubscribe(ch chan string) {
+	al.mu.Lock()
+	for i, l := range al.listeners {
+		if l == ch {
+			al.listeners = append(al.listeners[:i], al.listeners[i+1:]...)
+			break
+		}
+	}
+	al.mu.Unlock()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -406,6 +614,7 @@ type WebApp struct {
 	db        *runlog.RunDB
 	config    *runlog.Config
 	lm        *LauncherManager
+	linterMgr *LinterManager
 	sse       *SSEBroker
 	startedAt time.Time
 	workDir   string
@@ -442,16 +651,19 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 		}
 	}
 
+	sseBroker := newSSEBroker(db)
 	app := &WebApp{
 		echo:      e,
 		db:        db,
 		config:    config,
 		lm:        NewLauncherManager(db, config),
-		sse:       newSSEBroker(db),
+		linterMgr: NewLinterManager(db, sseBroker, workDir),
+		sse:       sseBroker,
 		startedAt: time.Now(),
-		workDir:   workDir,
+		workDir: workDir,
 	}
 
+	app.sse.SetLinterManager(app.linterMgr)
 	go app.sse.Run(context.Background())
 	go app.runTimeoutWorker(context.Background())
 
@@ -487,7 +699,25 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 	e.GET("/launch/:name", app.handleLaunchTest)
 	e.GET("/launch/:name/events", app.handleLaunchEvents)
 
+	// Linter routes
+	e.GET("/linters", app.handleLinters)
+	e.GET("/linters/events", app.handleLinterEventsStream)
+	e.GET("/linters/:name", app.handleLinterDetail)
+	e.POST("/linters/:name/run", app.handleRunLinter)
+	e.POST("/linters/run-all", app.handleRunAllLinters)
+	e.GET("/linters/:name/events", app.handleLinterEvents)
+
 	return app
+}
+
+// linterDefs returns the list of configured linters, falling back to lefthook
+// discovery if no linters are configured in the config file.
+func (app *WebApp) linterDefs() []runlog.LinterDef {
+	if len(app.config.Linters) > 0 {
+		return app.config.Linters
+	}
+	lefthook, _ := runlog.DiscoverLintersFromLefthook(app.workDir)
+	return lefthook
 }
 
 func (app *WebApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {

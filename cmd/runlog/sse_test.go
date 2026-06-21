@@ -12,6 +12,7 @@ import (
 	runlog "github.com/emergent-company/runlog"
 )
 
+// TestSSEBroker_SubscribePublishUnsubscribe verifies subscribing to a topic, publishing an event, receiving it, and unsubscribing closes the channel.
 func TestSSEBroker_SubscribePublishUnsubscribe(t *testing.T) {
 	b := newSSEBroker(nil)
 	ch := b.Subscribe("test")
@@ -28,6 +29,7 @@ func TestSSEBroker_SubscribePublishUnsubscribe(t *testing.T) {
 	}
 }
 
+// TestSSEBroker_MultipleSubscribers verifies two subscribers to the same topic both receive the published event.
 func TestSSEBroker_MultipleSubscribers(t *testing.T) {
 	b := newSSEBroker(nil)
 
@@ -50,6 +52,7 @@ func TestSSEBroker_MultipleSubscribers(t *testing.T) {
 	}
 }
 
+// TestSSEBroker_TopicIsolation verifies events on one topic do not reach subscribers on a different topic.
 func TestSSEBroker_TopicIsolation(t *testing.T) {
 	b := newSSEBroker(nil)
 
@@ -75,6 +78,7 @@ func TestSSEBroker_TopicIsolation(t *testing.T) {
 	}
 }
 
+// TestSSEBroker_UnsubscribeRemovesSubscriber verifies the channel is closed after unsubscribe and publish does not reach it.
 func TestSSEBroker_UnsubscribeRemovesSubscriber(t *testing.T) {
 	b := newSSEBroker(nil)
 	ch := b.Subscribe("test")
@@ -90,6 +94,7 @@ func TestSSEBroker_UnsubscribeRemovesSubscriber(t *testing.T) {
 	}
 }
 
+// TestSSEBroker_NonBlockingPublish verifies the 16-buffer channel drops the 17th event without blocking the publisher.
 func TestSSEBroker_NonBlockingPublish(t *testing.T) {
 	b := newSSEBroker(nil)
 	ch := b.Subscribe("test")
@@ -117,12 +122,14 @@ done:
 	}
 }
 
+// TestSSEBroker_ZeroSubscribersNoPanic verifies publishing to a topic with zero subscribers does not panic or block.
 func TestSSEBroker_ZeroSubscribersNoPanic(t *testing.T) {
 	b := newSSEBroker(nil)
 	b.Publish("empty", SSEEvent{Event: "x", Data: "y"})
 	// Should not panic or block
 }
 
+// TestSSEStream_HeadersAndConnectedMessage verifies /stream returns text/event-stream, no-cache, and starts with : connected.
 func TestSSEStream_HeadersAndConnectedMessage(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -160,6 +167,7 @@ func TestSSEStream_HeadersAndConnectedMessage(t *testing.T) {
 	}
 }
 
+// TestSSEStream_DeliversPublishedEvent verifies subscribing via HTTP stream and publishing an event delivers it in the response body.
 func TestSSEStream_DeliversPublishedEvent(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -192,6 +200,7 @@ func TestSSEStream_DeliversPublishedEvent(t *testing.T) {
 	}
 }
 
+// TestSSEStream_DefaultTopicIsFooter verifies /stream without topic param defaults to the footer topic.
 func TestSSEStream_DefaultTopicIsFooter(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -219,6 +228,7 @@ func TestSSEStream_DefaultTopicIsFooter(t *testing.T) {
 	}
 }
 
+// TestSSEStream_ContextCancellationExitsCleanly verifies cancelling the request context causes the SSE handler to exit cleanly without hanging.
 func TestSSEStream_ContextCancellationExitsCleanly(t *testing.T) {
 	app, _ := newTestApp(t)
 
@@ -250,6 +260,7 @@ func TestSSEStream_ContextCancellationExitsCleanly(t *testing.T) {
 	}
 }
 
+// TestFooterPoller_PublishesStatusEvent verifies the footer poller publishes a footer-status event with correct run/test counts.
 func TestFooterPoller_PublishesStatusEvent(t *testing.T) {
 	dbDir := t.TempDir()
 	dbPath := dbDir + "/test.db"
@@ -324,6 +335,7 @@ func TestFooterPoller_PublishesStatusEvent(t *testing.T) {
 	}
 }
 
+// TestFooterPoller_EmptyDB verifies the footer poller handles an empty database without errors.
 func TestFooterPoller_EmptyDB(t *testing.T) {
 	dbDir := t.TempDir()
 	dbPath := dbDir + "/test.db"

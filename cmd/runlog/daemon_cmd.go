@@ -298,10 +298,17 @@ func runDaemonInternal(args []string) error {
 	}
 	cfg, _ := runlog.LoadConfig(cfgDir)
 
-	// Infer project root: parent of .runlog directory, or the cfgDir
+	// Infer project root: parent of .runlog directory, or the config directory.
 	workDir := cfgDir
 	if filepath.Base(workDir) == ".runlog" {
 		workDir = filepath.Dir(workDir)
+	}
+	// If workDir doesn't look like a project root (no tests/ or go.mod), fall
+	// back to the current working directory so test discovery still works.
+	if _, err := os.Stat(filepath.Join(workDir, "go.mod")); os.IsNotExist(err) {
+		if wd, err := os.Getwd(); err == nil {
+			workDir = wd
+		}
 	}
 
 	port := *portFlag

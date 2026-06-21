@@ -31,6 +31,7 @@ func TestEnvVarsIntegration(t *testing.T) {
 	tmpDir := newTestDB(t)
 
 	rl := NewRunLog(t)
+	rl.SetCategory("env")
 	rl.Describe("Environment variable capture end-to-end",
 		"Sets test env vars before creating RunLog",
 		"RunLog auto-captures tracked env vars via NewRunLog",
@@ -52,7 +53,7 @@ func TestEnvVarsIntegration(t *testing.T) {
 		t.Fatal("expected at least one run")
 	}
 
-	run := runs[len(runs)-1] // last run (ours)
+	run := runs[0] // most recent run (ours)
 
 	if len(run.EnvVars) == 0 {
 		t.Fatal("expected env vars to be captured, but got empty map")

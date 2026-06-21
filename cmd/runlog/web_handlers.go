@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -55,14 +57,11 @@ func (app *WebApp) handleDashboard(c echo.Context) error {
 			}
 		}
 	}
-	catMap := make(map[string]int)
-	for n := range allTestNames {
-		cat := app.config.CategoryForTest(n)
-		catMap[cat]++
-	}
+	// Categories come only from the DB (SetCategory) or directory discovery.
+	// Without per-test DB lookups here, all tests are grouped as "Uncategorized".
 	var categories []catSummary
-	for name, count := range catMap {
-		categories = append(categories, catSummary{Name: name, TestCount: count})
+	if len(allTestNames) > 0 {
+		categories = []catSummary{{Name: "uncategorized", TestCount: len(allTestNames)}}
 	}
 
 	data := dashboardData{
@@ -223,15 +222,22 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 		page = append(page, r)
 	}
 	_ = rows.Close()
-
-	runRows := make([]runlog.RunRow, len(page))
+	runRows := make([]runlog.RunRow, 0, len(page))
 	catMap := make(map[int64]string, len(page))
-	for i, r := range page {
-		runRows[i] = r
-		catMap[r.ID] = app.config.CategoryForRun(&r)
+	catSet := make(map[string]bool)
+	for _, r := range page {
+		var cat string
+		if r.Category != nil && *r.Category != "" {
+			cat = *r.Category
+		} else {
+			cat = "Uncategorized"
+		}
+		catMap[r.ID] = cat
+		catSet[cat] = true
+		runRows = append(runRows, r)
 	}
+	categories := sortedKeys(catSet)
 
-	categories := sortedKeys(app.config.Categories)
 	f := runFilters{
 		Category: catFilter,
 		Status:   statusFilter,
@@ -319,8 +325,7 @@ func (app *WebApp) handleTests(c echo.Context) error {
 	// Build entries from DB runs
 	catMap := make(map[string][]testListEntry)
 	for _, a := range agg {
-		// Prefer DB-stored category, fall back to config match.
-		cat := app.config.CategoryForTest(a.Name)
+		cat := "Uncategorized"
 		if a.Category != nil && *a.Category != "" {
 			cat = *a.Category
 		}
@@ -360,18 +365,16 @@ func (app *WebApp) handleTests(c echo.Context) error {
 				if statusFilter != "" && statusFilter != "never_run" {
 					continue
 				}
-				cat := app.config.CategoryForTest(f)
-				if cat == "Uncategorized" {
-					for dirCat, dirFuncs := range discovered {
-						for _, df := range dirFuncs {
-							if df == f {
-								cat = dirCat
-								break
-							}
-						}
-						if cat != "Uncategorized" {
+				cat := "Uncategorized"
+				for dirCat, dirFuncs := range discovered {
+					for _, df := range dirFuncs {
+						if df == f {
+							cat = dirCat
 							break
 						}
+					}
+					if cat != "Uncategorized" {
+						break
 					}
 				}
 				if categoryFilter != "" && cat != categoryFilter {
@@ -396,19 +399,10 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		filteredCats = []testListCategory{}
 	}
 
-	// Build ALL categories for the dropdown from all sources
+	// Build categories dropdown from DB/discovery categories only
 	allCats := make([]testListCategory, 0)
-	seenCats := make(map[string]bool)
-	// First: categories that have entries from DB or discovery
 	for _, name := range sortedKeys(catMap) {
 		allCats = append(allCats, testListCategory{Name: name, Tests: catMap[name]})
-		seenCats[name] = true
-	}
-	// Then: config-only categories (empty but listed in dropdown)
-	for _, name := range sortedKeys(app.config.Categories) {
-		if !seenCats[name] {
-			allCats = append(allCats, testListCategory{Name: name, Tests: catMap[name]})
-		}
 	}
 	if len(allCats) == 0 {
 		allCats = filteredCats
@@ -642,7 +636,7 @@ func (app *WebApp) handleLaunchFromList(c echo.Context) error {
 
 func (app *WebApp) handleEventsReference(c echo.Context) error {
 	render.RenderAuto(c.Response().Writer, c.Request(),
-		EventsReferencePage(), EventsReferenceContent())
+		SDKPage(), SDKContent())
 	return nil
 }
 
@@ -1127,5 +1121,217 @@ func parseSinceParam(since string) time.Time {
 		return time.Now().Add(-30 * 24 * time.Hour)
 	default:
 		return time.Time{}
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Linter handlers
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (app *WebApp) handleLinters(c echo.Context) error {
+	rawDB := app.db.RawDB()
+	defs := app.linterDefs()
+	latestRuns, _ := app.db.ListLinterRuns()
+
+	latestByLinter := make(map[string]runlog.LinterRow)
+	for _, r := range latestRuns {
+		latestByLinter[r.LinterName] = r
+	}
+
+	var entries []linterListEntry
+	for _, d := range defs {
+		entry := linterListEntry{
+			Name:    d.Name,
+			Command: d.Command,
+		}
+		if lr, ok := latestByLinter[d.Name]; ok {
+			entry.LastStatus = lr.Status
+			entry.NeverRun = false
+			if lr.FinishedAt != nil {
+				entry.LastRunAt = formatTime(*lr.FinishedAt, TimeHuman)
+			} else {
+				entry.LastRunAt = formatTime(lr.StartedAt, TimeHuman)
+			}
+		} else {
+			entry.LastStatus = "never_run"
+			entry.NeverRun = true
+		}
+		var count int
+		_ = rawDB.QueryRow(`SELECT COUNT(*) FROM linter_runs WHERE linter_name = ?`, d.Name).Scan(&count)
+		entry.RunCount = count
+		entries = append(entries, entry)
+	}
+
+	data := linterListData{Linters: entries}
+	render.RenderAuto(c.Response().Writer, c.Request(),
+		LintersPage(data), LintersContent(data))
+	return nil
+}
+
+func (app *WebApp) handleLinterDetail(c echo.Context) error {
+	name := c.Param("name")
+	var def *runlog.LinterDef
+	for _, d := range app.linterDefs() {
+		if d.Name == name {
+			def = &d
+			break
+		}
+	}
+	if def == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "linter not found: "+name)
+	}
+
+	offset, _ := strconv.Atoi(c.QueryParam("offset"))
+	limit := 20
+	runs, total, err := app.db.ListLinterRunHistory(name, offset, limit)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	data := linterDetailData{
+		Name:      def.Name,
+		Command:   def.Command,
+		Runs:      runs,
+		TotalRuns: total,
+		Offset:    offset,
+		Limit:     limit,
+	}
+	render.RenderAuto(c.Response().Writer, c.Request(),
+		LinterDetailPage(data), LinterDetailContent(data))
+	return nil
+}
+
+func (app *WebApp) handleRunLinter(c echo.Context) error {
+	name := c.Param("name")
+	var cmd string
+	for _, d := range app.linterDefs() {
+		if d.Name == name {
+			cmd = runlog.EnsureRunAllCommand(d.Command)
+			break
+		}
+	}
+	if cmd == "" {
+		return echo.NewHTTPError(http.StatusNotFound, "linter not found: "+name)
+	}
+
+	if _, err := app.linterMgr.Lint(name, cmd); err != nil {
+		w := c.Response().Writer
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		html := fmt.Sprintf(`<div class="alert alert-error mt-4 mb-6"><span>%s</span></div>`, err.Error())
+		_, _ = io.WriteString(w, html)
+		return nil
+	}
+
+	data := linterLauncherData{
+		LinterName: name,
+		SSEURL:     fmt.Sprintf("/ui/linters/%s/events", url.PathEscape(name)),
+		Command:    cmd,
+	}
+	render.RenderPartial(c.Response().Writer, c.Request(), LinterLauncherView(data))
+	return nil
+}
+
+func (app *WebApp) handleRunAllLinters(c echo.Context) error {
+	defs := app.linterDefs()
+	go func() {
+		for _, d := range defs {
+			cmd := runlog.EnsureRunAllCommand(d.Command)
+			al, err := app.linterMgr.Lint(d.Name, cmd)
+			if err != nil {
+				continue
+			}
+			<-al.done
+		}
+	}()
+	target := "/ui/linters"
+	if render.IsHTMX(c.Request()) {
+		w := c.Response().Writer
+		w.Header().Set("HX-Redirect", target)
+		w.WriteHeader(http.StatusOK)
+		return nil
+	}
+	http.Redirect(c.Response().Writer, c.Request(), target, http.StatusSeeOther)
+	return nil
+}
+
+func (app *WebApp) handleLinterEvents(c echo.Context) error {
+	linterName := c.Param("name")
+	al := app.linterMgr.Get(linterName)
+	if al == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "no active linter: "+linterName)
+	}
+
+	w := c.Response().Writer
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "streaming not supported")
+	}
+
+	ch := al.Subscribe()
+	defer al.Unsubscribe(ch)
+
+	ctx := c.Request().Context()
+	for {
+		select {
+		case line, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			_, _ = io.WriteString(w, "data: ")
+			_, _ = io.WriteString(w, html.EscapeString(line))
+			_, _ = io.WriteString(w, "\n\n")
+			flusher.Flush()
+
+		case <-al.done:
+			_, _ = io.WriteString(w, fmt.Sprintf("event: done\ndata: {\"exit_code\":%d}\n\n", al.exitCode))
+			flusher.Flush()
+			return nil
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+// handleLinterEventsStream streams linter completion events to the linters list page.
+func (app *WebApp) handleLinterEventsStream(c echo.Context) error {
+	w := c.Response().Writer
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "streaming not supported")
+	}
+
+	ch := app.sse.Subscribe("linters")
+	defer app.sse.Unsubscribe("linters", ch)
+
+	if _, err := io.WriteString(w, ": connected\n\n"); err != nil {
+		return nil
+	}
+	flusher.Flush()
+
+	ctx := c.Request().Context()
+	for {
+		select {
+		case evt, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			_, err := io.WriteString(w, fmt.Sprintf("event: %s\ndata: %s\n\n", evt.Event, evt.Data))
+			if err != nil {
+				return nil
+			}
+			flusher.Flush()
+
+		case <-ctx.Done():
+			return nil
+		}
 	}
 }

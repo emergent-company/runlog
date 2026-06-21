@@ -24,6 +24,7 @@ func setupSkillsTestDir(t *testing.T) string {
 }
 
 // TestDiscoverEmbeddedSkills verifies that the embedded skills are discoverable.
+// TestDiscoverEmbeddedSkills verifies all embedded skill directories are discoverable and have the runlog- prefix.
 func TestDiscoverEmbeddedSkills(t *testing.T) {
 	skills, err := discoverEmbeddedSkills()
 	if err != nil {
@@ -62,6 +63,7 @@ func TestDiscoverEmbeddedSkills(t *testing.T) {
 
 // TestEmbeddedSkillsHaveSKILLMD verifies each embedded skill directory
 // contains a SKILL.md file.
+// TestEmbeddedSkillsHaveSKILLMD verifies each embedded skill directory contains a SKILL.md file with valid frontmatter.
 func TestEmbeddedSkillsHaveSKILLMD(t *testing.T) {
 	skills, err := discoverEmbeddedSkills()
 	if err != nil {
@@ -88,6 +90,7 @@ func TestEmbeddedSkillsHaveSKILLMD(t *testing.T) {
 }
 
 // TestSkillsInstall_HappyPath verifies a clean install copies embedded skills.
+// TestSkillsInstall_HappyPath verifies a clean install copies all embedded skills to the target directory.
 func TestSkillsInstall_HappyPath(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
@@ -113,6 +116,7 @@ func TestSkillsInstall_HappyPath(t *testing.T) {
 
 // TestSkillsInstall_SkipExisting verifies that an existing install is skipped
 // without --force.
+// TestSkillsInstall_SkipExisting verifies existing skill installations are not overwritten without the --force flag.
 func TestSkillsInstall_SkipExisting(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
@@ -148,6 +152,7 @@ func TestSkillsInstall_SkipExisting(t *testing.T) {
 
 // TestSkillsInstall_ForceOverwrite verifies --force removes and replaces an
 // existing install.
+// TestSkillsInstall_ForceOverwrite verifies the --force flag removes and replaces existing skill installations.
 func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
@@ -184,6 +189,7 @@ func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 
 // TestSkillsInstall_DryRun verifies that --dry-run prints actions without
 // writing any files.
+// TestSkillsInstall_DryRun verifies --dry-run prints the installation plan without writing any files.
 func TestSkillsInstall_DryRun(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
@@ -209,6 +215,7 @@ func TestSkillsInstall_DryRun(t *testing.T) {
 
 // TestSkillsInstall_UnknownTool verifies that an unknown --tools value returns
 // an error.
+// TestSkillsInstall_UnknownTool verifies an invalid --tools value returns an error.
 func TestSkillsInstall_UnknownTool(t *testing.T) {
 	root := setupSkillsTestDir(t)
 
@@ -228,6 +235,7 @@ func TestSkillsInstall_UnknownTool(t *testing.T) {
 }
 
 // TestSkillsList verifies the list subcommand runs without error.
+// TestSkillsList verifies the skills list subcommand runs without error and prints skill names.
 func TestSkillsList(t *testing.T) {
 	root := setupSkillsTestDir(t)
 	err := cmdSkillsList(root)
@@ -237,6 +245,7 @@ func TestSkillsList(t *testing.T) {
 }
 
 // TestSkillsInstall_MultipleTools verifies installing to multiple tools at once.
+// TestSkillsInstall_MultipleTools verifies installing skills to multiple tool directories at once.
 func TestSkillsInstall_MultipleTools(t *testing.T) {
 	root := setupSkillsTestDir(t)
 

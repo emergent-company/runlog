@@ -1,0 +1,38 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// CodeTab represents a single code block in a tabbed code preview.
+type CodeTab struct {
+	Label string // display name, e.g. "Go", "JavaScript"
+	Lang  string // highlight.js language, e.g. "go", "javascript"
+	Code  string // code content
+}
+
+// CodePreview displays code blocks with optional tab switching.
+// Single tab: renders a clean code block.
+// Multiple tabs: renders daisyUI tabs-lift with radio-based switching.
+// Uses highlight.js for syntax highlighting and styling.
+templ CodePreview(tabs []CodeTab) {
+	<div class="relative" { devmode.Attrs(ctx, "ui/CodePreview")... }>
+		if len(tabs) == 1 {
+			<pre class="text-xs"><code class={ "language-" + tabs[0].Lang }>{ tabs[0].Code }</code></pre>
+		} else {
+			<div class="tabs tabs-lift">
+				for i, tab := range tabs {
+					if i == 0 {
+						<input type="radio" name={ "cp-" + tabs[0].Label } class="tab" aria-label={ tab.Label } checked />
+					} else {
+						<input type="radio" name={ "cp-" + tabs[0].Label } class="tab" aria-label={ tab.Label } />
+					}
+					<div class="tab-content overflow-x-auto">
+						<pre class="text-xs"><code class={ "language-" + tab.Lang }>{ tab.Code }</code></pre>
+					</div>
+				}
+			</div>
+		}
+		<button type="button" class="btn btn-ghost btn-xs absolute top-2 right-2 z-10 opacity-60 hover:opacity-100" onclick="copyCode(this)" aria-label="Copy to clipboard">
+			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+		</button>
+	</div>
+}

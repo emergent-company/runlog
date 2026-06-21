@@ -85,6 +85,9 @@ func (d *DaemonServer) registerRoutes() {
 	d.mux.HandleFunc("/cleanup", d.handleCleanup)
 	d.mux.HandleFunc("/reap", d.handleReap)
 	d.mux.HandleFunc("/status", d.handleStatus)
+	// Serve e2e test artifacts (screenshots, traces) captured by Playwright.
+	d.mux.Handle("/artifact/", http.StripPrefix("/artifact/",
+		http.FileServer(http.Dir("/tmp/runlog-artifacts"))))
 	d.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			http.Redirect(w, r, "/ui/", http.StatusFound)

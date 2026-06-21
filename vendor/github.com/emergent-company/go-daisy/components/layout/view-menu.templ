@@ -1,0 +1,18 @@
+package layout
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ViewMenu renders a secondary vertical navigation panel.
+// Sticky, full-height, scrollable — use with .menu-item links and ViewMenuLabel.
+templ ViewMenu() {
+	<div class="sticky top-0 max-h-screen overflow-y-auto bg-base-100" { devmode.Attrs(ctx, "layout/ViewMenu")... }>
+		<div class="sidebar-menu mb-3 space-y-0.5 px-2.5 pt-4">
+			{ children... }
+		</div>
+	</div>
+}
+
+// ViewMenuLabel renders a group label inside a ViewMenu.
+templ ViewMenuLabel(label string) {
+	<p class="menu-label px-2.5 pb-1.5" { devmode.Attrs(ctx, "layout/ViewMenuLabel")... }>{ label }</p>
+}

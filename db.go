@@ -303,6 +303,23 @@ ALTER TABLE test_runs ADD COLUMN timeout_seconds REAL;
 ALTER TABLE test_runs ADD COLUMN category TEXT;
 `,
 	},
+	{
+		version: 20,
+		sql: `
+CREATE TABLE IF NOT EXISTS linter_runs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    linter_name  TEXT NOT NULL,
+    command      TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'running',
+    exit_code    INTEGER,
+    output       TEXT,
+    started_at   TEXT NOT NULL,
+    finished_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_linter_runs_name_started
+    ON linter_runs(linter_name, started_at DESC);
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1724,6 +1741,118 @@ func (rdb *RunDB) ListLaunchers(testName string) ([]LauncherRow, error) {
 		result = append(result, r)
 	}
 	return result, rows.Err()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Linter runs
+// ─────────────────────────────────────────────────────────────────────────────
+
+// LinterRow is a single row from linter_runs.
+type LinterRow struct {
+	ID         int64
+	LinterName string
+	Command    string
+	Status     string // running / passed / failed / error
+	ExitCode   *int
+	Output     string
+	StartedAt  time.Time
+	FinishedAt *time.Time
+}
+
+// InsertLinterRun inserts a new linter_runs row and returns its ID.
+func (rdb *RunDB) InsertLinterRun(linterName, command string, startedAt time.Time) (int64, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	res, err := rdb.db.Exec(
+		`INSERT INTO linter_runs(linter_name, command, started_at) VALUES (?, ?, ?)`,
+		linterName, command, startedAt.UTC().Format(time.RFC3339Nano),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("rundb: InsertLinterRun: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+// UpdateLinterRunResult sets the final result of a linter run.
+// status: "passed", "failed", or "error".
+func (rdb *RunDB) UpdateLinterRunResult(id int64, status string, exitCode int, output string, finishedAt time.Time) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE linter_runs SET status = ?, exit_code = ?, output = ?, finished_at = ? WHERE id = ?`,
+		status, exitCode, output, finishedAt.UTC().Format(time.RFC3339Nano), id,
+	)
+	return err
+}
+
+// ScanLinterRow scans a linter_runs row from the current cursor position.
+// Columns in order: id, linter_name, command, status, exit_code, output, started_at, finished_at.
+func scanLinterRow(scanner interface{ Scan(...any) error }) (LinterRow, error) {
+	var r LinterRow
+	var startedStr, status string
+	var finishedStr *string
+	err := scanner.Scan(&r.ID, &r.LinterName, &r.Command, &status, &r.ExitCode, &r.Output, &startedStr, &finishedStr)
+	if err != nil {
+		return r, err
+	}
+	r.Status = status
+	r.StartedAt, _ = time.Parse(time.RFC3339Nano, startedStr)
+	if finishedStr != nil && *finishedStr != "" {
+		t, _ := time.Parse(time.RFC3339Nano, *finishedStr)
+		r.FinishedAt = &t
+	}
+	return r, nil
+}
+
+// ListLinterRuns returns the latest run for each unique linter name.
+func (rdb *RunDB) ListLinterRuns() ([]LinterRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	rows, err := rdb.db.Query(`
+		SELECT id, linter_name, command, status, exit_code, output, started_at, finished_at
+		FROM linter_runs
+		WHERE id IN (SELECT MAX(id) FROM linter_runs GROUP BY linter_name)
+		ORDER BY linter_name`)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListLinterRuns: %w", err)
+	}
+	defer rows.Close()
+	var result []LinterRow
+	for rows.Next() {
+		r, err := scanLinterRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// ListLinterRunHistory returns paginated run history for a specific linter.
+func (rdb *RunDB) ListLinterRunHistory(name string, offset, limit int) ([]LinterRow, int, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	var total int
+	_ = rdb.db.QueryRow(`SELECT COUNT(*) FROM linter_runs WHERE linter_name = ?`, name).Scan(&total)
+	rows, err := rdb.db.Query(`
+		SELECT id, linter_name, command, status, exit_code, output, started_at, finished_at
+		FROM linter_runs
+		WHERE linter_name = ?
+		ORDER BY started_at DESC
+		LIMIT ? OFFSET ?`, name, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("rundb: ListLinterRunHistory: %w", err)
+	}
+	defer rows.Close()
+	var result []LinterRow
+	for rows.Next() {
+		r, err := scanLinterRow(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		result = append(result, r)
+	}
+	return result, total, rows.Err()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

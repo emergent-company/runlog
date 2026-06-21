@@ -454,32 +454,15 @@ func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
 
 	// Discover tests from DB + config.
 	dbDir := filepath.Dir(db.Path())
-	cfg, _ := runlog.LoadConfig(dbDir)
+	_, _ = runlog.LoadConfig(dbDir)
 	names, err := db.DiscoverTests()
 	if err != nil {
 		return err
 	}
 
-	// Build entries: categorized first, then uncategorized.
-	seen := make(map[string]bool)
 	var entries []testEntry
-	if cfg != nil && len(cfg.Categories) > 0 {
-		var cats []string
-		for cat := range cfg.Categories {
-			cats = append(cats, cat)
-		}
-		sort.Strings(cats)
-		for _, cat := range cats {
-			for _, name := range cfg.Categories[cat] {
-				entries = append(entries, testEntry{Name: name, Category: cat})
-				seen[name] = true
-			}
-		}
-	}
 	for _, name := range names {
-		if !seen[name] {
-			entries = append(entries, testEntry{Name: name, Category: "Uncategorized"})
-		}
+		entries = append(entries, testEntry{Name: name, Category: "Uncategorized"})
 	}
 
 	fmt.Printf("%-20s  %-*s  %6s  %4s\n", "category", 55, "test name", "last", "st")
@@ -3898,7 +3881,6 @@ func (m model) loadExperiments() tea.Cmd {
 // categories to produce an ordered []testEntry for the Tests tab.
 func (m model) loadTests() tea.Cmd {
 	db := m.db
-	cfg := m.config
 	return func() tea.Msg {
 		names, err := db.DiscoverTests()
 		if err != nil {
@@ -3907,31 +3889,9 @@ func (m model) loadTests() tea.Cmd {
 
 		// Build entries with categories from config.
 		// Categorized tests appear first (in config order), uncategorized last.
-		seen := make(map[string]bool)
 		var entries []testEntry
-
-		// First: add tests in config category order (preserves display order).
-		if cfg != nil && len(cfg.Categories) > 0 {
-			// Collect category keys in a stable order by iterating the config.
-			// Since Go maps are unordered, we sort categories alphabetically.
-			var cats []string
-			for cat := range cfg.Categories {
-				cats = append(cats, cat)
-			}
-			sort.Strings(cats)
-			for _, cat := range cats {
-				for _, name := range cfg.Categories[cat] {
-					entries = append(entries, testEntry{Name: name, Category: cat})
-					seen[name] = true
-				}
-			}
-		}
-
-		// Second: add DB-discovered tests not in any config category.
 		for _, name := range names {
-			if !seen[name] {
-				entries = append(entries, testEntry{Name: name, Category: "Uncategorized"})
-			}
+			entries = append(entries, testEntry{Name: name, Category: "Uncategorized"})
 		}
 
 		return testsLoadedMsg{entries: entries}
@@ -5361,7 +5321,8 @@ USAGE
   runlog experiments [flags]            list all experiments (non-interactive)
   runlog tests [flags]                  list all known tests with last status
   runlog tests [flags] <test-name>      list recent runs for a specific test
-  runlog inspect [flags] <run-id>       full inspector dump of a run (all events + details)
+   runlog inspect [flags] <run-id>       full inspector dump of a run (all events + details)
+   runlog watch [flags] <run-id>         live-tail a running test's events
   runlog analyze [flags] <run-id>       LLM analysis of a run with full conversation trace
   runlog trace [flags] <run-id>         show stored analysis trace for a run (no LLM call)
   runlog skills install [flags]         install embedded skills into tool directories
@@ -5554,8 +5515,8 @@ func main() {
 		since = parseSince(*sinceOut, subcommand)
 		subArgs = fs.Args() // optional positional arg: test name for run listing
 
-	case "inspect":
-		// --since is not meaningful for inspect but accept it silently.
+	case "inspect", "watch":
+		// --since is not meaningful for inspect/watch but accept it silently.
 		fs, dbOut, sinceOut := subFS(subcommand, *globalDB, *globalSince)
 		if err := fs.Parse(subArgs); err != nil {
 			if err == flag.ErrHelp {
@@ -5780,6 +5741,22 @@ func main() {
 		}
 		if err := cmdInspect(db, runID); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog inspect: %v\n", err)
+			os.Exit(1)
+		}
+
+	case "watch":
+		if len(subArgs) < 1 {
+			fmt.Fprintf(os.Stderr, "runlog watch: missing <run-id>\n")
+			fmt.Fprintf(os.Stderr, "usage: runlog watch <run-id>\n")
+			os.Exit(2)
+		}
+		_, err := strconv.ParseInt(subArgs[0], 10, 64)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "runlog watch: invalid run-id %q: %v\n", subArgs[0], err)
+			os.Exit(2)
+		}
+		if err := cmdWatch(db, subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog watch: %v\n", err)
 			os.Exit(1)
 		}
 

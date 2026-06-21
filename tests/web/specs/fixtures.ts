@@ -74,9 +74,9 @@ async function markDone(runId: string, passed: boolean, errorMsg?: string, artif
       }
     }
     if (passed) {
-      await insertEvent(runId, 'log', '✓ Test passed', elapsedS());
+      await insertEvent(runId, 'log', 'Test passed', elapsedS());
     } else {
-      const msg = errorMsg ? `✗ Test failed: ${errorMsg}` : '✗ Test failed';
+      const msg = errorMsg || 'Test failed';
       await insertEvent(runId, 'failure', msg, elapsedS());
     }
     await insertEvent(runId, 'state_change', 'test finished', elapsedS());
@@ -127,26 +127,26 @@ export const test = base.extend<{ captureErrors: void; dogfood: string | null }>
     page.on('request', req => {
       const u = req.url();
       if (u.includes('/ui/') && req.method() !== 'OPTIONS') {
-        emit('cli', `[http] ${req.method()} ${u.replace(/.*\/ui\//, '/')}`, elapsedS());
+        emit('cli', `${req.method()} ${u.replace(/.*\/ui\//, '/')}`, elapsedS());
       }
     });
-    page.on('response', resp => {
+    page.on('response', async resp => {
       const u = resp.url();
       if (u.includes('/ui/') && resp.request().method() !== 'OPTIONS') {
         const path = u.replace(/.*\/ui\//, '/');
         const s = resp.status();
         const m = resp.request().method();
-        const ok = s >= 200 && s < 300 ? '✓' : '✗';
-        emit('log', `${ok} [${s}] ${m} ${path}`, elapsedS());
+        let bodyStr = '';
+        try { bodyStr = (await resp.body()).toString().substring(0, 2048); } catch {}
         emit('http_call', `${m} ${path} → ${s}`, elapsedS(), {
           method: m, url: path, status_code: s,
-          headers: resp.headers(),
+          response_body: bodyStr,
         });
       }
     });
     page.on('framenavigated', frame => {
       if (frame === page.mainFrame()) {
-        emit('log', `[nav] ${frame.url().replace(/.*\/ui\//, '/')}`, elapsedS());
+        emit('log', frame.url().replace(/.*\/ui\//, '/'), elapsedS());
       }
     });
     page.on('console', msg => {

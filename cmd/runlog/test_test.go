@@ -53,6 +53,7 @@ func TestDummy(t *testing.T) {
 }
 
 // TestCmdTest_ProfileEnvVar verifies that profile names set MEMORY_TEST_ENV correctly.
+// TestCmdTest_ProfileEnvVar verifies that passing a profile name sets the MEMORY_TEST_ENV environment variable correctly.
 func TestCmdTest_ProfileEnvVar(t *testing.T) {
 	tmpdir := setupTestEnv(t)
 	oldCwd, err := os.Getwd()
@@ -86,6 +87,7 @@ func TestCmdTest_ProfileEnvVar(t *testing.T) {
 }
 
 // TestCmdTest_EnvFileLoading verifies that .env files are loaded correctly.
+// TestCmdTest_EnvFileLoading verifies that loading .env files populates environment variables correctly.
 func TestCmdTest_EnvFileLoading(t *testing.T) {
 	tmpdir := setupTestEnv(t)
 	oldCwd, err := os.Getwd()
@@ -120,6 +122,7 @@ func TestCmdTest_EnvFileLoading(t *testing.T) {
 }
 
 // TestCmdTest_HelpFlag verifies that --help can be parsed.
+// TestCmdTest_HelpFlag verifies that the --help flag can be parsed without error.
 func TestCmdTest_HelpFlag(t *testing.T) {
 	// Test help flag parsing (which exits early)
 	err := cmdTest([]string{"--help"})
@@ -130,6 +133,7 @@ func TestCmdTest_HelpFlag(t *testing.T) {
 }
 
 // TestCmdTest_ExtraFlagsAfterDashDash verifies parsing of flags after --.
+// TestCmdTest_ExtraFlagsAfterDashDash verifies that flags after the -- separator are parsed as extra go test flags.
 func TestCmdTest_ExtraFlagsAfterDashDash(t *testing.T) {
 	// Verify that arguments after -- are properly captured
 	// We test this by checking the parsing logic without exec

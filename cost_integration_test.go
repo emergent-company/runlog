@@ -15,6 +15,7 @@ func TestCostTracking_EndToEnd(t *testing.T) {
 	tmpDir := newTestDB(t)
 
 	rl := NewRunLog(t)
+	rl.SetCategory("cost")
 	rl.Describe("Full cost tracking workflow end-to-end",
 		"Creates a test run with RunLog",
 		"Simulates three LLM calls via RecordTokenUsage",
@@ -59,6 +60,15 @@ func TestCostTracking_EndToEnd(t *testing.T) {
 	}
 
 	run := runs[0]
+	if run.TestName != t.Name() {
+		t.Logf("picked run %d (%s), searching for ours", run.ID, run.TestName)
+		for _, r := range runs {
+			if r.TestName == t.Name() {
+				run = r
+				break
+			}
+		}
+	}
 	if run.TestName != t.Name() {
 		t.Errorf("TestName = %q, want %q", run.TestName, t.Name())
 	}

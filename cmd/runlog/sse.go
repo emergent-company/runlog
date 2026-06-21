@@ -20,6 +20,7 @@ type SSEBroker struct {
 	clients   map[string][]chan SSEEvent
 	startedAt time.Time
 	db        *runlog.RunDB
+	linterMgr *LinterManager
 }
 
 func newSSEBroker(db *runlog.RunDB) *SSEBroker {
@@ -28,6 +29,10 @@ func newSSEBroker(db *runlog.RunDB) *SSEBroker {
 		startedAt: time.Now(),
 		db:        db,
 	}
+}
+
+func (b *SSEBroker) SetLinterManager(lm *LinterManager) {
+	b.linterMgr = lm
 }
 
 func (b *SSEBroker) Subscribe(topic string) chan SSEEvent {
@@ -83,9 +88,23 @@ func (b *SSEBroker) runFooterPoller(ctx context.Context) {
 				uptimeStr = fmt.Sprintf("%.0fh", uptime.Hours())
 			}
 
+			linterStatus := ""
+			if b.linterMgr != nil {
+				if running := b.linterMgr.Running(); len(running) > 0 {
+					suffix := ""
+					if len(running) > 1 {
+						suffix = "s"
+					}
+					linterStatus = fmt.Sprintf(
+						`<span class="loading loading-spinner loading-xs text-primary ml-2"></span><span class="text-primary ml-1">%d linter%s</span>`,
+						len(running), suffix,
+					)
+				}
+			}
+
 			html := fmt.Sprintf(
-				`<div class="status status-success status-xs"></div><span class="text-base-content/50">Running — %d runs, %d tests</span><span class="text-base-content/30 ml-2">up %s</span>`,
-				totalRuns, totalTests, uptimeStr,
+				`<div class="status status-success status-xs"></div><span class="text-base-content/50">Running — %d runs, %d tests</span><span class="text-base-content/30 ml-2">up %s</span>%s`,
+				totalRuns, totalTests, uptimeStr, linterStatus,
 			)
 			data, _ := json.Marshal(map[string]string{"html": html})
 			b.Publish("footer", SSEEvent{Event: "footer-status", Data: string(data)})

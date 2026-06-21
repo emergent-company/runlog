@@ -42,6 +42,7 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 				{ children... }
 			</main>
 			<template id="skeleton-dashboard">@DashboardSkeleton()</template>
+			<template id="skeleton-linters">@LintersSkeleton()</template>
 			<template id="skeleton-tests">@TestsSkeleton()</template>
 			<template id="skeleton-test-detail">@TestDetailSkeleton()</template>
 			<template id="skeleton-runs">@AllRunsSkeleton()</template>
@@ -132,6 +133,8 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 
 			var skeletonMap = [
 				{ pattern: '/ui/events', skeleton: 'skeleton-events-reference' },
+				{ pattern: '/ui/linters/', skeleton: 'skeleton-linters' },
+				{ pattern: '/ui/linters', skeleton: 'skeleton-linters' },
 				{ pattern: '/ui/experiments/', skeleton: 'skeleton-experiment-detail' },
 				{ pattern: '/ui/experiments', skeleton: 'skeleton-experiments' },
 				{ pattern: '/ui/runs/', skeleton: 'skeleton-run-detail' },
