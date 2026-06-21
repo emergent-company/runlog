@@ -51,7 +51,7 @@ templ runDetailContent(data runDetailData) {
 				<div class="card bg-base-100 border border-base-200 shadow-sm">
 					<div class="card-body p-4">
 						<h2 class="card-title text-sm font-semibold text-base-content mb-1">Experiment</h2>
-						<a href={ "/ui/experiments/" + *data.Run.Experiment } class="badge badge-primary badge-sm hover:badge-outline" hx-get={ "/ui/experiments/" + *data.Run.Experiment } hx-target="#main-content" hx-swap="innerHTML" hx-push-url="true" hx-sync="#main-content:replace">{ *data.Run.Experiment }</a>
+						<a data-testid="experiment-link" href={ "/ui/experiments/" + *data.Run.Experiment } class="badge badge-primary badge-sm hover:badge-outline" hx-get={ "/ui/experiments/" + *data.Run.Experiment } hx-target="#main-content" hx-swap="innerHTML" hx-push-url="true" hx-sync="#main-content:replace">{ *data.Run.Experiment }</a>
 					</div>
 				</div>
 			</div>
@@ -117,22 +117,22 @@ templ runDetailContent(data runDetailData) {
 		if len(data.Run.EnvVars) > 0 {
 			<div class="mb-6">
 				@collapseSection("Environment Variables") {
-					<table class="table table-xs w-full font-mono">
-						<thead>
-							<tr>
-								<th class="w-48">Key</th>
-								<th>Value</th>
-							</tr>
-						</thead>
-						<tbody>
+					@table.TableWithProps(table.TableProps{Size: "xs"}) {
+						@table.TableHead() {
+							@table.TableHeadRow() {
+								@table.TableHeadCell("Key")
+								@table.TableHeadCell("Value")
+							}
+						}
+						@table.TableBody() {
 							for _, key := range sortedKeys(data.Run.EnvVars) {
 								<tr>
 									<td class="font-semibold">{ key }</td>
 									<td class="text-base-content/60 break-all">{ redactEnvValue(data.Run.EnvVars[key]) }</td>
 								</tr>
 							}
-						</tbody>
-					</table>
+						}
+					}
 				}
 			</div>
 		}
@@ -275,6 +275,7 @@ templ eventRow(e runlog.EventRow, isDebug bool) {
 		if isDebug {
 			<tr
 				id={ fmt.Sprintf("event-%d", e.ID) }
+				data-testid={ "event-" + fmt.Sprintf("%d", e.ID) + "-debug" }
 				class="is-debug-event opacity-50 bg-base-200/60 cursor-pointer hover hover:bg-base-300 transition-colors"
 				hx-get={ fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID) }
 				hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
@@ -292,6 +293,7 @@ templ eventRow(e runlog.EventRow, isDebug bool) {
 		} else {
 			<tr
 				id={ fmt.Sprintf("event-%d", e.ID) }
+				data-testid={ "event-" + fmt.Sprintf("%d", e.ID) }
 				class="hover"
 				hx-get={ fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID) }
 				hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }

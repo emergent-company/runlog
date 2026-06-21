@@ -1,7 +1,8 @@
 package main
 
-// ── Dashboard ──────────────────────────────────────────────────────────────
+import "github.com/emergent-company/go-daisy/components/table"
 
+// ── Dashboard ──────────────────────────────────────────────────────────────
 templ DashboardSkeleton() {
 	<div class="space-y-6">
 		<div class="skeleton h-8 w-48"></div>
@@ -32,7 +33,6 @@ templ DashboardSkeleton() {
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
-
 templ TestsSkeleton() {
 	<div class="space-y-4">
 		<div class="skeleton h-8 w-32"></div>
@@ -42,7 +42,6 @@ templ TestsSkeleton() {
 }
 
 // ── All Runs ───────────────────────────────────────────────────────────────
-
 templ AllRunsSkeleton() {
 	<div class="space-y-4">
 		<div class="skeleton h-8 w-40"></div>
@@ -60,7 +59,6 @@ templ AllRunsSkeleton() {
 }
 
 // ── Test Detail ────────────────────────────────────────────────────────────
-
 templ TestDetailSkeleton() {
 	<div class="space-y-6">
 		<div class="flex items-center gap-4">
@@ -88,7 +86,6 @@ templ TestDetailSkeleton() {
 }
 
 // ── Run Detail ─────────────────────────────────────────────────────────────
-
 templ RunDetailSkeleton() {
 	<div class="space-y-6">
 		<div class="flex items-center gap-4">
@@ -119,7 +116,6 @@ templ RunDetailSkeleton() {
 }
 
 // ── Experiments ────────────────────────────────────────────────────────────
-
 templ ExperimentsSkeleton() {
 	<div class="space-y-4">
 		<div class="skeleton h-8 w-48"></div>
@@ -128,7 +124,6 @@ templ ExperimentsSkeleton() {
 }
 
 // ── Experiment Detail ──────────────────────────────────────────────────────
-
 templ ExperimentDetailSkeleton() {
 	<div class="space-y-6">
 		<div class="flex items-center gap-4">
@@ -157,7 +152,6 @@ templ ExperimentDetailSkeleton() {
 }
 
 // ── Events Reference ───────────────────────────────────────────────────────
-
 templ EventsReferenceSkeleton() {
 	<div class="space-y-6">
 		<div class="skeleton h-8 w-48"></div>
@@ -168,20 +162,19 @@ templ EventsReferenceSkeleton() {
 }
 
 // ── Shared: skeleton table rows ────────────────────────────────────────────
-
 templ _skeletonTableRows(rows int, cols int) {
 	<div class="overflow-x-auto rounded-box border border-base-200">
-		<table class="table table-sm w-full">
-			<thead>
-				<tr>
+		@table.TableWithProps(table.TableProps{Size: "sm"}) {
+			@table.TableHead() {
+				@table.TableHeadRow() {
 					for i := 0; i < cols; i++ {
 						<th>
 							<div class="skeleton h-4 w-full max-w-24"></div>
 						</th>
 					}
-				</tr>
-			</thead>
-			<tbody>
+				}
+			}
+			@table.TableBody() {
 				for i := 0; i < rows; i++ {
 					<tr>
 						for j := 0; j < cols; j++ {
@@ -191,7 +184,7 @@ templ _skeletonTableRows(rows int, cols int) {
 						}
 					</tr>
 				}
-			</tbody>
-		</table>
+			}
+		}
 	</div>
 }

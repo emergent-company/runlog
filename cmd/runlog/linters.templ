@@ -174,10 +174,9 @@ templ linterDetailContent(data linterDetailData) {
 				Run
 			</button>
 		</div>
-
 		if len(data.Runs) > 0 {
-			<div id="runs-section" class="space-y-3">
-				@linterRunPanels(data)
+			<div id="runs-section">
+				@linterRunsTable(data.Runs)
 				if data.Offset+data.Limit < data.TotalRuns {
 					@loadMoreButton(
 						fmt.Sprintf("/ui/linters/%s?offset=%d", url.PathEscape(data.Name), data.Offset+data.Limit),
@@ -189,99 +188,147 @@ templ linterDetailContent(data linterDetailData) {
 			@emptyState("No runs yet. Click Run to execute this linter.")
 		}
 	</div>
-
-	<script type="text/javascript">
-		(function() {
-			var el = document.querySelector('[data-testid="linter-detail"]');
-			var runBtn = el && el.querySelector('[hx-post*="/run"]');
-			if (!runBtn) return;
-
-			// After clicking Run, the LinterDetailContent will be replaced by the
-			// launcher view served via the HX-Redirect. This script handles cleanup.
-			function handleRunDone() {
-				// When the run completes and we're back on the detail page,
-				// reload the detail content.
-			}
-		})();
-	</script>
 }
 
-templ linterRunPanel(r runlog.LinterRow) {
-	<div id={ fmt.Sprintf("linter-run-%d", r.ID) } class="border border-base-content/10 rounded-box bg-base-100 mb-3 overflow-hidden">
-		<div class="flex items-center gap-3 px-4 py-2.5 bg-base-200/50 border-b border-base-content/5">
-			@linterStatusBadge(r.Status)
-			if r.ExitCode != nil {
-				<span class="text-xs font-mono text-base-content/50">
-					Exit
-					if *r.ExitCode == 0 {
-						<span class="font-semibold text-success">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
-					} else {
-						<span class="font-semibold text-error">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
+templ linterRunsTable(runs []runlog.LinterRow) {
+	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+		@table.TableHead() {
+			@table.TableHeadRow() {
+				@table.TableHeadCell("Status")
+				@table.TableHeadCell("Exit Code", "text-right")
+				@table.TableHeadCell("Duration", "text-right")
+				@table.TableHeadCell("Started")
+			}
+		}
+		@table.TableBody() {
+			for _, r := range runs {
+				<tr
+					id={ fmt.Sprintf("linter-run-%d", r.ID) }
+					class="hover cursor-pointer"
+					hx-get={ fmt.Sprintf("/ui/linters/%s/runs/%d", url.PathEscape(r.LinterName), r.ID) }
+					hx-target="#main-content"
+					hx-swap="innerHTML"
+					hx-push-url="true"
+					hx-sync="#main-content:replace"
+				>
+					@table.TableCell("", nil) {
+						@linterStatusBadge(r.Status)
 					}
-				</span>
+					@table.TableCell("font-mono", nil) {
+						if r.ExitCode != nil {
+							if *r.ExitCode == 0 {
+								<span class="text-success">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
+							} else {
+								<span class="text-error">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
+							}
+						} else {
+							<span class="text-base-content/30">—</span>
+						}
+					}
+					@table.TableCell("", nil) {
+						if r.FinishedAt != nil {
+							@text(fmtElapsed(r.FinishedAt.Sub(r.StartedAt).Seconds()))
+						} else if r.Status == "running" {
+							<span class="loading loading-spinner loading-xs"></span>
+						} else {
+							<span class="text-base-content/30">—</span>
+						}
+					}
+					@table.TableCell("", nil) {
+						@text(formatTime(r.StartedAt, TimeFull))
+					}
+				</tr>
 			}
-			if r.FinishedAt != nil {
-				<span class="text-xs text-base-content/40">{ fmtElapsed(r.FinishedAt.Sub(r.StartedAt).Seconds()) }</span>
-			}
-			<span class="text-xs text-base-content/30 ml-auto">{ formatTime(r.StartedAt, TimeFull) }</span>
+		}
+	}
+}
+
+templ LinterRunDetailPage(data linterRunDetailData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - %s Run %d", appName(), data.LinterName, data.Run.ID), sidebarGroups) {
+		@linterRunDetailContent(data)
+	}
+}
+
+templ LinterRunDetailContent(data linterRunDetailData) {
+	@linterRunDetailContent(data)
+}
+
+templ linterRunDetailContent(data linterRunDetailData) {
+	<div data-testid="linter-run-detail">
+		@backButton(fmt.Sprintf("/ui/linters/%s", url.PathEscape(data.LinterName)))
+		<div class="flex items-center justify-between mb-4 mt-2">
+			<div>
+				<h1 class="text-2xl font-bold">{ data.LinterName }</h1>
+				<div class="flex items-center gap-3 mt-1">
+					@linterStatusBadge(data.Run.Status)
+					if data.Run.ExitCode != nil {
+						<span class="text-xs font-mono text-base-content/50">
+							Exit
+							if *data.Run.ExitCode == 0 {
+								<span class="font-semibold text-success">{ fmt.Sprintf("%d", *data.Run.ExitCode) }</span>
+							} else {
+								<span class="font-semibold text-error">{ fmt.Sprintf("%d", *data.Run.ExitCode) }</span>
+							}
+						</span>
+					}
+					if data.Run.FinishedAt != nil {
+						<span class="text-xs text-base-content/40">{ fmtElapsed(data.Run.FinishedAt.Sub(data.Run.StartedAt).Seconds()) }</span>
+					}
+					<span class="text-xs text-base-content/30">{ formatTime(data.Run.StartedAt, TimeFull) }</span>
+				</div>
+			</div>
 		</div>
-		if r.Output != "" {
-			<pre class="text-xs font-mono p-4 overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed text-base-content/80">{ r.Output }</pre>
+		if data.Run.Output != "" {
+			<pre class="text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] whitespace-pre-wrap leading-relaxed text-base-content/80 border border-base-content/10 bg-base-100">{ data.Run.Output }</pre>
 		} else {
-			<div class="text-xs text-base-content/30 italic px-4 py-6 text-center">No output</div>
+			@emptyState("No output recorded for this run.")
 		}
 	</div>
 }
 
-templ linterRunPanels(data linterDetailData) {
-	for _, r := range data.Runs {
-		@linterRunPanel(r)
-	}
-}
-
 templ LinterLauncherView(data linterLauncherData) {
-	<div class="mt-4 mb-6" data-testid="linter-launcher-view" data-sse-url={ data.SSEURL } data-linter-name={ data.LinterName }>
-		<div class="flex items-center gap-2 mb-2">
-			<span id="linter-launch-status" class="flex items-center gap-2 font-semibold">
-				<span class="loading loading-spinner loading-sm" data-testid="linter-launch-spinner"></span>
-				Running <span data-testid="linter-launch-name">{ data.LinterName }</span>...
+	<div class="border border-base-content/10 rounded-box bg-base-100 overflow-hidden" data-testid="linter-launcher-view" data-sse-url={ data.SSEURL } data-linter-name={ data.LinterName }>
+		<div class="flex items-center gap-3 px-4 py-2.5 bg-base-200/50 border-b border-base-content/5">
+			<span id="linter-launch-status" class="flex items-center gap-2">
+				<span class="loading loading-spinner loading-sm text-primary" data-testid="linter-launch-spinner"></span>
+				<span class="badge gap-1 badge-info badge-outline badge-sm">Running</span>
 			</span>
+			<span class="text-xs font-mono text-base-content/50 truncate">{ data.Command }</span>
 		</div>
 		<pre
 			id="linter-log-output"
-			class="bg-base-300 text-sm font-mono p-4 rounded-box overflow-auto max-h-96 whitespace-pre-wrap"
+			class="text-xs font-mono p-4 overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed text-base-content/80"
 			data-testid="linter-log-output"
 		></pre>
-		<div class="mt-4">
-			<button class="btn btn-ghost btn-sm" hx-get={ "/ui/linters/" + url.PathEscape(data.LinterName) } hx-target="#main-content" hx-swap="innerHTML" hx-sync="#main-content:replace">← Back to Details</button>
-		</div>
 	</div>
 	<script type="text/javascript">
 		(function() {
 			var el = document.querySelector('[data-testid="linter-launcher-view"]');
+			if (!el) return;
 			var sseUrl = el.getAttribute('data-sse-url');
 			var linterName = el.getAttribute('data-linter-name');
 			var es = new EventSource(sseUrl);
 			var log = document.getElementById('linter-log-output');
 			var status = document.getElementById('linter-launch-status');
-			var spinner = status && status.querySelector('.loading');
 			es.onmessage = function(e) {
 				if (log) log.textContent += e.data + '\n';
 				log.scrollTop = log.scrollHeight;
 			};
 			es.addEventListener('done', function(e) {
 				es.close();
-				if (spinner) spinner.remove();
+				if (status) {
+					var data = JSON.parse(e.data || '{}');
+					var exitCode = data.exit_code;
+					status.innerHTML = '<span class="badge gap-1 ' + (exitCode === 0 ? 'badge-success' : 'badge-error') + ' badge-outline badge-sm">' + (exitCode === 0 ? 'Pass' : 'Fail') + '</span> <span class="text-xs text-base-content/40">exit ' + exitCode + '</span>';
+				}
 				if (typeof htmx !== 'undefined') {
 					setTimeout(function() {
 						htmx.ajax('GET', '/ui/linters/' + encodeURIComponent(linterName), {target: '#main-content', swap: 'innerHTML', pushUrl: 'true'});
-					}, 500);
+					}, 1500);
 				}
 			});
 			es.onerror = function() {
 				es.close();
-				if (spinner) spinner.remove();
-				if (status) status.textContent = 'Connection closed';
 			};
 		})();
 	</script>

@@ -40,6 +40,7 @@ templ tableContent(cfg TableConfig) {
 				for _, row := range cfg.Rows {
 					<tr
 						id={ "row-" + fmt.Sprintf("%p", row) }
+						data-testid={ "row-" + fmt.Sprintf("%p", row) }
 						class="hover"
 						if cfg.RowClick != nil && cfg.RowClick(row) != "" {
 							hx-get={ cfg.RowClick(row) }
@@ -60,7 +61,7 @@ templ tableContent(cfg TableConfig) {
 			}
 		}
 		if cfg.Offset + cfg.PageSize < cfg.Total {
-			@scrollSentinel(loadMoreURL(cfg.HXGet, cfg.Offset + cfg.PageSize, cfg.Filters), "#" + cfg.TargetID)
+			@scrollSentinel(loadMoreURL(cfg.HXGet, cfg.Offset+cfg.PageSize, cfg.Filters), "#"+cfg.TargetID)
 		}
 	} else {
 		@emptyState(cfg.EmptyMsg)
@@ -72,6 +73,7 @@ templ tableContent(cfg TableConfig) {
 // The response includes a new sentinel, creating a continuous scroll chain.
 templ scrollSentinel(url string, target string) {
 	<div
+		data-testid="scroll-sentinel"
 		hx-get={ url }
 		hx-target={ target }
 		hx-swap="beforeend"
@@ -85,6 +87,7 @@ templ scrollSentinel(url string, target string) {
 // filterBar renders the filter form with all configured filter inputs.
 templ filterBar(cfg TableConfig) {
 	<form
+		data-testid="filter-bar"
 		class="flex flex-wrap gap-3 mb-4 items-end"
 		hx-get={ cfg.HXGet }
 		hx-target={ "#" + cfg.TargetID }
@@ -93,14 +96,14 @@ templ filterBar(cfg TableConfig) {
 	>
 		for _, f := range cfg.Filters {
 			switch f.Type {
-			case FilterSelect:
-				@filterSelect(f)
-			case FilterStatus:
-				@filterSelect(f)
-			case FilterText:
-				@filterText(f)
-			case FilterCheckbox:
-				@filterCheckbox(f)
+				case FilterSelect:
+					@filterSelect(f)
+				case FilterStatus:
+					@filterSelect(f)
+				case FilterText:
+					@filterText(f)
+				case FilterCheckbox:
+					@filterCheckbox(f)
 			}
 		}
 	</form>
@@ -139,7 +142,7 @@ templ filterText(f FilterConfig) {
 // filterCheckbox renders a checkbox filter.
 templ filterCheckbox(f FilterConfig) {
 	<label class="flex items-center gap-2 cursor-pointer" data-testid={ "filter-" + f.Name }>
-		<input type="checkbox" class="checkbox checkbox-sm" name={ f.Name } value="1" />
+		<input type="checkbox" class="checkbox checkbox-sm" name={ f.Name } value="1"/>
 		<span class="text-sm text-base-content/60">{ f.Label }</span>
 	</label>
 }

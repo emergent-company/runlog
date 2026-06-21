@@ -30,11 +30,11 @@ templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f
 				}
 			}}
 			@form.FormSelect("category", "Category", f.Category, catOpts, "", form.LabelAbove, "", "", templ.Attributes{
-				"hx-get": "/ui/runs",
-				"hx-target": "#runs-table",
-				"hx-trigger": "change",
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "change",
 				"hx-push-url": "true",
-				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-category",
 			})
 			@form.FormSelect("status", "Status", f.Status, [][2]string{
@@ -44,11 +44,11 @@ templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f
 				{"skip", "Skip"},
 				{"running", "Running"},
 			}, "", form.LabelAbove, "", "", templ.Attributes{
-				"hx-get": "/ui/runs",
-				"hx-target": "#runs-table",
-				"hx-trigger": "change",
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "change",
 				"hx-push-url": "true",
-				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-status",
 			})
 			@form.FormSelect("since", "Since", f.Since, [][2]string{
@@ -58,36 +58,36 @@ templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f
 				{"7d", "Last 7 days"},
 				{"30d", "Last 30 days"},
 			}, "", form.LabelAbove, "", "", templ.Attributes{
-				"hx-get": "/ui/runs",
-				"hx-target": "#runs-table",
-				"hx-trigger": "change",
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "change",
 				"hx-push-url": "true",
-				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-since",
 			})
 			@form.FormInput("search", "Test name", f.Search, "Search by name...", form.LabelAbove, "", "", templ.Attributes{
-				"hx-get": "/ui/runs",
-				"hx-target": "#runs-table",
-				"hx-trigger": "keyup changed delay:500ms",
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "keyup changed delay:500ms",
 				"hx-push-url": "true",
-				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-search",
 			})
 			@form.FormInput("tags", "Tags", f.Tags, "Filter by tag...", form.LabelAbove, "", "", templ.Attributes{
-				"hx-get": "/ui/runs",
-				"hx-target": "#runs-table",
-				"hx-trigger": "keyup changed delay:500ms",
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "keyup changed delay:500ms",
 				"hx-push-url": "true",
-				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-tags",
 			})
 			@form.FormCheckbox("has_cost", "Has cost data", f.HasCost, "", templ.Attributes{
-				"value": "1",
-				"hx-get": "/ui/runs",
-				"hx-target": "#runs-table",
-				"hx-trigger": "change",
+				"value":       "1",
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "change",
 				"hx-push-url": "true",
-				"hx-sync": "closest [data-testid='runs-filters']:drop",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-cost",
 			})
 		</div>

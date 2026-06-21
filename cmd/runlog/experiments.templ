@@ -26,6 +26,7 @@ templ ExperimentsPage(experiments []runlog.ExperimentSummary) {
 						for _, exp := range experiments {
 							<tr
 								id={ "exp-" + exp.Name }
+								data-testid={ "experiment-row-" + exp.Name }
 								class="hover"
 								hx-get={ "/ui/experiments/" + exp.Name }
 								hx-target="#main-content"
@@ -81,6 +82,7 @@ templ ExperimentsContent(experiments []runlog.ExperimentSummary) {
 					for _, exp := range experiments {
 						<tr
 							id={ "exp-" + exp.Name }
+							data-testid={ "experiment-row-" + exp.Name }
 							class="hover"
 							hx-get={ "/ui/experiments/" + exp.Name }
 							hx-target="#main-content"

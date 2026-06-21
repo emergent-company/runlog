@@ -41,15 +41,33 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 			<main id="main-content" hx-history-elt class="grow overflow-auto bg-base-200 p-6" data-testid="main-content">
 				{ children... }
 			</main>
-			<template id="skeleton-dashboard">@DashboardSkeleton()</template>
-			<template id="skeleton-linters">@LintersSkeleton()</template>
-			<template id="skeleton-tests">@TestsSkeleton()</template>
-			<template id="skeleton-test-detail">@TestDetailSkeleton()</template>
-			<template id="skeleton-runs">@AllRunsSkeleton()</template>
-			<template id="skeleton-run-detail">@RunDetailSkeleton()</template>
-			<template id="skeleton-experiments">@ExperimentsSkeleton()</template>
-			<template id="skeleton-experiment-detail">@ExperimentDetailSkeleton()</template>
-			<template id="skeleton-events-reference">@EventsReferenceSkeleton()</template>
+			<template id="skeleton-dashboard">
+				@DashboardSkeleton()
+			</template>
+			<template id="skeleton-linters">
+				@LintersSkeleton()
+			</template>
+			<template id="skeleton-tests">
+				@TestsSkeleton()
+			</template>
+			<template id="skeleton-test-detail">
+				@TestDetailSkeleton()
+			</template>
+			<template id="skeleton-runs">
+				@AllRunsSkeleton()
+			</template>
+			<template id="skeleton-run-detail">
+				@RunDetailSkeleton()
+			</template>
+			<template id="skeleton-experiments">
+				@ExperimentsSkeleton()
+			</template>
+			<template id="skeleton-experiment-detail">
+				@ExperimentDetailSkeleton()
+			</template>
+			<template id="skeleton-events-reference">
+				@EventsReferenceSkeleton()
+			</template>
 			<footer class="hidden sm:flex border-t border-base-200 bg-base-100 shrink-0">
 				<div class="flex w-full items-center justify-between gap-3 px-4 py-1.5">
 					<div id="footer-status" class="flex items-center gap-2 text-xs">

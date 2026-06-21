@@ -1129,6 +1129,11 @@ func parseSinceParam(since string) time.Time {
 // ─────────────────────────────────────────────────────────────────────────────
 
 func (app *WebApp) handleLinters(c echo.Context) error {
+	w := c.Response().Writer
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	rawDB := app.db.RawDB()
 	defs := app.linterDefs()
 	latestRuns, _ := app.db.ListLinterRuns()
@@ -1251,6 +1256,31 @@ func (app *WebApp) handleRunAllLinters(c echo.Context) error {
 		return nil
 	}
 	http.Redirect(c.Response().Writer, c.Request(), target, http.StatusSeeOther)
+	return nil
+}
+
+func (app *WebApp) handleLinterRunDetail(c echo.Context) error {
+	name := c.Param("name")
+	runIDStr := c.Param("runID")
+	runID, err := strconv.ParseInt(runIDStr, 10, 64)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid run id")
+	}
+
+	run, err := app.db.GetLinterRun(runID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "linter run not found: "+err.Error())
+	}
+	if run == nil || run.LinterName != name {
+		return echo.NewHTTPError(http.StatusNotFound, "linter run not found")
+	}
+
+	data := linterRunDetailData{
+		LinterName: name,
+		Run:        *run,
+	}
+	render.RenderAuto(c.Response().Writer, c.Request(),
+		LinterRunDetailPage(data), LinterRunDetailContent(data))
 	return nil
 }
 

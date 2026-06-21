@@ -1828,6 +1828,27 @@ func (rdb *RunDB) ListLinterRuns() ([]LinterRow, error) {
 	return result, rows.Err()
 }
 
+// GetLinterRun returns a single linter run by ID.
+func (rdb *RunDB) GetLinterRun(id int64) (*LinterRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	row := rdb.db.QueryRow(`
+		SELECT id, linter_name, command, status, exit_code, output, started_at, finished_at
+		FROM linter_runs WHERE id = ?`, id)
+	var r LinterRow
+	var startedStr string
+	var finishedStr *string
+	if err := row.Scan(&r.ID, &r.LinterName, &r.Command, &r.Status, &r.ExitCode, &r.Output, &startedStr, &finishedStr); err != nil {
+		return nil, fmt.Errorf("rundb: GetLinterRun: %w", err)
+	}
+	r.StartedAt, _ = time.Parse(time.RFC3339Nano, startedStr)
+	if finishedStr != nil {
+		t, _ := time.Parse(time.RFC3339Nano, *finishedStr)
+		r.FinishedAt = &t
+	}
+	return &r, nil
+}
+
 // ListLinterRunHistory returns paginated run history for a specific linter.
 func (rdb *RunDB) ListLinterRunHistory(name string, offset, limit int) ([]LinterRow, int, error) {
 	rdb.mu.Lock()

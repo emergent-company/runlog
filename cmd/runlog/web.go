@@ -234,6 +234,11 @@ type linterLauncherData struct {
 	Command    string
 }
 
+type linterRunDetailData struct {
+	LinterName string
+	Run        runlog.LinterRow
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LauncherManager — tracks running test processes, streams output via SSE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -703,6 +708,7 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 	e.GET("/linters", app.handleLinters)
 	e.GET("/linters/events", app.handleLinterEventsStream)
 	e.GET("/linters/:name", app.handleLinterDetail)
+	e.GET("/linters/:name/runs/:runID", app.handleLinterRunDetail)
 	e.POST("/linters/:name/run", app.handleRunLinter)
 	e.POST("/linters/run-all", app.handleRunAllLinters)
 	e.GET("/linters/:name/events", app.handleLinterEvents)

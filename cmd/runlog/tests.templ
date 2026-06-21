@@ -121,6 +121,7 @@ templ flatTestTable(data testListData) {
 					for _, e := range cat.Tests {
 						<tr
 							id={ "test-" + e.Name }
+							data-testid={ "test-row-" + e.Name }
 							class="hover"
 							hx-get={ "/ui/tests/" + url.PathEscape(e.Name) }
 							hx-target="#main-content"
@@ -154,7 +155,7 @@ templ flatTestTable(data testListData) {
 							}
 							@table.TableCell("text-center w-16", nil) {
 								@ui.Dropdown(ui.DropdownEnd, nil) {
-									<button class="btn btn-ghost btn-xs" tabindex="0">
+									<button data-testid={ "test-actions-" + e.Name } class="btn btn-ghost btn-xs" tabindex="0">
 										<span class="iconify lucide--ellipsis-vertical size-4"></span>
 									</button>
 									@ui.DropdownMenu(nil) {

@@ -132,16 +132,22 @@ func renderHttpCall(detailsJSON string) templ.Component {
 	}
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm %s">%.0f</span><span class="badge badge-sm badge-ghost font-mono">%s</span><span class="font-mono text-xs break-all">%s</span></div>`, statusClass, statusCode, html.EscapeString(method), html.EscapeString(url))
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if headers, ok := details["headers"].(map[string]any); ok && len(headers) > 0 {
 			hJSON := mapToJSON(headers)
 			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box"><summary class="collapse-title text-xs font-semibold">Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(headers), html.EscapeString(hJSON))
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 		if body, ok := details["response_body"]; ok && body != nil {
 			bJSON := mapToJSON(body)
 			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box"><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto">%s</pre></div></details>`, html.EscapeString(bJSON))
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 		}
 		_, err = fmt.Fprint(w, `</div>`)
 		return err
@@ -155,13 +161,17 @@ func renderArtifact(detailsJSON string) templ.Component {
 	mime := getStrField(details, "mime")
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm badge-primary">%s</span><span class="text-xs text-base-content/50">%s</span></div>`, html.EscapeString(artType), html.EscapeString(mime))
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if mime == "image/png" || mime == "image/jpeg" || mime == "image/webp" {
 			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" rel="noopener noreferrer"><img src="%s" class="max-w-full max-h-96 rounded-box border border-base-300 cursor-pointer hover:opacity-90 transition-opacity" alt="artifact"/></a>`, html.EscapeString(artURL), html.EscapeString(artURL))
 		} else {
 			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" class="btn btn-ghost btn-sm"><span class="iconify lucide--download size-4"></span> Download artifact</a>`, html.EscapeString(artURL))
 		}
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		_, err = fmt.Fprint(w, `</div>`)
 		return err
 	})
@@ -215,12 +225,16 @@ type _renderLogDetail struct {
 
 func (r *_renderLogDetail) Render(ctx context.Context, w io.Writer) error {
 	_, err := fmt.Fprintf(w, `<div class="text-sm space-y-1">`)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	for k, v := range r.details {
 		val := fmt.Sprintf("%v", v)
 		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
 			html.EscapeString(k), html.EscapeString(val))
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	_, err = fmt.Fprint(w, `</div>`)
 	return err
@@ -246,13 +260,19 @@ func (r *_renderAssertionDetail) Render(ctx context.Context, w io.Writer) error 
 	}
 	_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm %s">%s</span></div><div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">expected</span><span class="font-mono text-xs break-all">%s</span></div><div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">actual</span><span class="font-mono text-xs break-all">%s</span></div>`,
 		matchClass, matchTxt, html.EscapeString(expected), html.EscapeString(actual))
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	for k, v := range r.details {
-		if k == "expected" || k == "actual" { continue }
+		if k == "expected" || k == "actual" {
+			continue
+		}
 		val := fmt.Sprintf("%v", v)
 		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
 			html.EscapeString(k), html.EscapeString(val))
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	_, err = fmt.Fprint(w, `</div>`)
 	return err
