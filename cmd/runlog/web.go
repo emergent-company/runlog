@@ -545,24 +545,6 @@ func reqCtx(c echo.Context) context.Context {
 // These are lines from go test -v that are already handled by the test's own
 // dbEvent() path (rl.Printf → dbEvent inserts into run_events directly).
 func skipLogLine(line string) bool {
-	// Skip t.Log() output lines: "    file.go:line: message"
-	if len(line) > 4 {
-		trimmed := line
-		i := 0
-		for i < len(trimmed) && trimmed[i] == ' ' {
-			i++
-		}
-		if i >= 4 && i < len(trimmed)-5 {
-			rest := trimmed[i:]
-			if dotIdx := strings.Index(rest, ".go:"); dotIdx > 0 && dotIdx < 40 {
-				afterDot := rest[dotIdx+4:]
-				colonIdx := strings.Index(afterDot, ":")
-				if colonIdx > 0 && colonIdx < 10 {
-					return true
-				}
-			}
-		}
-	}
 	// Skip go test framework output noise
 	switch {
 	case strings.HasPrefix(line, "=== RUN "):
@@ -570,6 +552,8 @@ func skipLogLine(line string) bool {
 	case strings.HasPrefix(line, "--- PASS"):
 		return true
 	case strings.HasPrefix(line, "--- FAIL"):
+		return true
+	case strings.HasPrefix(line, "--- SKIP"):
 		return true
 	case strings.HasPrefix(line, "PASS"):
 		return true

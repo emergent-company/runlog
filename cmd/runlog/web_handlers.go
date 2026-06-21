@@ -86,20 +86,143 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 		offset, _ = strconv.Atoi(offsetStr)
 	}
 
+	search := c.QueryParam("search")
+	statusFilter := c.QueryParam("status")
+	catFilter := c.QueryParam("category")
 	since := parseSinceParam(c.QueryParam("since"))
-	allRuns, err := app.db.ListRuns(since, offset+runsPerPage+1)
-	if err != nil {
-		return fmt.Errorf("list runs: %w", err)
+	tagFilter := c.QueryParam("tags")
+	hasCost := c.QueryParam("has_cost") == "1"
+
+	rawDB := app.db.RawDB()
+	q := `SELECT r.id, r.test_name, r.started_at, r.finished_at, r.passed, r.skipped,
+	              r.description, r.tags, r.experiment, r.runner, r.reason, r.env_name,
+	              r.input_tokens, r.output_tokens, r.cost_usd, r.env_vars,
+	              r.app_version, r.test_version, r.category
+	       FROM test_runs r`
+	args := []any{}
+
+	var wheres []string
+	if since.IsZero() {
+		wheres = append(wheres, `r.started_at >= ?`)
+		args = append(args, time.Now().Add(-365*24*time.Hour).UTC().Format(time.RFC3339))
+	} else {
+		wheres = append(wheres, `r.started_at >= ?`)
+		args = append(args, since.UTC().Format(time.RFC3339))
+	}
+	if search != "" {
+		wheres = append(wheres, `r.test_name LIKE ?`)
+		args = append(args, "%"+search+"%")
+	}
+	if statusFilter != "" {
+		switch statusFilter {
+		case "pass":
+			wheres = append(wheres, `r.passed = 1`)
+		case "fail":
+			wheres = append(wheres, `r.finished_at IS NOT NULL AND (r.passed = 0 OR (r.passed IS NULL AND r.skipped = 0)) AND (r.reason IS NULL OR r.reason != 'timed out')`)
+		case "skip":
+			wheres = append(wheres, `r.skipped = 1`)
+		case "timeout":
+			wheres = append(wheres, `r.reason = 'timed out'`)
+		case "running":
+			wheres = append(wheres, `r.finished_at IS NULL`)
+		}
+	}
+	if tagFilter != "" {
+		wheres = append(wheres, `r.tags LIKE ?`)
+		args = append(args, `%"`+tagFilter+`"%`)
+	}
+	if hasCost {
+		wheres = append(wheres, `r.cost_usd IS NOT NULL AND r.cost_usd > 0`)
 	}
 
-	total := len(allRuns)
-	page := allRuns
-	if offset > 0 && offset < len(allRuns) {
-		page = allRuns[offset:]
+	for i, w := range wheres {
+		if i == 0 {
+			q += ` WHERE ` + w
+		} else {
+			q += ` AND ` + w
+		}
 	}
-	if len(page) > runsPerPage {
-		page = page[:runsPerPage]
+	q += ` ORDER BY r.started_at DESC`
+
+	// Count total matching rows
+	var total int
+	countQ := `SELECT COUNT(*) FROM (` + q + `)`
+	_ = rawDB.QueryRow(countQ, args...).Scan(&total)
+
+	// Apply pagination
+	q += ` LIMIT ? OFFSET ?`
+	limit := runsPerPage
+	args = append(args, limit, offset)
+
+	rows, err := rawDB.Query(q, args...)
+	if err != nil {
+		return fmt.Errorf("query runs: %w", err)
 	}
+	defer rows.Close()
+
+	var page []runlog.RunRow
+	for rows.Next() {
+		var r runlog.RunRow
+		var startedStr string
+		var finishedStr, descJSON, tagsJSON *string
+		var experiment, runner, reason, envName *string
+		var inputTokens, outputTokens *int64
+		var costUSD *float64
+		var envVarsJSON *string
+		var appVersion, testVersion *string
+		var passedInt *int
+		var skipped bool
+		var category *string
+		if err := rows.Scan(
+			&r.ID, &r.TestName, &startedStr, &finishedStr,
+			&passedInt, &skipped,
+			&descJSON, &tagsJSON, &experiment,
+			&runner, &reason, &envName,
+			&inputTokens, &outputTokens, &costUSD, &envVarsJSON,
+			&appVersion, &testVersion, &category,
+		); err != nil {
+			continue
+		}
+		r.StartedAt, _ = time.Parse(time.RFC3339Nano, startedStr)
+		if finishedStr != nil {
+			t, _ := time.Parse(time.RFC3339Nano, *finishedStr)
+			r.FinishedAt = &t
+		}
+		r.Skipped = skipped
+		if passedInt != nil && !skipped {
+			p := *passedInt == 1
+			r.Passed = &p
+		}
+		r.Experiment = experiment
+		r.Reason = reason
+		r.EnvName = envName
+		r.InputTokens = inputTokens
+		r.OutputTokens = outputTokens
+		r.CostUSD = costUSD
+		r.AppVersion = appVersion
+		r.TestVersion = testVersion
+		r.Category = category
+		if descJSON != nil && *descJSON != "" {
+			var d runlog.RunDescription
+			if json.Unmarshal([]byte(*descJSON), &d) == nil {
+				r.Description = &d
+			}
+		}
+		if tagsJSON != nil && *tagsJSON != "" {
+			var tags []string
+			if json.Unmarshal([]byte(*tagsJSON), &tags) == nil {
+				r.Tags = tags
+			}
+		}
+		if envVarsJSON != nil && *envVarsJSON != "" {
+			var envVars map[string]string
+			if json.Unmarshal([]byte(*envVarsJSON), &envVars) == nil {
+				r.EnvVars = envVars
+			}
+		}
+		page = append(page, r)
+	}
+	_ = rows.Close()
 
 	runRows := make([]runlog.RunRow, len(page))
 	catMap := make(map[int64]string, len(page))
@@ -110,16 +233,15 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 
 	categories := sortedKeys(app.config.Categories)
 	f := runFilters{
-		Category: c.QueryParam("category"),
-		Status:   c.QueryParam("status"),
+		Category: catFilter,
+		Status:   statusFilter,
 		Since:    c.QueryParam("since"),
-		Search:   c.QueryParam("search"),
-		Tags:     c.QueryParam("tags"),
-		HasCost:  c.QueryParam("has_cost") == "1",
+		Search:   search,
+		Tags:     tagFilter,
+		HasCost:  hasCost,
 		Offset:   offset,
 	}
-	// If filter params are set, this is a table refresh — return only the table content.
-	if render.IsPartial(c.Request()) && (offset > 0 || c.QueryParam("category") != "" || c.QueryParam("status") != "" || c.QueryParam("since") != "" || c.QueryParam("search") != "" || c.QueryParam("tags") != "" || c.QueryParam("has_cost") != "") {
+	if render.IsPartial(c.Request()) && (offset > 0 || catFilter != "" || statusFilter != "" || c.QueryParam("since") != "" || search != "" || tagFilter != "" || hasCost) {
 		render.RenderPartial(c.Response().Writer, c.Request(), runsTableContent(runRows, catMap, total, f))
 	} else {
 		render.RenderAuto(c.Response().Writer, c.Request(),
