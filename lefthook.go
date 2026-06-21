@@ -7,9 +7,9 @@ import (
 )
 
 // DiscoverLintersFromLefthook parses lefthook.yml from workDir and extracts
-// the `lint` group jobs as LinterDef entries. Returns empty slice if lefthook.yml
-// is not found or has no lint group.
-func DiscoverLintersFromLefthook(workDir string) ([]LinterDef, error) {
+// jobs from the given groupName (e.g. "lint", "pre-commit") as LinterDef entries.
+// Returns empty slice if lefthook.yml is not found or has no matching group.
+func DiscoverLintersFromLefthook(workDir, groupName string) ([]LinterDef, error) {
 	path := workDir + "/lefthook.yml"
 	if workDir == "" {
 		path = "lefthook.yml"
@@ -21,12 +21,13 @@ func DiscoverLintersFromLefthook(workDir string) ([]LinterDef, error) {
 	defer f.Close()
 
 	var linters []LinterDef
-	inLintGroup := false
+	inTargetGroup := false
 	inLintJobs := false
 	var current *LinterDef
 	var runBuffer strings.Builder
 	inRunBlock := false
 	nameIndent := 0
+	targetPrefix := groupName + ":"
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -37,17 +38,17 @@ func DiscoverLintersFromLefthook(workDir string) ([]LinterDef, error) {
 			continue
 		}
 
-		// Detect "lint:" group (top-level, no leading space)
-		if trimmed == "lint:" && !isIndented(line) {
-			inLintGroup = true
+		// Detect target group (top-level, no leading space)
+		if trimmed == targetPrefix && !isIndented(line) {
+			inTargetGroup = true
 			continue
 		}
 
-		if !inLintGroup {
+		if !inTargetGroup {
 			continue
 		}
 
-		// Non-indented line means we've left the lint block
+		// Non-indented line means we've left the group block
 		if !isIndented(line) {
 			break
 		}

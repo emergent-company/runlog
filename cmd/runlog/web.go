@@ -716,7 +716,10 @@ func (app *WebApp) linterDefs() []runlog.LinterDef {
 	if len(app.config.Linters) > 0 {
 		return app.config.Linters
 	}
-	lefthook, _ := runlog.DiscoverLintersFromLefthook(app.workDir)
+	lefthook, _ := runlog.DiscoverLintersFromLefthook(app.workDir, "pre-commit")
+	if len(lefthook) == 0 {
+		lefthook, _ = runlog.DiscoverLintersFromLefthook(app.workDir, "lint")
+	}
 	return lefthook
 }
 

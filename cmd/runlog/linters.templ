@@ -7,6 +7,7 @@ import (
 
 	"github.com/emergent-company/go-daisy/components/table"
 	"github.com/emergent-company/go-daisy/components/ui"
+	runlog "github.com/emergent-company/runlog"
 )
 
 templ LintersPage(data linterListData) {
@@ -175,8 +176,8 @@ templ linterDetailContent(data linterDetailData) {
 		</div>
 
 		if len(data.Runs) > 0 {
-			<div id="runs-section">
-				@linterRunsTable(data)
+			<div id="runs-section" class="space-y-3">
+				@linterRunPanels(data)
 				if data.Offset+data.Limit < data.TotalRuns {
 					@loadMoreButton(
 						fmt.Sprintf("/ui/linters/%s?offset=%d", url.PathEscape(data.Name), data.Offset+data.Limit),
@@ -205,50 +206,36 @@ templ linterDetailContent(data linterDetailData) {
 	</script>
 }
 
-templ linterRunsTable(data linterDetailData) {
-	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
-		@table.TableHead() {
-			@table.TableHeadRow() {
-				@table.TableHeadCell("Status")
-				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Exit Code</th>
-				@table.TableHeadCell("Started")
-				<th class="text-xs font-semibold text-base-content/60 uppercase">Output</th>
+templ linterRunPanel(r runlog.LinterRow) {
+	<div id={ fmt.Sprintf("linter-run-%d", r.ID) } class="border border-base-content/10 rounded-box bg-base-100 mb-3 overflow-hidden">
+		<div class="flex items-center gap-3 px-4 py-2.5 bg-base-200/50 border-b border-base-content/5">
+			@linterStatusBadge(r.Status)
+			if r.ExitCode != nil {
+				<span class="text-xs font-mono text-base-content/50">
+					Exit
+					if *r.ExitCode == 0 {
+						<span class="font-semibold text-success">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
+					} else {
+						<span class="font-semibold text-error">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
+					}
+				</span>
 			}
-		}
-		@table.TableBody() {
-			for _, r := range data.Runs {
-				<tr
-					id={ fmt.Sprintf("linter-run-%d", r.ID) }
-					class="hover"
-				>
-					@table.TableCell("", nil) {
-						@linterStatusBadge(r.Status)
-					}
-					@table.TableCell("text-right w-16", nil) {
-						if r.ExitCode != nil {
-							@text(fmt.Sprintf("%d", *r.ExitCode))
-						} else {
-							<span class="text-base-content/30">—</span>
-						}
-					}
-					@table.TableCell("", nil) {
-						@text(formatTime(r.StartedAt, TimeFull))
-					}
-					@table.TableCell("", nil) {
-						if r.Output != "" {
-							<details class="collapse collapse-arrow">
-								<summary class="collapse-title text-sm font-semibold text-base-content/70 min-h-0 p-2">View Output</summary>
-								<div class="collapse-content p-0">
-									<pre class="bg-base-300 text-xs font-mono p-3 rounded-box overflow-auto max-h-64 whitespace-pre-wrap">{ r.Output }</pre>
-								</div>
-							</details>
-						} else {
-							<span class="text-base-content/30">—</span>
-						}
-					}
-				</tr>
+			if r.FinishedAt != nil {
+				<span class="text-xs text-base-content/40">{ fmtElapsed(r.FinishedAt.Sub(r.StartedAt).Seconds()) }</span>
 			}
+			<span class="text-xs text-base-content/30 ml-auto">{ formatTime(r.StartedAt, TimeFull) }</span>
+		</div>
+		if r.Output != "" {
+			<pre class="text-xs font-mono p-4 overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed text-base-content/80">{ r.Output }</pre>
+		} else {
+			<div class="text-xs text-base-content/30 italic px-4 py-6 text-center">No output</div>
 		}
+	</div>
+}
+
+templ linterRunPanels(data linterDetailData) {
+	for _, r := range data.Runs {
+		@linterRunPanel(r)
 	}
 }
 
