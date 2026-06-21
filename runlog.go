@@ -314,6 +314,11 @@ func DoSkipf(t *testing.T, rl *RunLog, format string, args ...any) {
 //	    "Runs task-cli list and asserts all titles appear",
 //	)
 func (rl *RunLog) Describe(summary string, bullets ...string) {
+	rl.t.Helper()
+	rl.t.Log(summary)
+	for _, b := range bullets {
+		rl.t.Log("  • " + b)
+	}
 	// Write a human-readable block to the flat log so it appears at the top.
 	rl.writef("description: %s\n", summary)
 	for _, b := range bullets {
@@ -516,6 +521,8 @@ func (rl *RunLog) RecordTokenUsage(inputTokens, outputTokens int64, costUSD floa
 // collapsible group in the DB.  All subsequent Printf/CLI/Event calls are
 // stored as children of this section until the next Section() or Close().
 func (rl *RunLog) Section(name string) {
+	rl.t.Helper()
+	rl.t.Log("── " + name + " ──")
 	rl.writef("\n%s\n%s\n", name, strings.Repeat("─", 72))
 
 	rl.mu.Lock()
@@ -579,13 +586,15 @@ func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[st
 	for k, v := range extra {
 		details[k] = v
 	}
+	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
+	rl.writef("[%s] ASSERT %s\n", ts, label)
 	rl.t.Log(label)
 	rl.dbEvent("assertion", label, details)
 }
 
-// CLI writes a CLI invocation header and its full output to the log file.
-// It does NOT call t.Log for the output (to avoid noise); only the header is
-// passed to t.Log.
+// CLI writes a CLI invocation header and its full output to the log file
+// and stdout (via t.Log). The full invocation and output are available in the
+// event details.
 //
 // The event message shown in the run list is "$ <invocation>".
 // Use CLIStep when you want a short human-readable description as the message
@@ -631,9 +640,15 @@ func (rl *RunLog) CLIStep(desc, invocation, output string) {
 // CLIStepErr is like CLIStep but also records the command error (exit code) in
 // the event details so the TUI can highlight the row in red on failure.
 func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) {
+	rl.t.Helper()
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] $ %s\n%s\n", ts, invocation, strings.TrimRight(output, "\n"))
 	rl.t.Logf("$ %s", invocation)
+	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+		if line != "" {
+			rl.t.Log("  " + line)
+		}
+	}
 	details := map[string]any{
 		"invocation": invocation,
 		"output":     output,
@@ -667,6 +682,8 @@ func exitCode(err error) int {
 // "gantt_row".  details may be any JSON-serialisable value or nil.
 // This is the general-purpose escape hatch for tests that need custom events.
 func (rl *RunLog) Event(kind, message string, details any) {
+	rl.t.Helper()
+	rl.t.Logf("[%s] %s", kind, message)
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] [%s] %s\n", ts, kind, message)
 	rl.dbEvent(kind, message, details)

@@ -27,7 +27,7 @@ templ testsContent(data testListData) {
 
 templ testsContentInner(data testListData) {
 	<h1 class="text-2xl font-bold mb-4">Tests</h1>
-	<div
+	<form
 		class="flex flex-wrap gap-3 mb-4 items-end"
 		hx-get="/ui/tests"
 		hx-target="[data-testid='tests-content']"
@@ -85,7 +85,7 @@ templ testsContentInner(data testListData) {
 				<option value="timeout">Timeout</option>
 			}
 		</select>
-	</div>
+	</form>
 	<div id="test-list" data-testid="test-list" class="contents">
 		if len(data.Categories) > 0 {
 			@flatTestTable(data)

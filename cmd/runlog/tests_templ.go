@@ -151,7 +151,7 @@ func testsContentInner(data testListData) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h1 class=\"text-2xl font-bold mb-4\">Tests</h1><div class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"/ui/tests\" hx-target=\"[data-testid='tests-content']\" hx-trigger=\"change from:select\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"category-filter\"><option value=\"\">All Categories</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h1 class=\"text-2xl font-bold mb-4\">Tests</h1><form class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"/ui/tests\" hx-target=\"[data-testid='tests-content']\" hx-trigger=\"change from:select\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"category-filter\"><option value=\"\">All Categories</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -290,7 +290,7 @@ func testsContentInner(data testListData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</select></div><div id=\"test-list\" data-testid=\"test-list\" class=\"contents\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</select></form><div id=\"test-list\" data-testid=\"test-list\" class=\"contents\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

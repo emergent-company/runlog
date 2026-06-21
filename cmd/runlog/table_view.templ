@@ -1,0 +1,155 @@
+package main
+
+import (
+	"fmt"
+
+	"github.com/emergent-company/go-daisy/components/table"
+)
+
+// TableView renders a complete table view with filter bar, table, and Load More pagination.
+// Configuration is passed via TableConfig — see table_view.go for field docs.
+templ TableView(cfg TableConfig) {
+	<div data-testid={ cfg.HXTarget }>
+		if cfg.Title != "" {
+			<h1 class="text-2xl font-bold mb-6">{ cfg.Title }</h1>
+		}
+		@filterBar(cfg)
+		<p class="text-sm text-base-content/60 mb-4">
+			if cfg.Total > 0 {
+				{ fmt.Sprintf("%d result(s)", cfg.Total) }
+			}
+		</p>
+		<div id={ cfg.TargetID } data-testid={ cfg.TargetID }>
+			@tableContent(cfg)
+		</div>
+	</div>
+}
+
+// tableContent renders the table (or empty state) and Load More button.
+templ tableContent(cfg TableConfig) {
+	if len(cfg.Rows) > 0 {
+		@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+			@table.TableHead() {
+				@table.TableHeadRow() {
+					for _, col := range cfg.Columns {
+						<th class={ "text-xs font-semibold text-base-content/60 uppercase " + string(col.Align) + " " + col.Width }>{ col.Label }</th>
+					}
+				}
+			}
+			@table.TableBody() {
+				for _, row := range cfg.Rows {
+					<tr
+						id={ "row-" + fmt.Sprintf("%p", row) }
+						class="hover"
+						if cfg.RowClick != nil && cfg.RowClick(row) != "" {
+							hx-get={ cfg.RowClick(row) }
+							hx-target="#main-content"
+							hx-swap="innerHTML"
+							hx-push-url="true"
+							hx-sync="#main-content:replace"
+							hx-trigger="click[!target.closest('.dropdown')]"
+						}
+					>
+						for _, col := range cfg.Columns {
+							<td class={ string(col.Align) + " " + col.Width }>
+								@col.Render(row)
+							</td>
+						}
+					</tr>
+				}
+			}
+		}
+		if cfg.Offset + cfg.PageSize < cfg.Total {
+			@scrollSentinel(loadMoreURL(cfg.HXGet, cfg.Offset + cfg.PageSize, cfg.Filters), "#" + cfg.TargetID)
+		}
+	} else {
+		@emptyState(cfg.EmptyMsg)
+	}
+}
+
+// scrollSentinel is an invisible element at the bottom of the table.
+// When scrolled into view, it fires an HTMX request to load the next page.
+// The response includes a new sentinel, creating a continuous scroll chain.
+templ scrollSentinel(url string, target string) {
+	<div
+		hx-get={ url }
+		hx-target={ target }
+		hx-swap="beforeend"
+		hx-trigger="revealed"
+		class="flex items-center justify-center py-4 htmx-indicator"
+	>
+		<span class="loading loading-spinner loading-sm text-primary"></span>
+	</div>
+}
+
+// filterBar renders the filter form with all configured filter inputs.
+templ filterBar(cfg TableConfig) {
+	<form
+		class="flex flex-wrap gap-3 mb-4 items-end"
+		hx-get={ cfg.HXGet }
+		hx-target={ "#" + cfg.TargetID }
+		hx-trigger={ filterBarHXTrigger(cfg.Filters) }
+		hx-push-url="true"
+	>
+		for _, f := range cfg.Filters {
+			switch f.Type {
+			case FilterSelect:
+				@filterSelect(f)
+			case FilterStatus:
+				@filterSelect(f)
+			case FilterText:
+				@filterText(f)
+			case FilterCheckbox:
+				@filterCheckbox(f)
+			}
+		}
+	</form>
+}
+
+// filterSelect renders a <select> filter.
+templ filterSelect(f FilterConfig) {
+	<select
+		class="select select-bordered select-sm w-full max-w-xs"
+		name={ f.Name }
+		data-testid={ "filter-" + f.Name }
+	>
+		<option value="">{ f.Label }</option>
+		for _, opt := range f.Options {
+			if f.Value == opt.Value {
+				<option value={ opt.Value } selected>{ opt.Label }</option>
+			} else {
+				<option value={ opt.Value }>{ opt.Label }</option>
+			}
+		}
+	</select>
+}
+
+// filterText renders a text <input> filter.
+templ filterText(f FilterConfig) {
+	<input
+		type="text"
+		class="input input-bordered input-sm w-full max-w-xs"
+		name={ f.Name }
+		placeholder={ f.Placeholder }
+		value={ f.Value }
+		data-testid={ "filter-" + f.Name }
+	/>
+}
+
+// filterCheckbox renders a checkbox filter.
+templ filterCheckbox(f FilterConfig) {
+	<label class="flex items-center gap-2 cursor-pointer" data-testid={ "filter-" + f.Name }>
+		<input type="checkbox" class="checkbox checkbox-sm" name={ f.Name } value="1" />
+		<span class="text-sm text-base-content/60">{ f.Label }</span>
+	</label>
+}
+
+// loadMoreBtn renders the Load More pagination button.
+templ loadMoreBtn(url string, target string) {
+	<button
+		class="btn btn-ghost btn-sm w-full mt-4"
+		hx-get={ url }
+		hx-target={ target }
+		hx-swap="beforeend"
+	>Load More</button>
+}
