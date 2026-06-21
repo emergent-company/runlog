@@ -46,9 +46,9 @@ var sdkPageCSS = `.sdk-page { display: grid; grid-template-columns: 14rem 1fr; g
 
 var codeExamples = []codeExample{
 	{
-		Title: "Basic Setup",
+		Title:       "Basic Setup",
 		Description: "Creates a RunLog that registers the test in the database, captures structured events, and persists results on Close. Call at the start of every test that uses runlog.",
-		ID: "new-runlog", Lang: "go",
+		ID:          "new-runlog", Lang: "go",
 		Code: `import runlog "github.com/emergent-company/runlog"
 
 func TestMyFeature(t *testing.T) {
@@ -64,9 +64,9 @@ func TestMyFeature(t *testing.T) {
 		},
 	},
 	{
-		Title: "HTTP Call",
+		Title:       "HTTP Call",
 		Description: "Captures HTTP request/response details as structured http_call events. Records method, URL, status code, and response body.",
-		ID: "http-call", Lang: "go",
+		ID:          "http-call", Lang: "go",
 		Code: `rec := runlog.NewRunRecorder(db)
 rec.RegisterRun("my-test")
 
@@ -81,9 +81,9 @@ rec.HTTPCall("GET", "/api/health",
 		},
 	},
 	{
-		Title: "CLI Capture",
+		Title:       "CLI Capture",
 		Description: "Wraps any CLI command execution and records the full command, exit code, and stdout/stderr as a cli event.",
-		ID: "cli-capture", Lang: "go",
+		ID:          "cli-capture", Lang: "go",
 		Code: `rec := runlog.NewRunRecorder(db)
 rec.RegisterRun("deploy-test")
 
@@ -99,9 +99,9 @@ output := rec.CLICapture("kubectl apply -f deploy.yaml", func() error {
 		},
 	},
 	{
-		Title: "Fail",
+		Title:       "Fail",
 		Description: "Records a failure event with the error message and exits the test via t.Fatal.",
-		ID: "failf", Lang: "go",
+		ID:          "failf", Lang: "go",
 		Code: `rl.Failf("expected status 200, got %d", resp.StatusCode)`,
 		Events: []runlog.EventRow{
 			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
@@ -110,9 +110,9 @@ output := rec.CLICapture("kubectl apply -f deploy.yaml", func() error {
 		},
 	},
 	{
-		Title: "Section",
+		Title:       "Section",
 		Description: "Groups related events under named sections. Section children are collapsed by default and expand on click.",
-		ID: "section", Lang: "go",
+		ID:          "section", Lang: "go",
 		Code: `rl.Section("Setup")
 rl.CLI("go build ./...")
 rl.Printf("build succeeded")
@@ -131,17 +131,17 @@ rl.Printf("testing login flow...")`,
 		},
 	},
 	{
-		Title: "Tag",
+		Title:       "Tag",
 		Description: "Attaches key:value tags to a run for filtering and comparison.",
-		ID: "tagging", Lang: "go",
+		ID:          "tagging", Lang: "go",
 		Code: `rl.Tag("model", "gpt-4")
 rl.Tag("variant", "baseline")
 rl.SetExperiment("prompt-optimization-v3")`,
 	},
 	{
-		Title: "Screenshots",
+		Title:       "Screenshots",
 		Description: "Emits screenshot artifacts from Playwright e2e tests. The UI renders the image inline in the event detail.",
-		ID: "playwright-screenshots", Lang: "javascript",
+		ID:          "playwright-screenshots", Lang: "javascript",
 		Code: `// In your Playwright test fixture:
 const artifactsDir = '/tmp/runlog-artifacts';
 
@@ -171,9 +171,9 @@ await saveArtifact(runId, page, 'after-login');`,
 		},
 	},
 	{
-		Title: "Daemon",
+		Title:       "Daemon",
 		Description: "RunRecorder auto-registers with the daemon when RUNLOG_DAEMON_URL is set.",
-		ID: "daemon-integration", Lang: "go",
+		ID:          "daemon-integration", Lang: "go",
 		Code: `rec := runlog.NewRunRecorder(db)
 runID, _ := rec.RegisterRun("my-test-suite")
 defer rec.MarkDone(runID, !t.Failed())

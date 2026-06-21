@@ -283,10 +283,10 @@ func (app *WebApp) handleTests(c echo.Context) error {
 	defer rows.Close()
 
 	type aggRow struct {
-		Name       string
-		RunCount   int
+		Name        string
+		RunCount    int
 		LastStarted string
-		Category   *string
+		Category    *string
 	}
 	var agg []aggRow
 	statusMap := make(map[string]string)

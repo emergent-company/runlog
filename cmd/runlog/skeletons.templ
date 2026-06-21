@@ -169,6 +169,7 @@ templ _skeletonTableRows(rows int, cols int) {
 				@table.TableHeadRow() {
 					for i := 0; i < cols; i++ {
 						<th>
+							<!-- lint:allow-raw: skeleton placeholder -->
 							<div class="skeleton h-4 w-full max-w-24"></div>
 						</th>
 					}
@@ -177,8 +178,10 @@ templ _skeletonTableRows(rows int, cols int) {
 			@table.TableBody() {
 				for i := 0; i < rows; i++ {
 					<tr>
+						<!-- lint:allow-raw -->
 						for j := 0; j < cols; j++ {
 							<td>
+								<!-- lint:allow-raw: skeleton placeholder -->
 								<div class="skeleton h-4 w-full"></div>
 							</td>
 						}

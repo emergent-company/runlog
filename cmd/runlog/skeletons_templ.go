@@ -447,7 +447,7 @@ func _skeletonTableRows(rows int, cols int) templ.Component {
 					}
 					ctx = templ.InitializeContext(ctx)
 					for i := 0; i < cols; i++ {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<th><div class=\"skeleton h-4 w-full max-w-24\"></div></th>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<th><!-- lint:allow-raw: skeleton placeholder --><div class=\"skeleton h-4 w-full max-w-24\"></div></th>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -481,12 +481,12 @@ func _skeletonTableRows(rows int, cols int) templ.Component {
 				}
 				ctx = templ.InitializeContext(ctx)
 				for i := 0; i < rows; i++ {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<tr>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<tr><!-- lint:allow-raw -->")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					for j := 0; j < cols; j++ {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<td><div class=\"skeleton h-4 w-full\"></div></td>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<td><!-- lint:allow-raw: skeleton placeholder --><div class=\"skeleton h-4 w-full\"></div></td>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}

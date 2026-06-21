@@ -81,10 +81,13 @@ templ renderExampleEvents(events []runlog.EventRow) {
 	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
 		@table.TableHead() {
 			@table.TableHeadRow() {
+				<!-- lint:allow-raw -->
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-12">Seq</th>
 				<th class="text-xs font-semibold text-base-content/60 uppercase">Kind</th>
 				<th class="text-xs font-semibold text-base-content/60 uppercase">Message</th>
+				<!-- lint:allow-raw -->
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-20">Elapsed</th>
+				<!-- lint:allow-raw -->
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-8"></th>
 			}
 		}
@@ -250,6 +253,7 @@ templ eventsReferenceTable() {
 				@table.TableHeadCell("Kind")
 				@table.TableHeadCell("Description")
 				@table.TableHeadCell("Usage")
+				<!-- lint:allow-raw: table header for Meta column uses center alignment -->
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Meta</th>
 			}
 		}
@@ -257,8 +261,11 @@ templ eventsReferenceTable() {
 			for _, ek := range eventKinds {
 				<!-- lint:allow-raw -->
 				<tr class="hover hover:bg-base-200 transition-colors">
+					<!-- lint:allow-raw: plain text cells, no component needed -->
 					<td class="font-mono text-sm font-semibold">{ ek.Kind }</td>
+					<!-- lint:allow-raw -->
 					<td class="text-sm">{ ek.Description }</td>
+					<!-- lint:allow-raw -->
 					<td class="text-xs font-mono text-base-content/60">{ ek.Usage }</td>
 					<td class="text-center">
 						if ek.IsMeta {

@@ -61,15 +61,16 @@ templ linterTable(entries []linterListEntry) {
 				@table.TableHeadRow() {
 					@table.TableHeadCell("Linter")
 					@table.TableHeadCell("Status")
-					<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Runs</th>
+					@table.TableHeadCell("Runs", "text-right w-16")
 					@table.TableHeadCell("Last Run")
-					<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Action</th>
+					@table.TableHeadCell("Action", "text-center w-16")
 				}
 			}
 			@table.TableBody() {
 				for _, e := range entries {
 					<tr
 						id={ "linter-" + e.Name }
+						data-testid={ "linter-row-" + e.Name }
 						class="hover"
 						hx-get={ "/ui/linters/" + url.PathEscape(e.Name) }
 						hx-target="#main-content"
@@ -100,7 +101,7 @@ templ linterTable(entries []linterListEntry) {
 						}
 						@table.TableCell("text-center w-16", nil) {
 							@ui.Dropdown(ui.DropdownEnd, nil) {
-								<button class="btn btn-ghost btn-xs" tabindex="0">
+								<button data-testid={ "linter-actions-" + e.Name } class="btn btn-ghost btn-xs" tabindex="0">
 									<span class="iconify lucide--ellipsis-vertical size-4"></span>
 								</button>
 								@ui.DropdownMenu(nil) {
@@ -166,6 +167,7 @@ templ linterDetailContent(data linterDetailData) {
 				<p class="text-sm text-base-content/50 font-mono mt-1">{ data.Command }</p>
 			</div>
 			<button
+				data-testid="run-linter-btn"
 				class="btn btn-primary btn-sm"
 				hx-post={ "/ui/linters/" + url.PathEscape(data.Name) + "/run" }
 				hx-sync="#main-content:replace"
@@ -204,6 +206,7 @@ templ linterRunsTable(runs []runlog.LinterRow) {
 			for _, r := range runs {
 				<tr
 					id={ fmt.Sprintf("linter-run-%d", r.ID) }
+					data-testid={ fmt.Sprintf("linter-run-row-%d", r.ID) }
 					class="hover cursor-pointer"
 					hx-get={ fmt.Sprintf("/ui/linters/%s/runs/%d", url.PathEscape(r.LinterName), r.ID) }
 					hx-target="#main-content"

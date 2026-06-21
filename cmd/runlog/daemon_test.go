@@ -400,9 +400,9 @@ func TestDaemon_Status(t *testing.T) {
 	}
 
 	var status struct {
-		Status          string `json:"status"`
-		ActiveRuns      int    `json:"active_runs"`
-		TrackedResources int   `json:"tracked_resources"`
+		Status           string `json:"status"`
+		ActiveRuns       int    `json:"active_runs"`
+		TrackedResources int    `json:"tracked_resources"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
 		t.Fatalf("decode status JSON: %v", err)

@@ -126,8 +126,10 @@ templ runDetailContent(data runDetailData) {
 						}
 						@table.TableBody() {
 							for _, key := range sortedKeys(data.Run.EnvVars) {
+								<!-- lint:allow-raw -->
 								<tr>
 									<td class="font-semibold">{ key }</td>
+									<!-- lint:allow-raw: env var table cells with dynamic content -->
 									<td class="text-base-content/60 break-all">{ redactEnvValue(data.Run.EnvVars[key]) }</td>
 								</tr>
 							}

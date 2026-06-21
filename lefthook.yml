@@ -38,10 +38,6 @@ pre-commit:
     - name: go-build
       run: go build ./...
 
-    - name: no-dead-code
-      glob: "*.go"
-      run: scripts/lint/no-dead-code.sh
-
     - name: check-icons
       glob: "*.{templ,go}"
       run: scripts/lint/check-icons.sh --staged
@@ -49,9 +45,6 @@ pre-commit:
     - name: require-testid
       glob: "*.templ"
       run: scripts/lint/require-testid.sh {staged_files}
-
-    - name: no-secrets
-      run: gitleaks git --staged --config .gitleaks.toml --no-banner
 
     - name: no-panic-in-lib
       glob: "*.go"

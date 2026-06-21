@@ -89,16 +89,16 @@ type trendPoint struct {
 }
 
 type testStats struct {
-	AvgDuration  string
-	MinDuration  string
-	MaxDuration  string
-	PassRate     string
-	TotalRuns    int
-	TrendData    []trendPoint
-	TrendUp      bool
-	TrendFlat    bool
-	HasCostData  bool
-	AvgCost      string
+	AvgDuration string
+	MinDuration string
+	MaxDuration string
+	PassRate    string
+	TotalRuns   int
+	TrendData   []trendPoint
+	TrendUp     bool
+	TrendFlat   bool
+	HasCostData bool
+	AvgCost     string
 }
 
 type runFilters struct {
@@ -136,10 +136,10 @@ type runDetailData struct {
 type TimeFormat int
 
 const (
-	TimeFull   TimeFormat = iota // 10/06/2026 11:27:59
-	TimeShort                     // 11:27:59
-	TimeHuman                     // 2 min ago
-	TimeISO                       // 2026-06-10T11:27:59Z
+	TimeFull  TimeFormat = iota // 10/06/2026 11:27:59
+	TimeShort                   // 11:27:59
+	TimeHuman                   // 2 min ago
+	TimeISO                     // 2026-06-10T11:27:59Z
 )
 
 func formatTime(t time.Time, f TimeFormat) string {
@@ -418,10 +418,10 @@ func (al *ActiveLaunch) Unsubscribe(ch chan string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ActiveLinter struct {
-	Name     string
-	Cmd      *exec.Cmd
-	Started  time.Time
-	RunID    int64
+	Name    string
+	Cmd     *exec.Cmd
+	Started time.Time
+	RunID   int64
 
 	mu        sync.Mutex
 	lines     []string
@@ -665,7 +665,7 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 		linterMgr: NewLinterManager(db, sseBroker, workDir),
 		sse:       sseBroker,
 		startedAt: time.Now(),
-		workDir: workDir,
+		workDir:   workDir,
 	}
 
 	app.sse.SetLinterManager(app.linterMgr)
@@ -755,9 +755,15 @@ func (app *WebApp) runTimeoutWorker(ctx context.Context) {
 			if err != nil {
 				continue
 			}
-			var stale []struct{ id int64; testName string }
+			var stale []struct {
+				id       int64
+				testName string
+			}
 			for rows.Next() {
-				var s struct{ id int64; testName string }
+				var s struct {
+					id       int64
+					testName string
+				}
 				if err := rows.Scan(&s.id, &s.testName); err == nil {
 					stale = append(stale, s)
 				}

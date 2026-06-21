@@ -1,24 +1,22 @@
-# Build artifacts
-/runlog
-/dist/
 
+*~
+# Build artifacts
 # Databases
 *.db
-
-# Log files
-logs/
-*.log
-
-# Node.js / Playwright
-tests/web/node_modules/
-
-# OS files
+/dist/
 .DS_Store
-Thumbs.db
-
 # IDE
 .idea/
-.vscode/
-*.swp
+*.log
+# Log files
+logs/
+# Node.js / Playwright
+# OS files
+/runlog
+.runlog/config.yaml
+.runlog/daemon.pid
 *.swo
-*~
+*.swp
+tests/web/node_modules/
+Thumbs.db
+.vscode/

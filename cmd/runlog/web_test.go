@@ -204,7 +204,7 @@ func TestWebApp_Tests_FilterByStatus(t *testing.T) {
 	db.RawDB().Exec(`INSERT INTO test_runs (test_name, started_at) VALUES ('TestFilterRunning', datetime('now'))`)
 
 	tests := []struct {
-		filter string
+		filter      string
 		wantVariant string // badge CSS variant class
 	}{
 		{"pass", "badge-success"},

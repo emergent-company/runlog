@@ -31,11 +31,11 @@ KNOWN_ICONS=(
   check x circle alert-triangle alert-circle
   info settings user users search filter
   arrow-left arrow-right arrow-up arrow-down chevron-left chevron-right
-  plus minus more-horizontal more-vertical edit trash
+  plus minus more-horizontal more-vertical ellipsis-vertical edit trash
   external-link link copy clipboard clock
   refresh loader spinner download upload
-  home menu sidebar book file text
-  code terminal github twitter
+  home menu sidebar book file file-text text list
+  code terminal github twitter shield layers
 )
 
 if $STAGED_ONLY; then
