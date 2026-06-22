@@ -21,7 +21,7 @@ import (
 // "still waiting" noise.
 //
 // Returns true on success, false on timeout or terminal error.
-func PollUntilSuccess(  //nolint:deadcode
+func PollUntilSuccess( //nolint:deadcode
 	t *testing.T,
 	rl *RunLog,
 	home, srv, token, projectID, agentID, agentName string,
@@ -90,7 +90,7 @@ func PollUntilSuccess(  //nolint:deadcode
 
 // extractStatus parses the current status from compact or raw runs output.
 // Returns an empty string if no status can be determined.
-func extractStatus(compact, raw string) string {  //nolint:deadcode
+func extractStatus(compact, raw string) string { //nolint:deadcode
 	// Compact output format: "status=<value>"
 	for _, part := range strings.Fields(compact) {
 		if strings.HasPrefix(part, "status=") {
@@ -113,7 +113,7 @@ func extractStatus(compact, raw string) string {  //nolint:deadcode
 //
 // agentNames and agentIDs must be parallel slices of the same length.
 // Must be called before the project is deleted (the API needs the project alive).
-func DumpAgentRunDetails(t *testing.T, rl *RunLog, srv, token, projectID string, agentNames, agentIDs []string) {  //nolint:deadcode
+func DumpAgentRunDetails(t *testing.T, rl *RunLog, srv, token, projectID string, agentNames, agentIDs []string) { //nolint:deadcode
 	t.Helper()
 	dir := rl.Dir()
 	if dir == "" {
@@ -193,14 +193,14 @@ func DumpAgentRunDetails(t *testing.T, rl *RunLog, srv, token, projectID string,
 }
 
 // writeFile writes content to path, creating or truncating the file.
-func writeFile(path, content string) error {  //nolint:deadcode
+func writeFile(path, content string) error { //nolint:deadcode
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 // TriggerAgent triggers an agent via the `memory agents trigger` CLI command.
 // It wraps MustRunCLIInDirWithHome (fatal on non-zero exit) and logs the result
 // to rl when rl is non-nil. Returns the raw CLI output string.
-func TriggerAgent(t *testing.T, rl *RunLog, home, projectID, agentID string) string {  //nolint:deadcode
+func TriggerAgent(t *testing.T, rl *RunLog, home, projectID, agentID string) string { //nolint:deadcode
 	t.Helper()
 	out := MustRunCLIInDirWithHome(t, "", home,
 		"agents", "trigger", agentID,
@@ -222,7 +222,7 @@ type AgentQuestion struct {
 // ListPendingQuestions lists pending agent questions for a project via the CLI.
 // Returns the parsed questions and raw CLI output. On CLI error returns nil
 // questions and the error. Does NOT call t.Fatal — safe for poll loops.
-func ListPendingQuestions(t *testing.T, rl *RunLog, home, projectID string) ([]AgentQuestion, string, error) {  //nolint:deadcode
+func ListPendingQuestions(t *testing.T, rl *RunLog, home, projectID string) ([]AgentQuestion, string, error) { //nolint:deadcode
 	t.Helper()
 	out, err := RunCLIInDirWithHome(t, "", home,
 		"agents", "questions", "list-project",
@@ -248,7 +248,7 @@ func ListPendingQuestions(t *testing.T, rl *RunLog, home, projectID string) ([]A
 
 // ListAllQuestions lists all agent questions for a project (no status filter).
 // Returns parsed questions and raw CLI output. Does NOT call t.Fatal.
-func ListAllQuestions(t *testing.T, rl *RunLog, home, projectID string) ([]AgentQuestion, string, error) {  //nolint:deadcode
+func ListAllQuestions(t *testing.T, rl *RunLog, home, projectID string) ([]AgentQuestion, string, error) { //nolint:deadcode
 	t.Helper()
 	out, err := RunCLIInDirWithHome(t, "", home,
 		"agents", "questions", "list-project",
@@ -274,7 +274,7 @@ func ListAllQuestions(t *testing.T, rl *RunLog, home, projectID string) ([]Agent
 // RespondToQuestion responds to a pending agent question via the CLI.
 // Returns raw CLI output. On CLI error returns the output and the error.
 // Does NOT call t.Fatal — callers decide how to handle errors.
-func RespondToQuestion(t *testing.T, rl *RunLog, home, projectID, questionID, response string) (string, error) {  //nolint:deadcode
+func RespondToQuestion(t *testing.T, rl *RunLog, home, projectID, questionID, response string) (string, error) { //nolint:deadcode
 	t.Helper()
 	out, err := RunCLIInDirWithHome(t, "", home,
 		"agents", "questions", "respond",

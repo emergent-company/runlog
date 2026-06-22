@@ -242,13 +242,27 @@ tasks:
       - curl -s http://localhost:{{.DOGFOOD_PORT}}/status | python3 -m json.tool || echo "Not running"
 
   dogfood:server:
-    desc: "Run dogfood daemon in foreground with hot-reload (Ctrl+C to stop)"
+    desc: "Run dogfood daemon in foreground with hot-reload (clean DB, Ctrl+C to stop)"
     env:
       RUNLOG_APP_TITLE: "runlog (dogfood)"
     cmds:
       - task: dogfood:stop
       - rm -f {{.DOGFOOD_DB}}
       - air -c .air.dogfood.toml
+
+  dogfood:server:persist:
+    desc: "Run dogfood daemon keeping existing DB (hot-reload, Ctrl+C to stop)"
+    env:
+      RUNLOG_APP_TITLE: "runlog (dogfood)"
+    cmds:
+      - task: dogfood:stop
+      - |
+        air -c .air.dogfood.toml &
+        AIR_PID=$!
+        sleep 3
+        curl -s -o /dev/null -X POST "http://localhost:{{.DOGFOOD_PORT}}/ui/linters/run-all" &
+        echo "→ Linters started in background (≈45s for all). Refresh browser."
+        wait $AIR_PID
 
   # ── Dogfood: test recording ─────────────────────────────────────────────
 

@@ -569,7 +569,11 @@ func (lm *LinterManager) Lint(name, command string) (*ActiveLinter, error) {
 		if al.exitCode != 0 {
 			status = "failed"
 		}
-		_ = lm.db.UpdateLinterRunResult(al.RunID, status, al.exitCode, outputBuf.String(), time.Now())
+		out := outputBuf.String()
+		if out == "" {
+			out = fmt.Sprintf("exit code: %d", al.exitCode)
+		}
+		_ = lm.db.UpdateLinterRunResult(al.RunID, status, al.exitCode, out, time.Now())
 		close(al.done)
 		if lm.sse != nil {
 			data, _ := json.Marshal(map[string]interface{}{
@@ -831,7 +835,7 @@ func (app *WebApp) runTimeoutWorker(ctx context.Context) {
 }
 
 // reqCtx returns a context with the request context from Echo.
-func reqCtx(c echo.Context) context.Context {  //nolint:deadcode
+func reqCtx(c echo.Context) context.Context { //nolint:deadcode
 	return c.Request().Context()
 }
 

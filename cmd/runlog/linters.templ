@@ -217,7 +217,7 @@ templ linterRunsTable(runs []runlog.LinterRow) {
 					@table.TableCell("", nil) {
 						@linterStatusBadge(r.Status)
 					}
-					@table.TableCell("font-mono", nil) {
+					@table.TableCell("font-mono text-right", nil) {
 						if r.ExitCode != nil {
 							if *r.ExitCode == 0 {
 								<span class="text-success">{ fmt.Sprintf("%d", *r.ExitCode) }</span>
@@ -228,7 +228,7 @@ templ linterRunsTable(runs []runlog.LinterRow) {
 							<span class="text-base-content/30">—</span>
 						}
 					}
-					@table.TableCell("", nil) {
+					@table.TableCell("text-right", nil) {
 						if r.FinishedAt != nil {
 							@text(fmtElapsed(r.FinishedAt.Sub(r.StartedAt).Seconds()))
 						} else if r.Status == "running" {

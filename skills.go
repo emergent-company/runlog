@@ -17,7 +17,7 @@ import (
 // the message "Verify <skillName> skill", recording the parsed name,
 // description, and whether the name matched the directory.  All assertion
 // failures are reported via t.Errorf (non-fatal).
-func VerifySkillInstalled(t *testing.T, rl *RunLog, skillsDir, skillName string) {  //nolint:deadcode
+func VerifySkillInstalled(t *testing.T, rl *RunLog, skillsDir, skillName string) { //nolint:deadcode
 	t.Helper()
 
 	skillMDPath := filepath.Join(skillsDir, skillName, "SKILL.md")

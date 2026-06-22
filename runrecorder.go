@@ -38,7 +38,7 @@ type RunRecorder struct {
 // NewRunRecorder creates a RunRecorder. When RUNLOG_DAEMON_URL is set, it
 // connects to the daemon for automatic run registration. The optional *RunDB
 // is used for direct DB writes when no daemon is available.
-func NewRunRecorder(db *RunDB) *RunRecorder {  //nolint:deadcode
+func NewRunRecorder(db *RunDB) *RunRecorder { //nolint:deadcode
 	r := &RunRecorder{
 		startedAt: time.Now(),
 		db:        db,
@@ -51,7 +51,7 @@ func NewRunRecorder(db *RunDB) *RunRecorder {  //nolint:deadcode
 
 // RegisterRun creates a test run via the daemon API (or directly in the DB)
 // and returns the run ID. The event stream starts with a state_change event.
-func (r *RunRecorder) RegisterRun(testName string) (string, error) {  //nolint:deadcode
+func (r *RunRecorder) RegisterRun(testName string) (string, error) { //nolint:deadcode
 	r.runID = ""
 	r.active = false
 	r.seq = 0
@@ -88,7 +88,7 @@ func (r *RunRecorder) RegisterRun(testName string) (string, error) {  //nolint:d
 }
 
 // MarkDone marks the run as finished with the given pass/fail status.
-func (r *RunRecorder) MarkDone(runID string, passed bool) error {  //nolint:deadcode
+func (r *RunRecorder) MarkDone(runID string, passed bool) error { //nolint:deadcode
 	if !r.active {
 		return nil
 	}
@@ -117,7 +117,7 @@ func (r *RunRecorder) MarkDone(runID string, passed bool) error {  //nolint:dead
 
 // Event emits an arbitrary event with the given kind, message, and optional
 // structured details. Details should be a JSON-serializable map.
-func (r *RunRecorder) Event(kind, message string, details map[string]any) error {  //nolint:deadcode
+func (r *RunRecorder) Event(kind, message string, details map[string]any) error { //nolint:deadcode
 	return r.emit(kind, message, details)
 }
 
@@ -132,7 +132,7 @@ func (r *RunRecorder) Event(kind, message string, details map[string]any) error 
 //	    cmd.Stderr = os.Stderr
 //	    return cmd.Run()
 //	})
-func (r *RunRecorder) CLICapture(description string, fn func() error) string {  //nolint:deadcode
+func (r *RunRecorder) CLICapture(description string, fn func() error) string { //nolint:deadcode
 	oldOut := os.Stdout
 	oldErr := os.Stderr
 	rOut, wOut, _ := os.Pipe()
@@ -176,7 +176,7 @@ func (r *RunRecorder) CLICapture(description string, fn func() error) string {  
 // HTTPCall emits an http_call event with full request/response details.
 // method, url, and statusCode are required. requestBody and responseBody
 // are optional and will be truncated to 2048 bytes in the event details.
-func (r *RunRecorder) HTTPCall(method, url string, statusCode int, requestBody, responseBody string) {  //nolint:deadcode
+func (r *RunRecorder) HTTPCall(method, url string, statusCode int, requestBody, responseBody string) { //nolint:deadcode
 	details := map[string]any{
 		"method":      method,
 		"url":         url,
@@ -200,7 +200,7 @@ func (r *RunRecorder) HTTPCall(method, url string, statusCode int, requestBody, 
 }
 
 // emit sends an event to the daemon or writes it directly to the DB.
-func (r *RunRecorder) emit(kind, message string, details map[string]any) error {  //nolint:deadcode
+func (r *RunRecorder) emit(kind, message string, details map[string]any) error { //nolint:deadcode
 	if !r.active {
 		return nil
 	}
@@ -238,7 +238,7 @@ func (r *RunRecorder) emit(kind, message string, details map[string]any) error {
 
 // ExtractOutput is a helper that extracts a specific line from CLI output.
 // Useful for test assertions.
-func ExtractOutput(output, prefix string) string {  //nolint:deadcode
+func ExtractOutput(output, prefix string) string { //nolint:deadcode
 	for _, line := range strings.Split(output, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, prefix) {
@@ -247,5 +247,3 @@ func ExtractOutput(output, prefix string) string {  //nolint:deadcode
 	}
 	return ""
 }
-
-

@@ -3911,7 +3911,7 @@ func (m model) loadDrawerSuggestions(exp string) tea.Cmd {
 }
 
 // loadSuggestions reads cached suggestions from DB (fast, no LLM).
-func (m model) loadSuggestions(experiment string) tea.Cmd {  //nolint:deadcode
+func (m model) loadSuggestions(experiment string) tea.Cmd { //nolint:deadcode
 	return func() tea.Msg {
 		rows, err := m.db.ListSuggestions(experiment)
 		if err != nil {
@@ -4039,7 +4039,7 @@ func (m model) runTestAnalysis(testName string) tea.Cmd {
 }
 
 // loadTestSuggestions reads cached suggestions for a single test from the DB.
-func (m model) loadTestSuggestions(testName string) tea.Cmd {  //nolint:deadcode
+func (m model) loadTestSuggestions(testName string) tea.Cmd { //nolint:deadcode
 	suggKey := "test:" + testName
 	return func() tea.Msg {
 		rows, err := m.db.ListSuggestions(suggKey)
@@ -4308,7 +4308,7 @@ func (m model) listenRunTrace() tea.Cmd {
 }
 
 // loadRunSuggestions reads cached suggestions for a single run from the DB.
-func (m model) loadRunSuggestions(runID int64) tea.Cmd {  //nolint:deadcode
+func (m model) loadRunSuggestions(runID int64) tea.Cmd { //nolint:deadcode
 	suggKey := fmt.Sprintf("run:%d", runID)
 	return func() tea.Msg {
 		rows, err := m.db.ListSuggestions(suggKey)
@@ -4749,7 +4749,7 @@ func (m *model) resetCursorsForSearch() {
 }
 
 // searchableViews returns true for views that support the / search shortcut.
-func searchableView(s viewState) bool {  //nolint:deadcode
+func searchableView(s viewState) bool { //nolint:deadcode
 	switch s {
 	case viewRuns, viewEvents, viewExperiments, viewExpRuns, viewExpAnalysis,
 		viewTests, viewTestRuns, viewTestAnalysis, viewRunAnalysis:
@@ -4940,7 +4940,7 @@ func (m model) visibleEventRows() int {
 	return n
 }
 
-func (m model) visibleDetailLines() int {  //nolint:deadcode
+func (m model) visibleDetailLines() int { //nolint:deadcode
 	n := m.height - 2
 	if n < 1 {
 		return 1
@@ -5095,7 +5095,7 @@ func statusLabel(r runlog.RunRow) string {
 	return styleFail.Render("FAIL")
 }
 
-func kindStyled(kind string) string {  //nolint:deadcode
+func kindStyled(kind string) string { //nolint:deadcode
 	return kindStyledWithDetails(kind, "")
 }
 
@@ -5141,7 +5141,7 @@ func cliExitCode(detailsJSON string) int {
 	return d.ExitCode
 }
 
-func formatAge(t time.Time) string {  //nolint:deadcode
+func formatAge(t time.Time) string { //nolint:deadcode
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
@@ -5153,7 +5153,7 @@ func formatAge(t time.Time) string {  //nolint:deadcode
 	}
 }
 
-func formatDuration(start time.Time, end *time.Time) string {  //nolint:deadcode
+func formatDuration(start time.Time, end *time.Time) string { //nolint:deadcode
 	return formatDurationPlain(start, end)
 }
 
@@ -5242,7 +5242,7 @@ func padToWidth(s string, w int) string {
 // Math helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-func clamp(v, lo, hi int) int {  //nolint:deadcode
+func clamp(v, lo, hi int) int { //nolint:deadcode
 	if hi < lo {
 		return lo
 	}

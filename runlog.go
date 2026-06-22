@@ -100,7 +100,7 @@ var ActiveRunLogs sync.Map
 // The folder is placed under the logs/ directory used by LogSession.
 // It is safe to call even if the directory cannot be created — all writes
 // become no-ops and the path is logged via t.Log.
-func NewRunLog(t *testing.T) *RunLog {  //nolint:deadcode
+func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	t.Helper()
 	rl := &RunLog{t: t, StartedAt: time.Now()}
 
@@ -200,13 +200,13 @@ func NewRunLog(t *testing.T) *RunLog {  //nolint:deadcode
 
 // Dir returns the folder that contains run.log and any sibling detail files.
 // Returns "" if the log directory could not be created.
-func (rl *RunLog) Dir() string {  //nolint:deadcode
+func (rl *RunLog) Dir() string { //nolint:deadcode
 	return rl.dir
 }
 
 // Close flushes and closes the log file and deregisters from LogSession routing.
 // It records the test outcome (passed/failed) in the DB.
-func (rl *RunLog) Close() {  //nolint:deadcode
+func (rl *RunLog) Close() { //nolint:deadcode
 	// Stop trace poller before acquiring the log mutex (poller may call dbEvent).
 	if rl.tracePoller != nil {
 		rl.tracePoller.Stop()
@@ -260,7 +260,7 @@ func (rl *RunLog) Close() {  //nolint:deadcode
 // Because t.Fatal calls runtime.Goexit, all deferred functions (including
 // defer rl.Close()) still execute, which means finished_at and passed=false
 // are correctly written to the DB even when the test fails mid-run.
-func (rl *RunLog) Failf(format string, args ...any) {  //nolint:deadcode
+func (rl *RunLog) Failf(format string, args ...any) { //nolint:deadcode
 	rl.t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	rl.lastFailMsg = msg
@@ -276,7 +276,7 @@ func (rl *RunLog) Failf(format string, args ...any) {  //nolint:deadcode
 // Because t.Skip calls runtime.Goexit, all deferred functions (including
 // defer rl.Close()) still execute, which means finished_at and passed=2
 // are correctly written to the DB.
-func (rl *RunLog) Skipf(format string, args ...any) {  //nolint:deadcode
+func (rl *RunLog) Skipf(format string, args ...any) { //nolint:deadcode
 	rl.t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	rl.skipReason = msg
@@ -290,7 +290,7 @@ func (rl *RunLog) Skipf(format string, args ...any) {  //nolint:deadcode
 // optional *RunLog so the reason is captured in the runs DB.
 //
 // Because both rl.Skipf and t.Skipf call runtime.Goexit, DoSkipf never returns.
-func DoSkipf(t *testing.T, rl *RunLog, format string, args ...any) {  //nolint:deadcode
+func DoSkipf(t *testing.T, rl *RunLog, format string, args ...any) { //nolint:deadcode
 	t.Helper()
 	if rl != nil {
 		rl.Skipf(format, args...) // calls t.Skip internally — never returns
@@ -313,7 +313,7 @@ func DoSkipf(t *testing.T, rl *RunLog, format string, args ...any) {  //nolint:d
 //	    "Creates WorkPackage and Task graph objects",
 //	    "Runs task-cli list and asserts all titles appear",
 //	)
-func (rl *RunLog) Describe(summary string, bullets ...string) {  //nolint:deadcode
+func (rl *RunLog) Describe(summary string, bullets ...string) { //nolint:deadcode
 	rl.t.Helper()
 	rl.t.Log(summary)
 	for _, b := range bullets {
@@ -343,7 +343,7 @@ func (rl *RunLog) Describe(summary string, bullets ...string) {  //nolint:deadco
 // Tag is safe to call multiple times; each call appends to the existing set.
 // It also emits a "tag" event to the flat log so tags are visible in the
 // chronological record.
-func (rl *RunLog) Tag(tags ...string) {  //nolint:deadcode
+func (rl *RunLog) Tag(tags ...string) { //nolint:deadcode
 	if len(tags) == 0 {
 		return
 	}
@@ -374,7 +374,7 @@ func (rl *RunLog) Tag(tags ...string) {  //nolint:deadcode
 //
 // SetExperiment is called automatically by NewRunLog when the EXPERIMENT
 // environment variable is set.  Tests may also call it explicitly.
-func (rl *RunLog) SetExperiment(name string) {  //nolint:deadcode
+func (rl *RunLog) SetExperiment(name string) { //nolint:deadcode
 	if name == "" {
 		return
 	}
@@ -395,7 +395,7 @@ func (rl *RunLog) SetExperiment(name string) {  //nolint:deadcode
 // SetCategory declares the test's category for the web UI tests list.
 // Call this at the start of a test to group it under a named category
 // instead of relying on config-file category patterns or directory names.
-func (rl *RunLog) SetCategory(category string) {  //nolint:deadcode
+func (rl *RunLog) SetCategory(category string) { //nolint:deadcode
 	if category == "" {
 		return
 	}
@@ -416,7 +416,7 @@ func (rl *RunLog) SetCategory(category string) {  //nolint:deadcode
 // SetTimeout registers a per-test timeout duration.  The background timeout
 // worker will mark the run as timed out if it exceeds this duration.
 // Call this at the start of a test to prevent stuck runs.
-func (rl *RunLog) SetTimeout(d time.Duration) {  //nolint:deadcode
+func (rl *RunLog) SetTimeout(d time.Duration) { //nolint:deadcode
 	if d <= 0 {
 		return
 	}
@@ -440,7 +440,7 @@ func (rl *RunLog) SetTimeout(d time.Duration) {  //nolint:deadcode
 //
 // Unlike SetTestVersion, this is always manual — the test writer decides what
 // version to record and when.
-func (rl *RunLog) SetAppVersion(version string) {  //nolint:deadcode
+func (rl *RunLog) SetAppVersion(version string) { //nolint:deadcode
 	if version == "" {
 		return
 	}
@@ -467,7 +467,7 @@ func (rl *RunLog) SetAppVersion(version string) {  //nolint:deadcode
 // auto-detected version with a custom label.
 //
 // It is stored in test_runs.test_version and emitted as a "test_version" event.
-func (rl *RunLog) SetTestVersion(version string) {  //nolint:deadcode
+func (rl *RunLog) SetTestVersion(version string) { //nolint:deadcode
 	if version == "" {
 		return
 	}
@@ -498,7 +498,7 @@ func (rl *RunLog) SetTestVersion(version string) {  //nolint:deadcode
 //
 //	inputTok, outputTok, cost := FetchRunTokenUsage(t, srv, token, projectID, runID)
 //	rl.RecordTokenUsage(inputTok, outputTok, cost)
-func (rl *RunLog) RecordTokenUsage(inputTokens, outputTokens int64, costUSD float64) {  //nolint:deadcode
+func (rl *RunLog) RecordTokenUsage(inputTokens, outputTokens int64, costUSD float64) { //nolint:deadcode
 	if inputTokens == 0 && outputTokens == 0 && costUSD == 0 {
 		return
 	}
@@ -520,7 +520,7 @@ func (rl *RunLog) RecordTokenUsage(inputTokens, outputTokens int64, costUSD floa
 // Section writes a prominent section header to the log file and starts a new
 // collapsible group in the DB.  All subsequent Printf/CLI/Event calls are
 // stored as children of this section until the next Section() or Close().
-func (rl *RunLog) Section(name string) {  //nolint:deadcode
+func (rl *RunLog) Section(name string) { //nolint:deadcode
 	rl.t.Helper()
 	rl.t.Log("── " + name + " ──")
 	rl.writef("\n%s\n%s\n", name, strings.Repeat("─", 72))
@@ -547,7 +547,7 @@ func (rl *RunLog) Section(name string) {  //nolint:deadcode
 }
 
 // Printf writes a timestamped line to the log file and also calls t.Log.
-func (rl *RunLog) Printf(format string, args ...any) {  //nolint:deadcode
+func (rl *RunLog) Printf(format string, args ...any) { //nolint:deadcode
 	rl.t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
@@ -562,7 +562,7 @@ func (rl *RunLog) Printf(format string, args ...any) {  //nolint:deadcode
 // Example:
 //
 //	rl.LogStep("setting up project", map[string]any{"project_id": id})
-func (rl *RunLog) LogStep(label string, details map[string]any) {  //nolint:deadcode
+func (rl *RunLog) LogStep(label string, details map[string]any) { //nolint:deadcode
 	rl.t.Helper()
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] %s\n", ts, label)
@@ -577,7 +577,7 @@ func (rl *RunLog) LogStep(label string, details map[string]any) {  //nolint:dead
 // Example:
 //
 //	rl.AssertionStep("status == 404", 404, resp.StatusCode, nil)
-func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[string]any) {  //nolint:deadcode
+func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[string]any) { //nolint:deadcode
 	rl.t.Helper()
 	details := map[string]any{
 		"expected": expected,
@@ -600,20 +600,20 @@ func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[st
 // Use CLIStep when you want a short human-readable description as the message
 // instead (e.g. "Revoke token") while still recording the full command and
 // output in the inspector details.
-func (rl *RunLog) CLI(invocation, output string) {  //nolint:deadcode
+func (rl *RunLog) CLI(invocation, output string) { //nolint:deadcode
 	rl.CLIStepErr("$ "+invocation, invocation, output, nil)
 }
 
 // CLIErr is like CLI but also records the command error (exit code) in the
 // event details so the TUI can highlight the row in red on failure.
-func (rl *RunLog) CLIErr(invocation, output string, err error) {  //nolint:deadcode
+func (rl *RunLog) CLIErr(invocation, output string, err error) { //nolint:deadcode
 	rl.CLIStepErr("$ "+invocation, invocation, output, err)
 }
 
 // MustRunCLI runs `memory <args>` and emits a CLI event with the full
 // invocation and output. Fails the test on non-zero exit.
 // Equivalent to calling runlog.MustRunCLI then rl.CLI, but in one step.
-func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string {  //nolint:deadcode
+func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string { //nolint:deadcode
 	t.Helper()
 	out := MustRunCLI(t, args...)
 	invocation := "memory " + strings.Join(args, " ")
@@ -622,7 +622,7 @@ func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string {  //nolint:de
 }
 
 // MustRunCLIInDir runs `memory <args>` from dir and emits a CLI event.
-func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) string {  //nolint:deadcode
+func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) string { //nolint:deadcode
 	t.Helper()
 	out := MustRunCLIInDir(t, dir, args...)
 	invocation := "memory " + strings.Join(args, " ")
@@ -633,13 +633,13 @@ func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) stri
 // CLIStep is like CLI but uses desc as the short message shown in the run list
 // (e.g. "Revoke token") instead of the raw invocation string.  The full
 // invocation and output are still recorded in the inspector details.
-func (rl *RunLog) CLIStep(desc, invocation, output string) {  //nolint:deadcode
+func (rl *RunLog) CLIStep(desc, invocation, output string) { //nolint:deadcode
 	rl.CLIStepErr(desc, invocation, output, nil)
 }
 
 // CLIStepErr is like CLIStep but also records the command error (exit code) in
 // the event details so the TUI can highlight the row in red on failure.
-func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) {  //nolint:deadcode
+func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) { //nolint:deadcode
 	rl.t.Helper()
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] $ %s\n%s\n", ts, invocation, strings.TrimRight(output, "\n"))
@@ -662,7 +662,7 @@ func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) {  //no
 
 // exitCode extracts the integer exit code from a command error.
 // Returns 1 for generic errors, 0 if err is nil.
-func exitCode(err error) int {  //nolint:deadcode
+func exitCode(err error) int { //nolint:deadcode
 	if err == nil {
 		return 0
 	}
@@ -681,7 +681,7 @@ func exitCode(err error) int {  //nolint:deadcode
 // kind should be a short snake_case string, e.g. "state_change", "metric",
 // "gantt_row".  details may be any JSON-serialisable value or nil.
 // This is the general-purpose escape hatch for tests that need custom events.
-func (rl *RunLog) Event(kind, message string, details any) {  //nolint:deadcode
+func (rl *RunLog) Event(kind, message string, details any) { //nolint:deadcode
 	rl.t.Helper()
 	rl.t.Logf("[%s] %s", kind, message)
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
@@ -703,7 +703,7 @@ func (rl *RunLog) Event(kind, message string, details any) {  //nolint:deadcode
 //
 // In the TUI the group appears as one collapsed row; pressing Enter expands
 // it to show the child lines.
-func (rl *RunLog) Group(kind, title string, fn func(g *GroupLogger)) {  //nolint:deadcode
+func (rl *RunLog) Group(kind, title string, fn func(g *GroupLogger)) { //nolint:deadcode
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 
 	// Write the parent header to the flat log.
@@ -744,7 +744,7 @@ type GroupLogger struct {
 }
 
 // Printf writes one child line under the current group.
-func (g *GroupLogger) Printf(format string, args ...any) {  //nolint:deadcode
+func (g *GroupLogger) Printf(format string, args ...any) { //nolint:deadcode
 	msg := fmt.Sprintf(format, args...)
 	g.rl.writef("  %s\n", msg) // indented in flat log
 	g.children = append(g.children, ChildEvent{
@@ -755,7 +755,7 @@ func (g *GroupLogger) Printf(format string, args ...any) {  //nolint:deadcode
 }
 
 // Event writes one structured child event under the current group.
-func (g *GroupLogger) Event(kind, message string, details any) {  //nolint:deadcode
+func (g *GroupLogger) Event(kind, message string, details any) { //nolint:deadcode
 	g.rl.writef("  [%s] %s\n", kind, message)
 	var detJSON string
 	if details != nil {
@@ -781,7 +781,7 @@ func (g *GroupLogger) Event(kind, message string, details any) {  //nolint:deadc
 // serverURL is the base URL of the Memory server (e.g. "http://localhost:3002").
 // token is the API key or Bearer token.
 // projectID is the Memory project to watch.
-func (rl *RunLog) StartTracePoller(serverURL, token, projectID string) {  //nolint:deadcode
+func (rl *RunLog) StartTracePoller(serverURL, token, projectID string) { //nolint:deadcode
 	if rl.db == nil || rl.runID == 0 || serverURL == "" || projectID == "" {
 		return
 	}
@@ -798,13 +798,13 @@ func (rl *RunLog) StartTracePoller(serverURL, token, projectID string) {  //noli
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-func (rl *RunLog) writef(format string, args ...any) {  //nolint:deadcode
+func (rl *RunLog) writef(format string, args ...any) { //nolint:deadcode
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	rl.writeLocked(fmt.Sprintf(format, args...))
 }
 
-func (rl *RunLog) writeLocked(s string) {  //nolint:deadcode
+func (rl *RunLog) writeLocked(s string) { //nolint:deadcode
 	if rl.f == nil {
 		return
 	}
@@ -814,7 +814,7 @@ func (rl *RunLog) writeLocked(s string) {  //nolint:deadcode
 // dbEvent persists one event to the DB.  Always best-effort.
 // When a section is active the event is stored as a child of that section;
 // otherwise it is inserted as a top-level row.
-func (rl *RunLog) dbEvent(kind, message string, details any) {  //nolint:deadcode
+func (rl *RunLog) dbEvent(kind, message string, details any) { //nolint:deadcode
 	if rl.db == nil || rl.runID == 0 {
 		return
 	}
@@ -857,7 +857,7 @@ func (rl *RunLog) dbEvent(kind, message string, details any) {  //nolint:deadcod
 
 // flushSectionLocked writes the buffered section children to the DB and resets
 // the section tracking state.  Must be called with rl.mu held.
-func (rl *RunLog) flushSectionLocked() {  //nolint:deadcode
+func (rl *RunLog) flushSectionLocked() { //nolint:deadcode
 	if rl.currentSectionID == 0 || len(rl.sectionChildren) == 0 {
 		rl.currentSectionID = 0
 		rl.sectionChildren = rl.sectionChildren[:0]
@@ -906,7 +906,7 @@ type AgentInfo struct {
 // GET /api/projects/:projectID/agent-runs/:runID.
 // Returns zeros gracefully when the endpoint returns 404 or the tokenUsage
 // field is absent.
-func FetchRunTokenUsage(t *testing.T, srv, token, projectID, runID string) (inputTokens, outputTokens int64, estimatedCostUSD float64) {  //nolint:deadcode
+func FetchRunTokenUsage(t *testing.T, srv, token, projectID, runID string) (inputTokens, outputTokens int64, estimatedCostUSD float64) { //nolint:deadcode
 	t.Helper()
 	url := fmt.Sprintf("%s/api/projects/%s/agent-runs/%s", srv, projectID, runID)
 	resp := DoJSON(t, "GET", url, token, projectID, nil)
@@ -937,7 +937,7 @@ func FetchRunTokenUsage(t *testing.T, srv, token, projectID, runID string) (inpu
 // BuildAgentRunIntervals queries the runs API for each agent and returns a
 // slice of AgentRunInterval sorted by start time.  Token usage is fetched
 // per run via FetchRunTokenUsage.
-func BuildAgentRunIntervals(t *testing.T, rl *RunLog, srv, token, projectID string, agents []AgentInfo) []AgentRunInterval {  //nolint:deadcode
+func BuildAgentRunIntervals(t *testing.T, rl *RunLog, srv, token, projectID string, agents []AgentInfo) []AgentRunInterval { //nolint:deadcode
 	t.Helper()
 	var intervals []AgentRunInterval
 	for _, agent := range agents {
@@ -1029,7 +1029,7 @@ type GanttData struct {
 // agent run interval.  Each row includes a token/cost suffix when available.
 // It also emits a single "gantt" event to the DB with the full GanttData so
 // the TUI can re-render the chart at any terminal width.
-func PrintGantt(rl *RunLog, intervals []AgentRunInterval) {  //nolint:deadcode
+func PrintGantt(rl *RunLog, intervals []AgentRunInterval) { //nolint:deadcode
 	if len(intervals) == 0 {
 		rl.Printf("(no agent run intervals found - API may have been unreachable)")
 		return
@@ -1130,7 +1130,7 @@ func PrintGantt(rl *RunLog, intervals []AgentRunInterval) {  //nolint:deadcode
 
 // PrintTokenSummary writes a summary table of token usage aggregated
 // by agent name after the Gantt chart.
-func PrintTokenSummary(rl *RunLog, intervals []AgentRunInterval) {  //nolint:deadcode
+func PrintTokenSummary(rl *RunLog, intervals []AgentRunInterval) { //nolint:deadcode
 	type agentSummary struct {
 		runs             int
 		inputTokens      int64
@@ -1237,7 +1237,7 @@ func FormatInt(n int64) string {
 
 // FileSHA256 computes the SHA-256 hex digest of the file at path.
 // Returns empty string if the file cannot be read.
-func FileSHA256(path string) string {  //nolint:deadcode
+func FileSHA256(path string) string { //nolint:deadcode
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
@@ -1249,7 +1249,7 @@ func FileSHA256(path string) string {  //nolint:deadcode
 // GitCommitHash returns the full commit hash of the last commit that touched
 // the given file.  Returns empty string if git is unavailable, not a repo, or
 // the file has no commits.
-func GitCommitHash(filePath string) string {  //nolint:deadcode
+func GitCommitHash(filePath string) string { //nolint:deadcode
 	dir := filepath.Dir(filePath)
 	cmd := exec.Command("git", "log", "-1", "--format=%H", "--", filepath.Base(filePath))
 	cmd.Dir = dir
@@ -1265,7 +1265,7 @@ func GitCommitHash(filePath string) string {  //nolint:deadcode
 // other configuration that affects test behavior.
 //
 // The returned map may be empty if no tracked variables are set.
-func captureEnvVars() map[string]string {  //nolint:deadcode
+func captureEnvVars() map[string]string { //nolint:deadcode
 	// List of environment variables to capture.
 	// Add any variable you want to see in runlog output here.
 	trackedVars := []string{

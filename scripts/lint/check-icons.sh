@@ -28,14 +28,18 @@ done
 # Full list: https://lucide.dev/icons
 KNOWN_ICONS=(
   layout-dashboard flask-conical play square-play-circle
-  check x circle alert-triangle alert-circle
+  check x circle alert-triangle alert-circle circle-check
   info settings user users search filter
-  arrow-left arrow-right arrow-up arrow-down chevron-left chevron-right
-  plus minus more-horizontal more-vertical ellipsis-vertical edit trash
+  arrow-left arrow-right arrow-up arrow-down chevron-left chevron-right chevron-up chevron-down
+  plus minus more-horizontal more-vertical ellipsis-vertical edit trash trash-2
   external-link link copy clipboard clock
   refresh loader spinner download upload
   home menu sidebar book file file-text text list
   code terminal github twitter shield layers
+  sun moon monitor-dot panel-left-close folder
+  paperclip image-plus mic cpu zap
+  pencil eye building-2 bot
+  thumbs-up thumbs-down send-horizontal briefcase lock
 )
 
 if $STAGED_ONLY; then
@@ -61,17 +65,18 @@ fi
 FOUND=""
 while IFS= read -r file; do
   while IFS= read -r match; do
-    icon=$(echo "$match" | grep -oP 'lucide--\K[a-zA-Z0-9_-]+' || true)
-    [ -z "$icon" ] && continue
-    known=false
-    for k in "${KNOWN_ICONS[@]}"; do
-      [[ "$icon" == "$k" ]] && known=true && break
-    done
-    if ! $known; then
-      rel="${file#$REPO/}"
-      lineno=$(echo "$match" | cut -d: -f1)
-      FOUND="${FOUND}  ${rel}:${lineno} — unknown icon: ${icon}"$'\n'
-    fi
+    lineno=$(echo "$match" | cut -d: -f1)
+    while IFS= read -r icon; do
+      [ -z "$icon" ] && continue
+      known=false
+      for k in "${KNOWN_ICONS[@]}"; do
+        [[ "$icon" == "$k" ]] && known=true && break
+      done
+      if ! $known; then
+        rel="${file#$REPO/}"
+        FOUND="${FOUND}  ${rel}:${lineno} — unknown icon: ${icon}"$'\n'
+      fi
+    done < <(echo "$match" | grep -oP 'lucide--\K[a-zA-Z0-9_-]+' || true)
   done < <(grep -n 'lucide--' "$file" 2>/dev/null || true)
 done <<< "$SOURCES"
 

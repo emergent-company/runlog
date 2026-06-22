@@ -29,7 +29,7 @@ type CLIResult struct {
 // newCLIResult constructs a CLIResult from a command's combined output and error.
 // If combinedOutput is true, both stdout and stderr are in the stdout field
 // (matching the current MustRunBinaryInDirWithHome which uses CombinedOutput).
-func newCLIResult(rl *RunLog, stdout, stderr string, exitCode int, err error) *CLIResult {  //nolint:deadcode
+func newCLIResult(rl *RunLog, stdout, stderr string, exitCode int, err error) *CLIResult { //nolint:deadcode
 	return &CLIResult{
 		rl:       rl,
 		stdout:   stdout,
@@ -41,7 +41,7 @@ func newCLIResult(rl *RunLog, stdout, stderr string, exitCode int, err error) *C
 
 // newCLIResultFromCombined constructs a CLIResult from combined output (stdout+stderr
 // merged) and the command error.
-func newCLIResultFromCombined(rl *RunLog, combined string, err error) *CLIResult {  //nolint:deadcode
+func newCLIResultFromCombined(rl *RunLog, combined string, err error) *CLIResult { //nolint:deadcode
 	code := 0
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
@@ -61,7 +61,7 @@ func newCLIResultFromCombined(rl *RunLog, combined string, err error) *CLIResult
 
 // Contains asserts that stdout contains ALL of the given substrings.
 // The first missing substring triggers rl.Failf.
-func (r *CLIResult) Contains(substrs ...string) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) Contains(substrs ...string) *CLIResult { //nolint:deadcode
 	for _, sub := range substrs {
 		if strings.Contains(r.stdout, sub) {
 			r.rl.Printf("assert: output contains %q ✓", sub)
@@ -73,7 +73,7 @@ func (r *CLIResult) Contains(substrs ...string) *CLIResult {  //nolint:deadcode
 }
 
 // ContainsAny asserts that stdout contains at least one of the given substrings.
-func (r *CLIResult) ContainsAny(substrs ...string) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) ContainsAny(substrs ...string) *CLIResult { //nolint:deadcode
 	for _, sub := range substrs {
 		if strings.Contains(r.stdout, sub) {
 			r.rl.Printf("assert: output contains one of %v ✓ (matched %q)", substrs, sub)
@@ -85,7 +85,7 @@ func (r *CLIResult) ContainsAny(substrs ...string) *CLIResult {  //nolint:deadco
 }
 
 // NotContains asserts that stdout does NOT contain any of the given substrings.
-func (r *CLIResult) NotContains(substrs ...string) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) NotContains(substrs ...string) *CLIResult { //nolint:deadcode
 	for _, sub := range substrs {
 		if strings.Contains(r.stdout, sub) {
 			r.rl.Failf("assert: output should not contain %q but does\noutput:\n%s", sub, Truncate(r.stdout, 500))
@@ -96,7 +96,7 @@ func (r *CLIResult) NotContains(substrs ...string) *CLIResult {  //nolint:deadco
 }
 
 // Matches asserts that stdout matches the given regexp pattern.
-func (r *CLIResult) Matches(pattern string) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) Matches(pattern string) *CLIResult { //nolint:deadcode
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		r.rl.Failf("assert: invalid regex %q: %v", pattern, err)
@@ -111,7 +111,7 @@ func (r *CLIResult) Matches(pattern string) *CLIResult {  //nolint:deadcode
 }
 
 // Empty asserts that stdout is empty or whitespace-only.
-func (r *CLIResult) Empty() *CLIResult {  //nolint:deadcode
+func (r *CLIResult) Empty() *CLIResult { //nolint:deadcode
 	if strings.TrimSpace(r.stdout) == "" {
 		r.rl.Printf("assert: output is empty ✓")
 	} else {
@@ -122,7 +122,7 @@ func (r *CLIResult) Empty() *CLIResult {  //nolint:deadcode
 
 // ParseID extracts a UUID (36-char, 4 hyphens) from stdout and stores it in *dst.
 // If no UUID is found, rl.Failf is called.
-func (r *CLIResult) ParseID(dst *string) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) ParseID(dst *string) *CLIResult { //nolint:deadcode
 	// UUID regex: 8-4-4-4-12 hex digits.
 	re := regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
 	match := re.FindString(r.stdout)
@@ -136,7 +136,7 @@ func (r *CLIResult) ParseID(dst *string) *CLIResult {  //nolint:deadcode
 }
 
 // JSONField parses stdout as JSON and extracts the named top-level field into *dst.
-func (r *CLIResult) JSONField(field string, dst *string) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) JSONField(field string, dst *string) *CLIResult { //nolint:deadcode
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(r.stdout), &m); err != nil {
 		r.rl.Failf("assert: cannot parse output as JSON: %v\noutput:\n%s", err, Truncate(r.stdout, 500))
@@ -159,7 +159,7 @@ func (r *CLIResult) JSONField(field string, dst *string) *CLIResult {  //nolint:
 }
 
 // JSON unmarshals the full stdout into dst.
-func (r *CLIResult) JSON(dst any) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) JSON(dst any) *CLIResult { //nolint:deadcode
 	if err := json.Unmarshal([]byte(r.stdout), dst); err != nil {
 		r.rl.Failf("assert: cannot unmarshal output as JSON: %v\noutput:\n%s", err, Truncate(r.stdout, 500))
 	} else {
@@ -169,7 +169,7 @@ func (r *CLIResult) JSON(dst any) *CLIResult {  //nolint:deadcode
 }
 
 // ExitCode asserts that the command exited with the expected code.
-func (r *CLIResult) ExitCode(expected int) *CLIResult {  //nolint:deadcode
+func (r *CLIResult) ExitCode(expected int) *CLIResult { //nolint:deadcode
 	if r.exitCode == expected {
 		r.rl.Printf("assert: exit code %d ✓", expected)
 	} else {
@@ -179,14 +179,14 @@ func (r *CLIResult) ExitCode(expected int) *CLIResult {  //nolint:deadcode
 }
 
 // Output returns the raw stdout string.
-func (r *CLIResult) Output() string {  //nolint:deadcode
+func (r *CLIResult) Output() string { //nolint:deadcode
 	return r.stdout
 }
 
 // StderrOutput returns the raw stderr string.  When combined output mode was
 // used (the default for CLI steps), stderr is interleaved in Output() and
 // this returns an empty string.
-func (r *CLIResult) StderrOutput() string {  //nolint:deadcode
+func (r *CLIResult) StderrOutput() string { //nolint:deadcode
 	return r.stderr
 }
 
@@ -204,7 +204,7 @@ type HTTPResult struct {
 }
 
 // newHTTPResult constructs an HTTPResult.
-func newHTTPResult(rl *RunLog, statusCode int, body string, headers map[string][]string) *HTTPResult {  //nolint:deadcode
+func newHTTPResult(rl *RunLog, statusCode int, body string, headers map[string][]string) *HTTPResult { //nolint:deadcode
 	return &HTTPResult{
 		rl:         rl,
 		statusCode: statusCode,
@@ -214,7 +214,7 @@ func newHTTPResult(rl *RunLog, statusCode int, body string, headers map[string][
 }
 
 // Status asserts the response status code matches expected.
-func (r *HTTPResult) Status(expected int) *HTTPResult {  //nolint:deadcode
+func (r *HTTPResult) Status(expected int) *HTTPResult { //nolint:deadcode
 	if r.statusCode == expected {
 		r.rl.Printf("assert: HTTP status %d ✓", expected)
 	} else {
@@ -224,7 +224,7 @@ func (r *HTTPResult) Status(expected int) *HTTPResult {  //nolint:deadcode
 }
 
 // JSONField parses the response body as JSON and extracts a top-level field into *dst.
-func (r *HTTPResult) JSONField(field string, dst *string) *HTTPResult {  //nolint:deadcode
+func (r *HTTPResult) JSONField(field string, dst *string) *HTTPResult { //nolint:deadcode
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(r.body), &m); err != nil {
 		r.rl.Failf("assert: cannot parse response body as JSON: %v\nbody:\n%s", err, Truncate(r.body, 500))
@@ -246,7 +246,7 @@ func (r *HTTPResult) JSONField(field string, dst *string) *HTTPResult {  //nolin
 }
 
 // JSONContains asserts that a top-level JSON field in the response body equals expected.
-func (r *HTTPResult) JSONContains(field, expected string) *HTTPResult {  //nolint:deadcode
+func (r *HTTPResult) JSONContains(field, expected string) *HTTPResult { //nolint:deadcode
 	var got string
 	r.JSONField(field, &got)
 	// JSONField already called Failf if parsing failed; if we get here, check value.
@@ -259,7 +259,7 @@ func (r *HTTPResult) JSONContains(field, expected string) *HTTPResult {  //nolin
 }
 
 // BodyContains asserts that the response body contains the given substring.
-func (r *HTTPResult) BodyContains(substr string) *HTTPResult {  //nolint:deadcode
+func (r *HTTPResult) BodyContains(substr string) *HTTPResult { //nolint:deadcode
 	if strings.Contains(r.body, substr) {
 		r.rl.Printf("assert: HTTP body contains %q ✓", substr)
 	} else {
@@ -269,7 +269,7 @@ func (r *HTTPResult) BodyContains(substr string) *HTTPResult {  //nolint:deadcod
 }
 
 // JSON unmarshals the full response body into dst.
-func (r *HTTPResult) JSON(dst any) *HTTPResult {  //nolint:deadcode
+func (r *HTTPResult) JSON(dst any) *HTTPResult { //nolint:deadcode
 	if err := json.Unmarshal([]byte(r.body), dst); err != nil {
 		r.rl.Failf("assert: cannot unmarshal response body as JSON: %v\nbody:\n%s", err, Truncate(r.body, 500))
 	} else {
@@ -279,12 +279,12 @@ func (r *HTTPResult) JSON(dst any) *HTTPResult {  //nolint:deadcode
 }
 
 // Body returns the raw response body string.
-func (r *HTTPResult) Body() string {  //nolint:deadcode
+func (r *HTTPResult) Body() string { //nolint:deadcode
 	return r.body
 }
 
 // Header returns the first value for the named response header, or "" if absent.
-func (r *HTTPResult) Header(name string) string {  //nolint:deadcode
+func (r *HTTPResult) Header(name string) string { //nolint:deadcode
 	vals := r.headers[name]
 	if len(vals) > 0 {
 		return vals[0]
@@ -300,7 +300,7 @@ func (r *HTTPResult) Header(name string) string {  //nolint:deadcode
 }
 
 // StatusCode returns the raw HTTP status code.
-func (r *HTTPResult) StatusCode() int {  //nolint:deadcode
+func (r *HTTPResult) StatusCode() int { //nolint:deadcode
 	return r.statusCode
 }
 
@@ -309,6 +309,6 @@ func (r *HTTPResult) StatusCode() int {  //nolint:deadcode
 // ─────────────────────────────────────────────────────────────────────────────
 
 // formatInvocation builds a human-readable CLI invocation string.
-func formatInvocation(binary string, args []string) string {  //nolint:deadcode
+func formatInvocation(binary string, args []string) string { //nolint:deadcode
 	return fmt.Sprintf("%s %s", binary, strings.Join(args, " "))
 }

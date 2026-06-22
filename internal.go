@@ -10,11 +10,11 @@ import (
 )
 
 // cancelCtx is a convenience wrapper around context.WithTimeout.
-func cancelCtx(d time.Duration) (context.Context, context.CancelFunc) {  //nolint:deadcode
+func cancelCtx(d time.Duration) (context.Context, context.CancelFunc) { //nolint:deadcode
 	return context.WithTimeout(context.Background(), d)
 }
 
 // hasPrefix is strings.HasPrefix re-exported for internal use in server.go.
-func hasPrefix(s, prefix string) bool {  //nolint:deadcode
+func hasPrefix(s, prefix string) bool { //nolint:deadcode
 	return strings.HasPrefix(s, prefix)
 }

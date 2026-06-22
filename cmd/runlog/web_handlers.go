@@ -630,7 +630,7 @@ func (app *WebApp) handleExperimentDetail(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusNotFound, "experiment not found")
 }
 
-func (app *WebApp) handleLaunchFromList(c echo.Context) error {  //nolint:deadcode
+func (app *WebApp) handleLaunchFromList(c echo.Context) error { //nolint:deadcode
 	return app.handleLaunchTest(c)
 }
 

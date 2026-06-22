@@ -13,7 +13,7 @@ import (
 )
 
 // captureStdout runs fn and returns everything written to stdout.
-func captureStdout(t *testing.T, fn func() error) string {  //nolint:deadcode
+func captureStdout(t *testing.T, fn func() error) string { //nolint:deadcode
 	t.Helper()
 	old := os.Stdout
 	r, w, _ := os.Pipe()
@@ -32,7 +32,7 @@ func captureStdout(t *testing.T, fn func() error) string {  //nolint:deadcode
 }
 
 // captureStdoutErr runs fn and returns everything written to stdout + stderr.
-func captureStdoutErr(t *testing.T, fn func() error) string {  //nolint:deadcode
+func captureStdoutErr(t *testing.T, fn func() error) string { //nolint:deadcode
 	t.Helper()
 	oldOut := os.Stdout
 	oldErr := os.Stderr
@@ -54,7 +54,7 @@ func captureStdoutErr(t *testing.T, fn func() error) string {  //nolint:deadcode
 }
 
 // captureStderr runs fn and returns everything written to stderr.
-func captureStderr(t *testing.T, fn func() error) string {  //nolint:deadcode
+func captureStderr(t *testing.T, fn func() error) string { //nolint:deadcode
 	t.Helper()
 	old := os.Stderr
 	r, w, _ := os.Pipe()

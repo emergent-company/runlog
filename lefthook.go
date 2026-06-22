@@ -139,7 +139,7 @@ func countIndent(line string) int {
 
 // MergeLinters merges config linters with lefthook-discovered linters.
 // Config linters take precedence (override same-name lefthook linters).
-func MergeLinters(cfg []LinterDef, lefthook []LinterDef) []LinterDef {  //nolint:deadcode
+func MergeLinters(cfg []LinterDef, lefthook []LinterDef) []LinterDef { //nolint:deadcode
 	seen := make(map[string]bool, len(cfg))
 	for _, l := range cfg {
 		seen[l.Name] = true

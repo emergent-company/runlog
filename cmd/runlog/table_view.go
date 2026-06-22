@@ -15,7 +15,7 @@ const DefaultPageSize = 50
 type FilterType int
 
 const (
-	FilterSelect   FilterType = iota
+	FilterSelect FilterType = iota
 	FilterText
 	FilterCheckbox
 	FilterStatus
@@ -60,22 +60,22 @@ type RowClickFunc func(row any) string
 
 // TableConfig is the complete configuration for a TableView component.
 type TableConfig struct {
-	Title     string
-	HXGet     string
-	HXTarget  string
-	TargetID  string
-	EmptyMsg  string
-	Filters   []FilterConfig
-	Columns   []ColumnConfig
-	Rows      []any
-	Total     int
-	Offset    int
-	PageSize  int
-	RowClick  RowClickFunc
+	Title    string
+	HXGet    string
+	HXTarget string
+	TargetID string
+	EmptyMsg string
+	Filters  []FilterConfig
+	Columns  []ColumnConfig
+	Rows     []any
+	Total    int
+	Offset   int
+	PageSize int
+	RowClick RowClickFunc
 }
 
 // filterBarHXTrigger builds the hx-trigger attribute for the filter form.
-func filterBarHXTrigger(filters []FilterConfig) string {  //nolint:deadcode
+func filterBarHXTrigger(filters []FilterConfig) string { //nolint:deadcode
 	var parts []string
 	hasSelect := false
 	hasText := false
@@ -97,7 +97,7 @@ func filterBarHXTrigger(filters []FilterConfig) string {  //nolint:deadcode
 }
 
 // loadMoreURL builds the URL for the Load More button including all filter params.
-func loadMoreURL(base string, offset int, filters []FilterConfig) string {  //nolint:deadcode
+func loadMoreURL(base string, offset int, filters []FilterConfig) string { //nolint:deadcode
 	vals := url.Values{}
 	vals.Set("offset", fmt.Sprintf("%d", offset))
 	for _, f := range filters {
@@ -109,7 +109,7 @@ func loadMoreURL(base string, offset int, filters []FilterConfig) string {  //no
 }
 
 // statusOptions returns the standard set of filter options for test run status.
-func statusOptions() []FilterOption {  //nolint:deadcode
+func statusOptions() []FilterOption { //nolint:deadcode
 	return []FilterOption{
 		{Value: "pass", Label: "Pass"},
 		{Value: "fail", Label: "Fail"},

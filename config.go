@@ -9,7 +9,6 @@ import (
 	"strings"
 )
 
-
 // LinterDef defines a single linter that can be run from the UI.
 type LinterDef struct {
 	Name    string `yaml:"name"`
@@ -300,5 +299,3 @@ func (c *Config) DaemonPortOrDefault() int {
 	}
 	return 7430
 }
-
-

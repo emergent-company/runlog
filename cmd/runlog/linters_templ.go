@@ -990,7 +990,7 @@ func linterRunsTable(runs []runlog.LinterRow) templ.Component {
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = table.TableCell("font-mono", nil).Render(templ.WithChildren(ctx, templ_7745c5c3_Var39), templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = table.TableCell("font-mono text-right", nil).Render(templ.WithChildren(ctx, templ_7745c5c3_Var39), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1024,7 +1024,7 @@ func linterRunsTable(runs []runlog.LinterRow) templ.Component {
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = table.TableCell("", nil).Render(templ.WithChildren(ctx, templ_7745c5c3_Var42), templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = table.TableCell("text-right", nil).Render(templ.WithChildren(ctx, templ_7745c5c3_Var42), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

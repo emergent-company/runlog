@@ -1885,7 +1885,7 @@ func (rdb *RunDB) ListLinterRunHistory(name string, offset, limit int) ([]Linter
 //  1. $TEST_RUNNER env var (e.g. "docker", "ci")
 //  2. "docker" if running inside Docker (CI=true && /test-logs exists)
 //  3. "host"
-func Runner() string {  //nolint:deadcode
+func Runner() string { //nolint:deadcode
 	if r := os.Getenv("TEST_RUNNER"); r != "" {
 		return r
 	}
@@ -1912,7 +1912,7 @@ var (
 // resetSharedDB resets the singleton so the next SharedDB() call re-opens the
 // DB.  Only intended for use in tests that need to redirect the DB path via
 // TEST_RUNS_DB between calls.
-func resetSharedDB() {  //nolint:deadcode
+func resetSharedDB() { //nolint:deadcode
 	globalDBMu.Lock()
 	defer globalDBMu.Unlock()
 	if globalDB != nil {
@@ -1931,7 +1931,7 @@ func resetSharedDB() {  //nolint:deadcode
 //
 // If the DB cannot be opened, a nil handle is returned and the error is
 // stored; subsequent calls return the same nil + error.
-func SharedDB() (*RunDB, error) {  //nolint:deadcode
+func SharedDB() (*RunDB, error) { //nolint:deadcode
 	globalDBOnce.Do(func() {
 		path := dbPath()
 		globalDB, globalDBErr = OpenDB(path)
@@ -1950,7 +1950,7 @@ func SharedDB() (*RunDB, error) {  //nolint:deadcode
 // NOTE: TEST_LOG_DIR is intentionally NOT consulted here.  Flat log files
 // (run.log, session-*.log) live under TEST_LOG_DIR, but the DB is always
 // at the project root so Docker and host runs share a single database.
-func dbPath() string {  //nolint:deadcode
+func dbPath() string { //nolint:deadcode
 	if d := os.Getenv("TEST_RUNS_DB"); d != "" {
 		return d
 	}

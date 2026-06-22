@@ -23,7 +23,7 @@ const (
 
 // MustRunCLI runs `memory <args>` from the current directory and fails the
 // test if the command exits non-zero.  Returns combined stdout+stderr.
-func MustRunCLI(t *testing.T, args ...string) string {  //nolint:deadcode
+func MustRunCLI(t *testing.T, args ...string) string { //nolint:deadcode
 	t.Helper()
 	return MustRunCLIInDir(t, "", args...)
 }
@@ -31,7 +31,7 @@ func MustRunCLI(t *testing.T, args ...string) string {  //nolint:deadcode
 // MustRunCLIInDir runs `memory <args>` from dir (empty = inherit) with a
 // per-test isolated HOME directory derived from t.TempDir().
 // It fails the test if the command exits non-zero and logs all output.
-func MustRunCLIInDir(t *testing.T, dir string, args ...string) string {  //nolint:deadcode
+func MustRunCLIInDir(t *testing.T, dir string, args ...string) string { //nolint:deadcode
 	t.Helper()
 	return MustRunCLIInDirWithHome(t, dir, t.TempDir(), args...)
 }
@@ -39,14 +39,14 @@ func MustRunCLIInDir(t *testing.T, dir string, args ...string) string {  //nolin
 // MustRunCLIInDirWithHome runs `memory <args>` from dir with the given home
 // directory injected as HOME in the subprocess environment.
 // Use this when you need to inspect the credentials written to a specific home.
-func MustRunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) string {  //nolint:deadcode
+func MustRunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) string { //nolint:deadcode
 	t.Helper()
 	return MustRunBinaryInDirWithHome(t, "memory", dir, home, args...)
 }
 
 // RunCLIInDirWithHome is like MustRunCLIInDirWithHome but returns an error
 // instead of failing the test — used for polling where transient failures are OK.
-func RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string, error) {  //nolint:deadcode
+func RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string, error) { //nolint:deadcode
 	t.Helper()
 	return RunBinaryInDirWithHome(t, "memory", dir, home, args...)
 }
@@ -59,7 +59,7 @@ func RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string
 // home directory injected as HOME in the subprocess environment.
 // It fails the test if the command exits non-zero.  Returns combined stdout+stderr.
 // This is the generic form of MustRunCLIInDirWithHome — pass any binary name.
-func MustRunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...string) string {  //nolint:deadcode
+func MustRunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...string) string { //nolint:deadcode
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), CLITimeout)
@@ -93,7 +93,7 @@ func MustRunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...
 // RunBinaryInDirWithHome is like MustRunBinaryInDirWithHome but returns an
 // error instead of failing the test — used when non-zero exit is expected or
 // for polling where transient failures are OK.
-func RunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...string) (string, error) {  //nolint:deadcode
+func RunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...string) (string, error) { //nolint:deadcode
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), CLITimeout)
@@ -133,7 +133,7 @@ func RunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...stri
 //	  with 401 missing_token.
 //
 // Call this once per test after creating the isolated home with t.TempDir().
-func SetupCLIAuth(t *testing.T, home string) {  //nolint:deadcode
+func SetupCLIAuth(t *testing.T, home string) { //nolint:deadcode
 	t.Helper()
 
 	srv := ServerURL()
@@ -162,7 +162,7 @@ func SetupCLIAuth(t *testing.T, home string) {  //nolint:deadcode
 //
 // home is an optional isolated HOME directory to inject.  Pass "" to use a
 // fresh TempDir (safe for tests that haven't set up their own home yet).
-func LogStatusPreamble(t *testing.T, home ...string) {  //nolint:deadcode
+func LogStatusPreamble(t *testing.T, home ...string) { //nolint:deadcode
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -197,7 +197,7 @@ func LogStatusPreamble(t *testing.T, home ...string) {  //nolint:deadcode
 //  1. TEST_LOG_DIR env var
 //  2. logs/ sibling to the calling source file
 //  3. /test-logs (fallback inside Docker)
-func logDir() string {  //nolint:deadcode
+func logDir() string { //nolint:deadcode
 	if d := os.Getenv("TEST_LOG_DIR"); d != "" {
 		return d
 	}
@@ -214,7 +214,7 @@ func logDir() string {  //nolint:deadcode
 // LogSession writes a structured log of the CLI invocation and its output to
 // the session log directory. It is a best-effort operation; failures are
 // logged via t.Log but do not fail the test.
-func LogSession(t *testing.T, invocation, output string) {  //nolint:deadcode
+func LogSession(t *testing.T, invocation, output string) { //nolint:deadcode
 	t.Helper()
 
 	d := logDir()

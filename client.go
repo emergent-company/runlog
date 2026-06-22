@@ -17,7 +17,7 @@ import (
 // Tokens with an "emt_" prefix are project-scoped API tokens sent as
 // "Authorization: Bearer". All other values are standalone API keys sent
 // as "X-API-Key".
-func SetAuthHeader(req *http.Request, token string) {  //nolint:deadcode
+func SetAuthHeader(req *http.Request, token string) { //nolint:deadcode
 	if strings.HasPrefix(token, "emt_") {
 		req.Header.Set("Authorization", "Bearer "+token)
 	} else {
@@ -27,7 +27,7 @@ func SetAuthHeader(req *http.Request, token string) {  //nolint:deadcode
 
 // DoJSON performs an HTTP request with JSON body and the correct auth header.
 // An optional X-Project-ID header is set when projectID is non-empty.
-func DoJSON(t *testing.T, method, url, token, projectID string, body []byte) *http.Response {  //nolint:deadcode
+func DoJSON(t *testing.T, method, url, token, projectID string, body []byte) *http.Response { //nolint:deadcode
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	// Note: cancel is intentionally not deferred here so the caller can read the body.
@@ -51,7 +51,7 @@ func DoJSON(t *testing.T, method, url, token, projectID string, body []byte) *ht
 }
 
 // ReadBody reads and closes the response body, returning it as a string.
-func ReadBody(t *testing.T, resp *http.Response) string {  //nolint:deadcode
+func ReadBody(t *testing.T, resp *http.Response) string { //nolint:deadcode
 	t.Helper()
 	defer resp.Body.Close()
 	b, err := io.ReadAll(resp.Body)
@@ -63,7 +63,7 @@ func ReadBody(t *testing.T, resp *http.Response) string {  //nolint:deadcode
 
 // DoMCPJSON performs an HTTP POST to the MCP RPC endpoint with the correct
 // MCP protocol headers. sessionID may be empty for the initialize call.
-func DoMCPJSON(t *testing.T, url, token, projectID, sessionID, protocolVersion string, body []byte) *http.Response {  //nolint:deadcode
+func DoMCPJSON(t *testing.T, url, token, projectID, sessionID, protocolVersion string, body []byte) *http.Response { //nolint:deadcode
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	_ = cancel
@@ -91,7 +91,7 @@ func DoMCPJSON(t *testing.T, url, token, projectID, sessionID, protocolVersion s
 }
 
 // Truncate returns s truncated to at most n runes with "…" appended if trimmed.
-func Truncate(s string, n int) string {  //nolint:deadcode
+func Truncate(s string, n int) string { //nolint:deadcode
 	runes := []rune(s)
 	if len(runes) <= n {
 		return s

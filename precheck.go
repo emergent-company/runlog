@@ -44,7 +44,7 @@ import (
 //	    framework.RequireServerReady(t, home)
 //	    // home is now fully authenticated; use mustRunCLIInDirWithHome(t, "", home, ...)
 //	}
-func RequireServerReady(t *testing.T, home string, rl ...*RunLog) {  //nolint:deadcode
+func RequireServerReady(t *testing.T, home string, rl ...*RunLog) { //nolint:deadcode
 	t.Helper()
 	var runlog *RunLog
 	if len(rl) > 0 {
@@ -57,7 +57,7 @@ func RequireServerReady(t *testing.T, home string, rl ...*RunLog) {  //nolint:de
 
 // checkHealth verifies the server /health endpoint is reachable and returns
 // status "healthy".  Skips (not fails) the test on any problem.
-func checkHealth(t *testing.T, rl *RunLog) {  //nolint:deadcode
+func checkHealth(t *testing.T, rl *RunLog) { //nolint:deadcode
 	t.Helper()
 
 	srv := ServerURL()
@@ -101,7 +101,7 @@ func checkHealth(t *testing.T, rl *RunLog) {  //nolint:deadcode
 // It hits GET /api/projects with the Bearer token (account mode) or X-API-Key
 // (standalone mode).  A 2xx response means auth works.  Any 401/403 causes the
 // test to be skipped with an actionable message.
-func checkAuth(t *testing.T, home string, rl *RunLog) {  //nolint:deadcode
+func checkAuth(t *testing.T, home string, rl *RunLog) { //nolint:deadcode
 	t.Helper()
 
 	srv := ServerURL()
@@ -152,7 +152,7 @@ func checkAuth(t *testing.T, home string, rl *RunLog) {  //nolint:deadcode
 //
 // account mode  → (Bearer <token>, "")
 // standalone    → ("", <api_key>)
-func authHeadersForHome(t *testing.T, home string) (authorizationHeader, xAPIKey string) {  //nolint:deadcode
+func authHeadersForHome(t *testing.T, home string) (authorizationHeader, xAPIKey string) { //nolint:deadcode
 	t.Helper()
 
 	if AuthMode() == "account" {

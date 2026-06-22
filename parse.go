@@ -12,7 +12,7 @@ import (
 // The CLI prints the project name with its ID in parentheses, e.g.:
 //
 //	Created project "my-project" (a1b2c3d4-…)
-func ParseProjectID(output string) string {  //nolint:deadcode
+func ParseProjectID(output string) string { //nolint:deadcode
 	for _, line := range strings.Split(output, "\n") {
 		if !strings.Contains(line, "(") {
 			continue
@@ -39,7 +39,7 @@ func ParseProjectID(output string) string {  //nolint:deadcode
 // Returns the first model name found, or "" if none is present.
 // When a test overrides all agents to the same model, this returns that model.
 // Used to tag test runs with the actual model in use rather than a hardcoded constant.
-func ParseAgentDefsModel(output string) string {  //nolint:deadcode
+func ParseAgentDefsModel(output string) string { //nolint:deadcode
 	for _, line := range strings.Split(output, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "Model:") {
@@ -54,7 +54,7 @@ func ParseAgentDefsModel(output string) string {  //nolint:deadcode
 
 // ParseAgentID extracts a UUID from `memory agents create` output.
 // Format:   ID:   <uuid>
-func ParseAgentID(output string) string {  //nolint:deadcode
+func ParseAgentID(output string) string { //nolint:deadcode
 	for _, line := range strings.Split(output, "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "ID:") {
@@ -68,7 +68,7 @@ func ParseAgentID(output string) string {  //nolint:deadcode
 }
 
 // ParseJSONField extracts a top-level string field from a JSON object string.
-func ParseJSONField(jsonStr, field string) string {  //nolint:deadcode
+func ParseJSONField(jsonStr, field string) string { //nolint:deadcode
 	var obj map[string]any
 	if err := json.Unmarshal([]byte(strings.TrimSpace(jsonStr)), &obj); err != nil {
 		return ""
@@ -84,7 +84,7 @@ func ParseJSONField(jsonStr, field string) string {  //nolint:deadcode
 //
 //	Found 2 run(s):
 //
-//	1. Run c0f5e9d1-4020-423f-a2e7-de239a1de5ef
+//	1. Run c0f5e9d1-4020-423f-a2e7-de239a1de5ef //nolint:hardcoded-uuid
 //	   Status:    success
 //	   Started:   2026-03-10 11:06:27
 //	   Completed: 2026-03-10 11:06:30
@@ -95,7 +95,7 @@ func ParseJSONField(jsonStr, field string) string {  //nolint:deadcode
 //	run 1: c0f5e9d1 status=success started=11:06:27 completed=11:06:30 dur=3496ms
 //
 // Returns "(no runs)" when the output is empty or contains no run blocks.
-func CompactRunsOutput(runsOut string) string {  //nolint:deadcode
+func CompactRunsOutput(runsOut string) string { //nolint:deadcode
 	type runEntry struct {
 		num       string
 		id        string
@@ -207,7 +207,7 @@ func CompactRunsOutput(runsOut string) string {  //nolint:deadcode
 // AllRunsTerminal returns true when runsOut contains at least one run and every
 // run is in a terminal status (success, error, failed, skipped).
 // Used in poll loops to detect a stuck state.
-func AllRunsTerminal(runsOut string) bool {  //nolint:deadcode
+func AllRunsTerminal(runsOut string) bool { //nolint:deadcode
 	terminalStatuses := map[string]bool{
 		"success": true,
 		"error":   true,
@@ -232,7 +232,7 @@ func AllRunsTerminal(runsOut string) bool {  //nolint:deadcode
 // ParseFrontmatterFields extracts the `name:` and `description:` values from
 // a SKILL.md YAML frontmatter block.  It intentionally avoids importing a YAML
 // library so the test module stays dependency-free.
-func ParseFrontmatterFields(content string) (name, description string) {  //nolint:deadcode
+func ParseFrontmatterFields(content string) (name, description string) { //nolint:deadcode
 	const delim = "---"
 	first := strings.Index(content, delim)
 	if first < 0 {
@@ -263,7 +263,7 @@ func ParseFrontmatterFields(content string) (name, description string) {  //noli
 // PrettyJSONOutput detects whether output is JSON (object or array), and if so
 // re-indents it and removes the noisy "content_hash" field before returning.
 // Non-JSON output is returned unchanged.
-func PrettyJSONOutput(output string) string {  //nolint:deadcode
+func PrettyJSONOutput(output string) string { //nolint:deadcode
 	trimmed := strings.TrimSpace(output)
 	if len(trimmed) == 0 {
 		return output
@@ -285,7 +285,7 @@ func PrettyJSONOutput(output string) string {  //nolint:deadcode
 
 // removeContentHash recursively removes "content_hash" keys from maps decoded
 // from JSON. The field contains raw binary bytes that render as garbage.
-func removeContentHash(v any) {  //nolint:deadcode
+func removeContentHash(v any) { //nolint:deadcode
 	switch val := v.(type) {
 	case map[string]any:
 		delete(val, "content_hash")
@@ -304,7 +304,7 @@ func removeContentHash(v any) {  //nolint:deadcode
 // table output, e.g.:
 //
 //	"  ID:      abc123"  with key "ID:"  →  "abc123"
-func ParseLineField(s, key string) string {  //nolint:deadcode
+func ParseLineField(s, key string) string { //nolint:deadcode
 	for _, line := range strings.Split(s, "\n") {
 		idx := strings.Index(line, key)
 		if idx == -1 {
