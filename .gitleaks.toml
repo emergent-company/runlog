@@ -23,3 +23,11 @@ regexes     = ['''<[A-Z][A-Z0-9_]{2,}>''']
 [[allowlists]]
 description = "Gitignored secret files — contain real keys intentionally, never committed"
 paths       = ['''(^|[\\/])\.env$''', '''(^|[\\/])\.env\.local$''']
+
+[[allowlists]]
+description = "Vendored third-party code — Windows crypto API constants, not real secrets"
+paths       = ['''(^|[\\/])vendor[\\/]''']
+
+[[allowlists]]
+description = "Test fixture environment variable maps — contain sample keys for CI"
+paths       = ['''env_vars_test\.go$''', '''env_vars_integration_test\.go$''']

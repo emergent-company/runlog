@@ -53,6 +53,7 @@ templ LaunchButton(testName string) {
 	<button
 		type="button"
 		class="btn btn-primary btn-sm"
+		data-testid={ "launch-" + testName }
 		hx-post={ "/ui/launch/" + url.PathEscape(testName) }
 		hx-target="#launch-area"
 		hx-swap="innerHTML"

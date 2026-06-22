@@ -126,14 +126,14 @@ templ emptyState(message string) {
 
 // backButton renders a button that navigates back via HTMX.
 templ backButton(href string) {
-	<button class="btn btn-ghost btn-sm" hx-get={ href } hx-target="#main-content" hx-swap="innerHTML" hx-sync="#main-content:replace">← Back</button>
+	<button data-testid="back-btn" class="btn btn-ghost btn-sm" hx-get={ href } hx-target="#main-content" hx-swap="innerHTML" hx-sync="#main-content:replace">← Back</button>
 }
 
 // loadMoreButton renders a paginated "Load More" button for tables.
 // target is the CSS selector of the container to replace with the next page.
 templ loadMoreButton(url string, target string) {
 	<div class="mt-4 text-center">
-		<button class="btn btn-outline btn-sm" hx-get={ url } hx-target={ target } hx-swap="innerHTML">Load More</button>
+		<button data-testid="load-more-btn" class="btn btn-outline btn-sm" hx-get={ url } hx-target={ target } hx-swap="innerHTML">Load More</button>
 	</div>
 }
 
@@ -208,6 +208,7 @@ templ runsTable(runs []runlog.RunRow, opts runsTableOpts) {
 			for _, r := range runs {
 				<tr
 					id={ fmt.Sprintf("run-%d", r.ID) }
+					data-testid={ fmt.Sprintf("run-row-%d", r.ID) }
 					class="hover"
 					hx-get={ fmt.Sprintf("/ui/runs/%d", r.ID) }
 					hx-target="#main-content"

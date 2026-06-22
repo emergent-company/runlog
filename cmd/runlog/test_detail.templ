@@ -65,6 +65,7 @@ templ testDetailContent(data testDetailData) {
 					placeholder="Filter by tag..."
 					class="input input-bordered input-xs w-40"
 					name="tag"
+					data-testid="tag-filter"
 					hx-get={ fmt.Sprintf("/ui/tests/%s", url.PathEscape(data.TestName)) }
 					hx-target="#main-content"
 					hx-swap="innerHTML"
@@ -72,7 +73,6 @@ templ testDetailContent(data testDetailData) {
 					hx-trigger="keyup changed delay:500ms"
 					hx-include="this"
 					value={ data.TagFilter }
-					data-testid="tag-filter"
 				/>
 			</div>
 		</div>

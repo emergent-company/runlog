@@ -227,14 +227,14 @@ func testDetailContent(data testDetailData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " run(s)</p><div class=\"flex items-center gap-2\"><input type=\"text\" placeholder=\"Filter by tag...\" class=\"input input-bordered input-xs w-40\" name=\"tag\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " run(s)</p><div class=\"flex items-center gap-2\"><input type=\"text\" placeholder=\"Filter by tag...\" class=\"input input-bordered input-xs w-40\" name=\"tag\" data-testid=\"tag-filter\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/ui/tests/%s", url.PathEscape(data.TestName)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/test_detail.templ`, Line: 68, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/test_detail.templ`, Line: 69, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -247,13 +247,13 @@ func testDetailContent(data testDetailData) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.TagFilter)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/test_detail.templ`, Line: 74, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/test_detail.templ`, Line: 75, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" data-testid=\"tag-filter\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

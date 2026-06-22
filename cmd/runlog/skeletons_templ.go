@@ -481,7 +481,7 @@ func _skeletonTableRows(rows int, cols int) templ.Component {
 				}
 				ctx = templ.InitializeContext(ctx)
 				for i := 0; i < rows; i++ {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<tr><!-- lint:allow-raw -->")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<!-- lint:allow-raw --> <tr>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

@@ -42,7 +42,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"relative\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"relative\" style=\"border-radius:var(--radius-box);overflow:hidden\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -55,7 +55,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(tabs) == 1 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<pre class=\"text-xs\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<pre class=\"text-xs\" style=\"background-color:var(--shiki-bg,#0d1117);color:var(--shiki-punctuation,#c9d1d9);margin:0;padding:1rem;overflow-x:auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -71,7 +71,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var2).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 1, Col: 0}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -84,7 +84,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(tabs[0].Code)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 19, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 19, Col: 207}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -108,7 +108,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue("cp-" + tabs[0].Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 24, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 24, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 					if templ_7745c5c3_Err != nil {
@@ -121,7 +121,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(tab.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 24, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 24, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 					if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue("cp-" + tabs[0].Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 26, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 26, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 					if templ_7745c5c3_Err != nil {
@@ -152,7 +152,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(tab.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 26, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 26, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 					if templ_7745c5c3_Err != nil {
@@ -163,7 +163,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " <div class=\"tab-content overflow-x-auto\"><pre class=\"text-xs\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " <div class=\"tab-content overflow-x-auto\"><pre class=\"text-xs\" style=\"background-color:var(--shiki-bg,#0d1117);color:var(--shiki-punctuation,#c9d1d9);margin:0;padding:1rem;overflow-x:auto\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -179,7 +179,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var9).String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 1, Col: 0}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 1, Col: 0}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 				if templ_7745c5c3_Err != nil {
@@ -192,7 +192,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tab.Code)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `code-preview.templ`, Line: 29, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 29, Col: 202}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -208,7 +208,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" class=\"btn btn-ghost btn-xs absolute top-2 right-2 z-10 opacity-60 hover:opacity-100\" onclick=\"copyCode(this)\" aria-label=\"Copy to clipboard\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\" ry=\"2\"></rect><path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\"></path></svg></button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" data-testid=\"code-preview-copy\" style=\"position:absolute;top:0.25rem;right:0.5rem;z-index:10;opacity:0.6;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:var(--radius-field);cursor:pointer;color:inherit;background:transparent;border:none;padding:0\" onclick=\"copyCode(this)\" onmouseover=\"this.style.opacity='1'\" onmouseout=\"this.style.opacity='0.6'\" aria-label=\"Copy to clipboard\"><svg fill=\"currentColor\" style=\"width:1rem;height:1rem\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><path d=\"M 16 3 C 14.742188 3 13.847656 3.890625 13.40625 5 L 6 5 L 6 28 L 26 28 L 26 5 L 18.59375 5 C 18.152344 3.890625 17.257813 3 16 3 Z M 16 5 C 16.554688 5 17 5.445313 17 6 L 17 7 L 20 7 L 20 9 L 12 9 L 12 7 L 15 7 L 15 6 C 15 5.445313 15.445313 5 16 5 Z M 8 7 L 10 7 L 10 11 L 22 11 L 22 7 L 24 7 L 24 26 L 8 26 Z\"></path></svg></button></div><script>\n\t\t(function() {\n\t\t\tif (window._hljsLoaded) return;\n\t\t\twindow._hljsLoaded = true;\n\t\t\tfunction highlight() { if (typeof hljs !== 'undefined') hljs.highlightAll(); }\n\t\t\tif (typeof hljs !== 'undefined') { highlight(); return; }\n\t\t\tvar l = document.createElement('link');\n\t\t\tl.rel = 'stylesheet';\n\t\t\tl.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';\n\t\t\tdocument.head.appendChild(l);\n\t\t\tvar s = document.createElement('script');\n\t\t\ts.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';\n\t\t\ts.onload = highlight;\n\t\t\tdocument.head.appendChild(s);\n\t\t\tdocument.addEventListener('htmx:after:settle', function() {\n\t\t\t\tif (typeof hljs !== 'undefined') hljs.highlightAll();\n\t\t\t});\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

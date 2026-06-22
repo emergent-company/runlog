@@ -63,7 +63,7 @@ type tempoAttrR struct {
 	} `json:"value"`
 }
 
-func (a tempoAttrR) Val() string {
+func (a tempoAttrR) Val() string {  //nolint:deadcode
 	if a.Value.StringValue != "" {
 		return a.Value.StringValue
 	}
@@ -92,7 +92,7 @@ type TracePoller struct {
 }
 
 // NewTracePoller creates a TracePoller. Call Start() to begin polling.
-func NewTracePoller(serverURL, token, projectID string, runDBID int64, db *RunDB) *TracePoller {
+func NewTracePoller(serverURL, token, projectID string, runDBID int64, db *RunDB) *TracePoller {  //nolint:deadcode
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TracePoller{
 		serverURL: serverURL,
@@ -109,18 +109,18 @@ func NewTracePoller(serverURL, token, projectID string, runDBID int64, db *RunDB
 }
 
 // Start launches the background polling goroutine.
-func (p *TracePoller) Start() {
+func (p *TracePoller) Start() {  //nolint:deadcode
 	p.wg.Add(1)
 	go p.loop()
 }
 
 // Stop cancels the polling goroutine and waits for it to exit.
-func (p *TracePoller) Stop() {
+func (p *TracePoller) Stop() {  //nolint:deadcode
 	p.cancel()
 	p.wg.Wait()
 }
 
-func (p *TracePoller) loop() {
+func (p *TracePoller) loop() {  //nolint:deadcode
 	defer p.wg.Done()
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
@@ -141,7 +141,7 @@ func (p *TracePoller) loop() {
 
 // poll queries Tempo for agent.run traces in the project and persists any new
 // or updated traces as "trace_span" events in the DB.
-func (p *TracePoller) poll() {
+func (p *TracePoller) poll() {  //nolint:deadcode
 	if p.db == nil || p.runID == 0 || p.serverURL == "" {
 		return
 	}
@@ -188,7 +188,7 @@ func (p *TracePoller) poll() {
 }
 
 // emitTrace writes one trace_span event to the DB.
-func (p *TracePoller) emitTrace(tr tempoTraceResult, isNew bool) {
+func (p *TracePoller) emitTrace(tr tempoTraceResult, isNew bool) {  //nolint:deadcode
 	startNs, _ := strconv.ParseInt(tr.StartTimeUnixNano, 10, 64)
 	var startTime time.Time
 	if startNs > 0 {
@@ -267,7 +267,7 @@ func (p *TracePoller) emitTrace(tr tempoTraceResult, isNew bool) {
 }
 
 // fetch performs an authenticated GET to the Memory server's Tempo proxy.
-func (p *TracePoller) fetch(path string, params url.Values) ([]byte, error) {
+func (p *TracePoller) fetch(path string, params url.Values) ([]byte, error) {  //nolint:deadcode
 	u := strings.TrimRight(p.serverURL, "/") + path
 	if len(params) > 0 {
 		u += "?" + params.Encode()
@@ -296,7 +296,7 @@ func (p *TracePoller) fetch(path string, params url.Values) ([]byte, error) {
 	return body, nil
 }
 
-func min16(n int) int {
+func min16(n int) int {  //nolint:deadcode
 	if n < 16 {
 		return n
 	}

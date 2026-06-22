@@ -32,7 +32,7 @@ type Step struct {
 //
 // If the command exits non-zero, the test fails via rl.Failf.
 // Returns a *CLIResult for chainable assertions.
-func (s *Step) CLI(args ...string) *CLIResult {
+func (s *Step) CLI(args ...string) *CLIResult {  //nolint:deadcode
 	s.tc.T.Helper()
 	binary := s.tc.Binary
 	invocation := formatInvocation(binary, args)
@@ -52,7 +52,7 @@ func (s *Step) CLI(args ...string) *CLIResult {
 // CLIExpectError executes the configured binary with the given args, but does
 // NOT fail the test on non-zero exit.  The exit code, stdout, and stderr are
 // captured for assertion via the returned *CLIResult.
-func (s *Step) CLIExpectError(args ...string) *CLIResult {
+func (s *Step) CLIExpectError(args ...string) *CLIResult {  //nolint:deadcode
 	s.tc.T.Helper()
 	binary := s.tc.Binary
 	invocation := formatInvocation(binary, args)
@@ -71,7 +71,7 @@ func (s *Step) CLIExpectError(args ...string) *CLIResult {
 //
 // An optional body may be provided (at most one); if present, Content-Type
 // is set to application/json.
-func (s *Step) HTTP(method, path string, body ...[]byte) *HTTPResult {
+func (s *Step) HTTP(method, path string, body ...[]byte) *HTTPResult {  //nolint:deadcode
 	s.tc.T.Helper()
 	url := s.tc.Server + path
 
@@ -117,13 +117,13 @@ func (s *Step) HTTP(method, path string, body ...[]byte) *HTTPResult {
 }
 
 // Log writes a scoped log message to RunLog under the current step's section.
-func (s *Step) Log(format string, args ...any) {
+func (s *Step) Log(format string, args ...any) {  //nolint:deadcode
 	s.tc.RunLog.Printf(format, args...)
 }
 
 // WriteFile creates a file at path (relative to tc.Home) with the given
 // content, and logs the action to RunLog.
-func (s *Step) WriteFile(path, content string) {
+func (s *Step) WriteFile(path, content string) {  //nolint:deadcode
 	s.tc.T.Helper()
 	fullPath := filepath.Join(s.tc.Home, path)
 

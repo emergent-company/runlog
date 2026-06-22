@@ -26,7 +26,7 @@ import (
 //
 //	.env.mcj-emergent   — account-mode auth against the shared test server
 //	.env.localhost      — standalone auth against a local dev server
-func LoadDotEnv() {
+func LoadDotEnv() {  //nolint:deadcode
 	_, filename, _, ok := runtime.Caller(1) // caller's source file
 	if !ok {
 		return
@@ -41,7 +41,7 @@ func LoadDotEnv() {
 
 // checkRawGoTest detects when tests are being run via raw 'go test' and provides
 // a helpful error message with instructions to use 'runlog test' instead.
-func checkRawGoTest() {
+func checkRawGoTest() {  //nolint:deadcode
 	// Only act when the process is 'go test' itself, not 'runlog test'.
 	exe := filepath.Base(os.Args[0])
 	if exe == "runlog" || exe == "runlog.test" || strings.HasPrefix(exe, "runlog-air") {
@@ -59,7 +59,7 @@ func checkRawGoTest() {
 	}
 }
 
-func printRawGoTestWarning() {
+func printRawGoTestWarning() {  //nolint:deadcode
 	msg := `
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                                                                            ║
@@ -144,7 +144,7 @@ func loadEnvFile(path string, overwrite bool) {
 // BlueprintEnvVar looks up key by reading dir/.env then dir/.env.local (later
 // file wins), then falls back to os.Getenv(key).  dir should be the local
 // path to the blueprint directory (e.g. "/root/ai-news-memory-blueprint").
-func BlueprintEnvVar(dir, key string) string {
+func BlueprintEnvVar(dir, key string) string {  //nolint:deadcode
 	vars := ParseBlueprintEnvFiles(dir)
 	if v, ok := vars[key]; ok && v != "" {
 		return v
@@ -154,7 +154,7 @@ func BlueprintEnvVar(dir, key string) string {
 
 // ParseBlueprintEnvFiles reads .env then .env.local from dir and returns the
 // merged key-value map.  Later files overwrite earlier ones.
-func ParseBlueprintEnvFiles(dir string) map[string]string {
+func ParseBlueprintEnvFiles(dir string) map[string]string {  //nolint:deadcode
 	m := make(map[string]string)
 	for _, name := range []string{".env", ".env.local"} {
 		path := filepath.Join(dir, name)

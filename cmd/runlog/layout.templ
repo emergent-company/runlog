@@ -38,7 +38,7 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 				</div>
 			}
 			<div id="global-loading-bar" class="h-0.5 shrink-0 bg-primary/60 transition-opacity duration-200" style="opacity:0"></div>
-			<main id="main-content" hx-history-elt class="grow overflow-auto bg-base-200 p-6" data-testid="main-content">
+			<main id="main-content" hx-ext="head" hx-history-elt class="grow overflow-auto bg-base-200 p-6" data-testid="main-content">
 				{ children... }
 			</main>
 			<template id="skeleton-dashboard">
@@ -132,7 +132,7 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 				try { cur = localStorage.getItem('runlog-theme'); } catch(e) {}
 				if (cur === 'system') applyTheme('system');
 			});
-			document.addEventListener('htmx:historyRestore', function() {
+			document.addEventListener('htmx:before:history:restore', function() {
 				var restored = null;
 				try { restored = localStorage.getItem('runlog-theme'); } catch(e) {}
 				if (restored) applyTheme(restored);
@@ -183,39 +183,30 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 				if (main) main.innerHTML = fallbackHtml;
 			}
 
-			document.addEventListener('htmx:beforeRequest', function(evt) {
-				try {
-					var elt = evt.detail ? evt.detail.elt : null;
-					if (elt && elt.getAttribute && elt.getAttribute('hx-push-url') === 'true') {
-						var href = elt.getAttribute('hx-get') || elt.getAttribute('data-hx-get');
-						if (href) injectSkeleton(href);
-					}
-				} catch(e) { /* skeleton is best-effort */ }
+		document.addEventListener('htmx:before:request', function(evt) {
+			try {
+				var elt = evt.detail?.ctx?.sourceElement || evt.detail?.elt || null;
+				if (elt && elt.getAttribute && elt.getAttribute('hx-push-url') === 'true') {
+					var href = elt.getAttribute('hx-get') || elt.getAttribute('data-hx-get');
+					if (href) injectSkeleton(href);
+				}
+			} catch(e) { /* skeleton is best-effort */ }
 				clearTimeout(hideTimer);
 				showTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);
 			});
-			document.addEventListener('htmx:afterRequest', function() {
+			document.addEventListener('htmx:after:request', function() {
 				clearTimeout(showTimer);
 				if (bar) bar.style.opacity = '0';
 			});
-			document.addEventListener('htmx:responseError', function() {
-				clearTimeout(showTimer);
-				if (bar) {
-					bar.style.background = 'var(--color-error, #ef4444)';
-					bar.style.opacity = '1';
-					setTimeout(function() { bar.style.opacity = '0'; }, 1500);
-					setTimeout(function() { bar.style.background = ''; }, 2000);
-				}
-			});
-			document.addEventListener('htmx:sendError', function() {
-				clearTimeout(showTimer);
-				if (bar) {
-					bar.style.background = 'var(--color-error, #ef4444)';
-					bar.style.opacity = '1';
-					setTimeout(function() { bar.style.opacity = '0'; }, 1500);
-					setTimeout(function() { bar.style.background = ''; }, 2000);
-				}
-			});
+		document.addEventListener('htmx:error', function() {
+			clearTimeout(showTimer);
+			if (bar) {
+				bar.style.background = 'var(--color-error, #ef4444)';
+				bar.style.opacity = '1';
+				setTimeout(function() { bar.style.opacity = '0'; }, 1500);
+				setTimeout(function() { bar.style.background = ''; }, 2000);
+			}
+		});
 		})();
 	</script>
 	// Event-detail toggle: collapse an expanded detail row on second click.
@@ -244,7 +235,7 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 		})();
 	</script>
 	<link rel="stylesheet" href="/static/css/frappe-gantt.css"/>
-	<script src="/static/js/frappe-gantt.js"></script>
+	<script src="/static/js/hx-head.js"></script>
 }
 
 // AppPage renders the full HTML shell with sidebar and content area.

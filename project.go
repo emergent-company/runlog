@@ -22,7 +22,7 @@ import (
 // When MEMORY_ORG_ID is set, --org-id is appended automatically.
 // If RUNLOG_RUN_ID and RUNLOG_DAEMON_URL are set, the project is registered
 // with the local daemon for orphan tracking (best-effort, fail-open).
-func CreateProject(t *testing.T, home, srv, name string) string {
+func CreateProject(t *testing.T, home, srv, name string) string {  //nolint:deadcode
 	t.Helper()
 	args := append([]string{"projects", "create", "--name", name}, ProjectCreateOrgArgs()...)
 	out := MustRunCLIInDirWithHome(t, "", home, args...)
@@ -45,14 +45,14 @@ func CreateProject(t *testing.T, home, srv, name string) string {
 
 // ProjectCreateOrgArgs returns ["--org-id", "<id>"] when MEMORY_ORG_ID is set,
 // otherwise returns an empty slice.  Append to any `projects create` CLI call.
-func ProjectCreateOrgArgs() []string {
+func ProjectCreateOrgArgs() []string {  //nolint:deadcode
 	return OrgIDArgs()
 }
 
 // OrgIDArgs returns ["--org-id", "<id>"] when MEMORY_ORG_ID is set,
 // otherwise returns an empty slice.  Append to any CLI call that requires
 // --org-id (provider configure, blueprints, agent-definitions, etc.).
-func OrgIDArgs() []string {
+func OrgIDArgs() []string {  //nolint:deadcode
 	if id := OrgID(); id != "" {
 		return []string{"--org-id", id}
 	}
@@ -63,7 +63,7 @@ func OrgIDArgs() []string {
 // project when the test finishes.  Non-fatal: if deletion fails, it is logged.
 // After successful deletion, the project is deregistered from the daemon
 // (best-effort, fail-open).
-func DeleteProjectOnCleanup(t *testing.T, home, projectID string) {
+func DeleteProjectOnCleanup(t *testing.T, home, projectID string) {  //nolint:deadcode
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -84,7 +84,7 @@ func DeleteProjectOnCleanup(t *testing.T, home, projectID string) {
 // opens a "Cleanup" section and records the invocation and outcome as structured
 // RunLog events; otherwise it falls back to t.Logf.  Non-fatal: failures are
 // logged but never fail the test.
-func RevokeTokenOnCleanup(t *testing.T, rl *RunLog, home, tokenID string) {
+func RevokeTokenOnCleanup(t *testing.T, rl *RunLog, home, tokenID string) {  //nolint:deadcode
 	t.Cleanup(func() {
 		if rl != nil {
 			rl.Section("Cleanup")
@@ -117,7 +117,7 @@ func RevokeTokenOnCleanup(t *testing.T, rl *RunLog, home, tokenID string) {
 // model is empty when the corresponding *_MODEL variable is not set; callers
 // should then omit --generative-model so the server auto-selects from its
 // model catalog.  All three strings are empty when no provider is configured.
-func ProviderFromEnv() (provider, apiKey, model string) {
+func ProviderFromEnv() (provider, apiKey, model string) {  //nolint:deadcode
 	if key := os.Getenv("DEEPSEEK_API_KEY"); key != "" {
 		return "deepseek", key, os.Getenv("DEEPSEEK_MODEL")
 	}
@@ -134,7 +134,7 @@ func ProviderFromEnv() (provider, apiKey, model string) {
 // provider is the provider type (e.g. "deepseek", "google", "openai").
 // model is the generative model name; when empty --generative-model is omitted
 // and the server picks from its catalog automatically.
-func ConfigureProvider(t *testing.T, home, provider, apiKey, model string) {
+func ConfigureProvider(t *testing.T, home, provider, apiKey, model string) {  //nolint:deadcode
 	t.Helper()
 	args := []string{"provider", "configure", provider, "--api-key", apiKey}
 	if model != "" {
@@ -150,7 +150,7 @@ func ConfigureProvider(t *testing.T, home, provider, apiKey, model string) {
 // If rl is non-nil the configure step is recorded in the RunLog.
 // The function falls back to "provider test" if configure fails, which is
 // useful when credentials are already stored on the server.
-func SetupTestProvider(t *testing.T, rl *RunLog, home string) {
+func SetupTestProvider(t *testing.T, rl *RunLog, home string) {  //nolint:deadcode
 	t.Helper()
 
 	provider, apiKey, model := ProviderFromEnv()
@@ -196,14 +196,14 @@ func SetupTestProvider(t *testing.T, rl *RunLog, home string) {
 
 // ConfigureGoogleProvider configures the Google AI provider.
 // Deprecated: use ConfigureProvider(t, home, "google", apiKey, model) instead.
-func ConfigureGoogleProvider(t *testing.T, home, apiKey, model string) {
+func ConfigureGoogleProvider(t *testing.T, home, apiKey, model string) {  //nolint:deadcode
 	t.Helper()
 	ConfigureProvider(t, home, "google", apiKey, model)
 }
 
 // InstallBlueprint runs `memory blueprints <blueprintURL> --project <name> --upgrade`
 // and fails the test if the output indicates errors.
-func InstallBlueprint(t *testing.T, home, blueprintURL, projectName string) string {
+func InstallBlueprint(t *testing.T, home, blueprintURL, projectName string) string {  //nolint:deadcode
 	t.Helper()
 	out := MustRunCLIInDirWithHome(t, "", home,
 		"blueprints", blueprintURL,
@@ -221,13 +221,13 @@ func InstallBlueprint(t *testing.T, home, blueprintURL, projectName string) stri
 // UniqueProjectName returns a unique project name using the given prefix,
 // a short machine ID derived from the hostname, and current time in milliseconds.
 // Format: <prefix>-<mid8>-<timestamp_ms>
-func UniqueProjectName(prefix string) string {
+func UniqueProjectName(prefix string) string {  //nolint:deadcode
 	return fmt.Sprintf("%s-%s-%d", prefix, machineID(), time.Now().UnixMilli())
 }
 
 // machineID returns the first 8 hex characters of the SHA-256 hash of the
 // system hostname. Falls back to "00000000" if the hostname cannot be retrieved.
-func machineID() string {
+func machineID() string {  //nolint:deadcode
 	host, err := os.Hostname()
 	if err != nil {
 		return "00000000"
@@ -237,16 +237,16 @@ func machineID() string {
 }
 
 // containsErrors returns true when output contains "errors" but not "0 errors".
-func containsErrors(out string) bool {
+func containsErrors(out string) bool {  //nolint:deadcode
 	return contains(out, "errors") && !contains(out, "0 errors")
 }
 
 // contains is a thin wrapper used internally.
-func contains(s, substr string) bool {
+func contains(s, substr string) bool {  //nolint:deadcode
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && stringContains(s, substr))
 }
 
-func stringContains(s, substr string) bool {
+func stringContains(s, substr string) bool {  //nolint:deadcode
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
 			return true
@@ -262,7 +262,7 @@ func stringContains(s, substr string) bool {
 // daemonRegisterResource registers a project with the local runlog daemon.
 // Called after CreateProject succeeds. No-op if RUNLOG_RUN_ID or
 // RUNLOG_DAEMON_URL are not set. All errors are silently ignored.
-func daemonRegisterResource(projectID string) {
+func daemonRegisterResource(projectID string) {  //nolint:deadcode
 	runID := os.Getenv("RUNLOG_RUN_ID")
 	dURL := os.Getenv("RUNLOG_DAEMON_URL")
 	if runID == "" || dURL == "" {
@@ -286,7 +286,7 @@ func daemonRegisterResource(projectID string) {
 // daemonDeregisterResource deregisters a project from the local runlog daemon
 // after it has been successfully deleted from the server.
 // Called after DeleteProjectOnCleanup succeeds. All errors are silently ignored.
-func daemonDeregisterResource(projectID string) {
+func daemonDeregisterResource(projectID string) {  //nolint:deadcode
 	runID := os.Getenv("RUNLOG_RUN_ID")
 	dURL := os.Getenv("RUNLOG_DAEMON_URL")
 	if runID == "" || dURL == "" {

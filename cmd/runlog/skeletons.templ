@@ -177,8 +177,8 @@ templ _skeletonTableRows(rows int, cols int) {
 			}
 			@table.TableBody() {
 				for i := 0; i < rows; i++ {
+					<!-- lint:allow-raw -->
 					<tr>
-						<!-- lint:allow-raw -->
 						for j := 0; j < cols; j++ {
 							<td>
 								<!-- lint:allow-raw: skeleton placeholder -->

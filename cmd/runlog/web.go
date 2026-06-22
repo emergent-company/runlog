@@ -179,6 +179,57 @@ func relativeTime(t time.Time) string {
 	}
 }
 
+// ansiToHTML converts ANSI escape codes to HTML span elements with color classes.
+func ansiToHTML(s string) string {
+	if !strings.Contains(s, "\x1b[") {
+		return html.EscapeString(s)
+	}
+	var buf strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+2 < len(s) && s[i+1] == '[' {
+			j := i + 2
+			for j < len(s) && s[j] != 'm' {
+				j++
+			}
+			code := s[i+2 : j]
+			if code == "0" {
+				buf.WriteString(`</span>`)
+			} else if code == "1" {
+				buf.WriteString(`<span class="font-bold">`)
+			} else {
+				colorClass := ""
+				switch code {
+				case "90":
+					colorClass = "text-base-content/50"
+				case "32":
+					colorClass = "text-success"
+				case "33":
+					colorClass = "text-warning"
+				case "31":
+					colorClass = "text-error"
+				case "34":
+					colorClass = "text-info"
+				case "35":
+					colorClass = "text-secondary"
+				case "36":
+					colorClass = "text-accent"
+				case "37":
+					colorClass = "text-base-content"
+				}
+				if colorClass != "" {
+					buf.WriteString(`<span class="` + colorClass + `">`)
+				}
+			}
+			i = j + 1
+		} else {
+			buf.WriteByte(s[i])
+			i++
+		}
+	}
+	return buf.String()
+}
+
 // metaRunEventKinds are event kinds that carry run-level metadata (tags, tokens,
 // state transitions) rather than execution timeline steps. Hidden from timeline
 // by default; shown in debug mode or reflected in run metadata/stats.
@@ -722,11 +773,9 @@ func (app *WebApp) linterDefs() []runlog.LinterDef {
 	if len(app.config.Linters) > 0 {
 		return app.config.Linters
 	}
-	lefthook, _ := runlog.DiscoverLintersFromLefthook(app.workDir, "pre-commit")
-	if len(lefthook) == 0 {
-		lefthook, _ = runlog.DiscoverLintersFromLefthook(app.workDir, "lint")
-	}
-	return lefthook
+	precommit, _ := runlog.DiscoverLintersFromLefthook(app.workDir, "pre-commit")
+	lint, _ := runlog.DiscoverLintersFromLefthook(app.workDir, "lint")
+	return runlog.MergeLinters(precommit, lint)
 }
 
 func (app *WebApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -782,7 +831,7 @@ func (app *WebApp) runTimeoutWorker(ctx context.Context) {
 }
 
 // reqCtx returns a context with the request context from Echo.
-func reqCtx(c echo.Context) context.Context {
+func reqCtx(c echo.Context) context.Context {  //nolint:deadcode
 	return c.Request().Context()
 }
 

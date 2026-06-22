@@ -282,7 +282,11 @@ templ linterRunDetailContent(data linterRunDetailData) {
 			</div>
 		</div>
 		if data.Run.Output != "" {
-			<pre class="text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] whitespace-pre-wrap leading-relaxed text-base-content/80 border border-base-content/10 bg-base-100">{ data.Run.Output }</pre>
+			<div class="text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] whitespace-pre-wrap leading-relaxed border border-base-content/10 bg-base-100">{ ansiToHTML(data.Run.Output) }&nbsp;</div>
+		} else if data.Run.Status == "passed" {
+			<div class="text-base-content/40 text-sm text-center py-8">Linter passed — no issues found.</div>
+		} else if data.Run.Status == "failed" {
+			<div class="text-base-content/40 text-sm text-center py-8">Linter failed with no output captured.</div>
 		} else {
 			@emptyState("No output recorded for this run.")
 		}

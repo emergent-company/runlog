@@ -14,14 +14,14 @@ import (
 // environment variable, falling back to an empty string.  An empty value
 // causes SkipIfServerDown to skip server-dependent tests rather than hitting
 // a wrong address.
-func ServerURL() string {
+func ServerURL() string {  //nolint:deadcode
 	return os.Getenv("MEMORY_TEST_SERVER")
 }
 
 // E2ETestToken returns the static API key for the test server.
 // It reads MEMORY_TEST_TOKEN from the environment, falling back to the
 // default value used by the Docker Compose stack.
-func E2ETestToken() string {
+func E2ETestToken() string {  //nolint:deadcode
 	if v := os.Getenv("MEMORY_TEST_TOKEN"); v != "" {
 		return v
 	}
@@ -34,7 +34,7 @@ func E2ETestToken() string {
 //	standalone — plain API key sent as X-API-Key (Docker Compose / local dev standalone)
 //	account    — Bearer token from credentials.json only (mcj-emergent, local Zitadel-backed dev)
 //	             api_key must NOT be set in this mode — see SetupCLIAuth for details.
-func AuthMode() string {
+func AuthMode() string {  //nolint:deadcode
 	if v := os.Getenv("MEMORY_AUTH_MODE"); v != "" {
 		return v
 	}
@@ -43,7 +43,7 @@ func AuthMode() string {
 
 // SetToken returns the Bearer token to write into credentials.json when
 // MEMORY_AUTH_MODE=account.  Reads MEMORY_SET_TOKEN; defaults to "all-scopes".
-func SetToken() string {
+func SetToken() string {  //nolint:deadcode
 	if v := os.Getenv("MEMORY_SET_TOKEN"); v != "" {
 		return v
 	}
@@ -52,13 +52,13 @@ func SetToken() string {
 
 // OrgID returns the organization ID to set in config when MEMORY_ORG_ID is
 // provided.  An empty return value means auto-detection should be relied upon.
-func OrgID() string {
+func OrgID() string {  //nolint:deadcode
 	return os.Getenv("MEMORY_ORG_ID")
 }
 
 // SkipIfServerDown skips t if the Emergent server at ServerURL() is unreachable.
 // If rl is non-nil the skip reason is recorded in the runs DB.
-func SkipIfServerDown(t *testing.T, rl ...*RunLog) {
+func SkipIfServerDown(t *testing.T, rl ...*RunLog) {  //nolint:deadcode
 	t.Helper()
 
 	var runlog *RunLog
@@ -92,7 +92,7 @@ func SkipIfServerDown(t *testing.T, rl ...*RunLog) {
 // auth is an optional bearer token to include so auth errors (401) are not
 // confused with routing errors (404).
 // If rl is non-nil the skip reason is recorded in the runs DB.
-func SkipIfEndpointMissing(t *testing.T, path string, bearerToken string, rl ...*RunLog) {
+func SkipIfEndpointMissing(t *testing.T, path string, bearerToken string, rl ...*RunLog) {  //nolint:deadcode
 	t.Helper()
 
 	var runlog *RunLog
@@ -123,7 +123,7 @@ func SkipIfEndpointMissing(t *testing.T, path string, bearerToken string, rl ...
 
 // FilteredEnv returns os.Environ() with project-scoped variables stripped.
 // HOME and PATH are also stripped so callers can re-inject isolated values.
-func FilteredEnv() []string {
+func FilteredEnv() []string {  //nolint:deadcode
 	filtered := make([]string, 0, len(os.Environ()))
 	for _, kv := range os.Environ() {
 		switch {

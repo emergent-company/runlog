@@ -54,6 +54,10 @@ pre-commit:
       glob: "*.go"
       run: scripts/lint/no-hardcoded-uuids.sh --staged
 
+    - name: check-htmx-events
+      glob: "*.{templ,go,js}"
+      run: scripts/lint/check-htmx-events.sh --staged
+
 # ── Manual lint group (task lint → lefthook run lint) ────────────────────────
 # Runs the same checks against ALL files, not just staged ones.
 lint:
@@ -100,3 +104,6 @@ lint:
 
     - name: no-hardcoded-uuids
       run: scripts/lint/no-hardcoded-uuids.sh
+
+    - name: check-htmx-events
+      run: scripts/lint/check-htmx-events.sh

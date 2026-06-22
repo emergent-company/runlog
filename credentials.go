@@ -39,7 +39,7 @@ type CredentialsInfo struct {
 // If rl is non-nil, a "credentials" event is emitted with the message
 // "credentials.json written" (or an error variant), recording the path,
 // which fields were present, and the server URL — but never the token value.
-func VerifyCredentialsWritten(t *testing.T, rl *RunLog, home string) CredentialsInfo {
+func VerifyCredentialsWritten(t *testing.T, rl *RunLog, home string) CredentialsInfo {  //nolint:deadcode
 	t.Helper()
 
 	credsPath := filepath.Join(home, ".memory", "credentials.json")

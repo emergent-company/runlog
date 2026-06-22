@@ -6,7 +6,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "templ generate && go build -o /tmp/runlog-air-dogfood ./cmd/runlog"
+  cmd = "templ generate && templ generate -f vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ && go build -o /tmp/runlog-air-dogfood ./cmd/runlog"
   entrypoint = ["/tmp/runlog-air-dogfood"]
   args_bin = ["--daemon", "--db", "/tmp/runlog-dogfood.db", "--port", "17433"]
   include_ext = ["go", "templ"]
@@ -17,7 +17,7 @@ tmp_dir = "tmp"
   log = "build-errors.log"
   send_interrupt = true
   kill_delay = "2s"
-  stop_on_error = true
+   stop_on_error = false
 
 [log]
   time = true

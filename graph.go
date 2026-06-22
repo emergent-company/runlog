@@ -13,7 +13,7 @@ import (
 // ListByType fetches graph objects filtered by type via the REST API.
 // If objectType is empty, all objects are returned.
 // The server identifies the project via the X-Project-ID header (set by DoJSON).
-func ListByType(t *testing.T, srv, token, projectID, objectType string) []map[string]any {
+func ListByType(t *testing.T, srv, token, projectID, objectType string) []map[string]any {  //nolint:deadcode
 	t.Helper()
 	apiURL := fmt.Sprintf("%s/api/graph/objects/search?limit=200", srv)
 	if objectType != "" {
@@ -37,7 +37,7 @@ func ListByType(t *testing.T, srv, token, projectID, objectType string) []map[st
 }
 
 // ListByLabel fetches graph objects filtered by label via the REST API.
-func ListByLabel(t *testing.T, srv, token, projectID, label string) []map[string]any {
+func ListByLabel(t *testing.T, srv, token, projectID, label string) []map[string]any {  //nolint:deadcode
 	t.Helper()
 	apiURL := fmt.Sprintf("%s/api/graph/objects/search?limit=200&label=%s", srv, label)
 	resp := DoJSON(t, "GET", apiURL, token, projectID, nil)
@@ -59,7 +59,7 @@ func ListByLabel(t *testing.T, srv, token, projectID, label string) []map[string
 
 // ListRelationships fetches relationships where dst_id matches targetID,
 // optionally filtered by relationship type.
-func ListRelationships(t *testing.T, srv, token, projectID, targetID, relType string) []map[string]any {
+func ListRelationships(t *testing.T, srv, token, projectID, targetID, relType string) []map[string]any {  //nolint:deadcode
 	t.Helper()
 	apiURL := fmt.Sprintf("%s/api/graph/relationships/search?limit=200&dst_id=%s", srv, targetID)
 	if relType != "" {
@@ -85,7 +85,7 @@ func ListRelationships(t *testing.T, srv, token, projectID, targetID, relType st
 // ListRelationshipsFromCLI lists relationships where the source matches fromID,
 // optionally filtered by relationship type.  Uses the CLI instead of HTTP.
 // Returns the parsed items slice.  An empty slice is returned on any error.
-func ListRelationshipsFromCLI(t *testing.T, home, projectID, fromID, relType string) []map[string]any {
+func ListRelationshipsFromCLI(t *testing.T, home, projectID, fromID, relType string) []map[string]any {  //nolint:deadcode
 	t.Helper()
 	args := []string{
 		"graph", "relationships", "list",
@@ -119,7 +119,7 @@ func ListRelationshipsFromCLI(t *testing.T, home, projectID, fromID, relType str
 }
 
 // PropString extracts a string value from a properties map, trying keys in order.
-func PropString(props map[string]any, keys ...string) string {
+func PropString(props map[string]any, keys ...string) string {  //nolint:deadcode
 	for _, k := range keys {
 		if v, ok := props[k].(string); ok && v != "" {
 			return v

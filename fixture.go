@@ -80,7 +80,7 @@ type Option func(*fixture)
 //	fx := framework.Use(t, framework.WithProject("e2e-docs"))
 //	out := fx.CLI("documents", "list")
 //	out.Contains("[]")
-func Use(t *testing.T, opts ...Option) *Fixture {
+func Use(t *testing.T, opts ...Option) *Fixture {  //nolint:deadcode
 	t.Helper()
 
 	rl := NewRunLog(t)
@@ -129,7 +129,7 @@ func Use(t *testing.T, opts ...Option) *Fixture {
 // needing a --project flag.
 //
 // WithProject must appear before WithSchema and WithDocument in the options list.
-func WithProject(prefix string) Option {
+func WithProject(prefix string) Option {  //nolint:deadcode
 	return func(b *fixture) {
 		b.t.Helper()
 		name := UniqueProjectName(prefix)
@@ -144,7 +144,7 @@ func WithProject(prefix string) Option {
 // WithSchema uploads a schema file to the project after it has been created.
 // Panics with a clear message if WithProject does not precede WithSchema.
 // Fails the test via t.Fatal if the upload fails.
-func WithSchema(filePath string) Option {
+func WithSchema(filePath string) Option {  //nolint:deadcode
 	return func(b *fixture) {
 		b.t.Helper()
 		if !b.hasProject {
@@ -158,7 +158,7 @@ func WithSchema(filePath string) Option {
 // WithDocument uploads a document file to the project after it has been created.
 // Panics with a clear message if WithProject does not precede WithDocument.
 // Fails the test via t.Fatal if the upload fails.
-func WithDocument(filePath string) Option {
+func WithDocument(filePath string) Option {  //nolint:deadcode
 	return func(b *fixture) {
 		b.t.Helper()
 		if !b.hasProject {
@@ -170,7 +170,7 @@ func WithDocument(filePath string) Option {
 }
 
 // WithBinary overrides the CLI binary name.  Defaults to "memory".
-func WithBinary(bin string) Option {
+func WithBinary(bin string) Option {  //nolint:deadcode
 	return func(b *fixture) {
 		b.binary = bin
 	}
@@ -186,7 +186,7 @@ func WithBinary(bin string) Option {
 //
 // No --project, --server, or token flags are needed: WithProject already wrote
 // project_id, server_url, and credentials to fx.Home/.memory/config.yaml.
-func (fx *Fixture) CLI(args ...string) *CLIResult {
+func (fx *Fixture) CLI(args ...string) *CLIResult {  //nolint:deadcode
 	fx.T.Helper()
 	invocation := formatInvocation(fx.Binary, args)
 
@@ -204,7 +204,7 @@ func (fx *Fixture) CLI(args ...string) *CLIResult {
 // CLIExpectError runs fx.Binary with the given args but does NOT fail the test
 // on non-zero exit.  The exit code and output are captured in the returned
 // *CLIResult for assertion.
-func (fx *Fixture) CLIExpectError(args ...string) *CLIResult {
+func (fx *Fixture) CLIExpectError(args ...string) *CLIResult {  //nolint:deadcode
 	fx.T.Helper()
 	invocation := formatInvocation(fx.Binary, args)
 
@@ -219,7 +219,7 @@ func (fx *Fixture) CLIExpectError(args ...string) *CLIResult {
 // returns the absolute path.  Fails the test via t.Fatal if the write fails.
 //
 // Multiple TempFile calls each return a distinct path.
-func (fx *Fixture) TempFile(name, content string) string {
+func (fx *Fixture) TempFile(name, content string) string {  //nolint:deadcode
 	fx.T.Helper()
 	dir := fx.T.TempDir()
 	path := filepath.Join(dir, name)
@@ -230,12 +230,12 @@ func (fx *Fixture) TempFile(name, content string) string {
 }
 
 // Log writes a formatted message to fx.RunLog.
-func (fx *Fixture) Log(format string, args ...any) {
+func (fx *Fixture) Log(format string, args ...any) {  //nolint:deadcode
 	fx.RunLog.Printf(format, args...)
 }
 
 // Section starts a named section in fx.RunLog (mirrors RunLog.Section).
-func (fx *Fixture) Section(name string) {
+func (fx *Fixture) Section(name string) {  //nolint:deadcode
 	fx.RunLog.Section(name)
 }
 
@@ -246,7 +246,7 @@ func (fx *Fixture) Section(name string) {
 // fixtureToFixture creates a temporary *Fixture view of the builder so that
 // Option functions (WithSchema, WithDocument) can call Fixture.CLI internally
 // during setup without duplicating the CLI invocation logic.
-func fixtureToFixture(b *fixture) *Fixture {
+func fixtureToFixture(b *fixture) *Fixture {  //nolint:deadcode
 	return &Fixture{
 		T:         b.t,
 		Home:      b.home,

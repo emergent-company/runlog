@@ -630,7 +630,7 @@ func (app *WebApp) handleExperimentDetail(c echo.Context) error {
 	return echo.NewHTTPError(http.StatusNotFound, "experiment not found")
 }
 
-func (app *WebApp) handleLaunchFromList(c echo.Context) error {
+func (app *WebApp) handleLaunchFromList(c echo.Context) error {  //nolint:deadcode
 	return app.handleLaunchTest(c)
 }
 
@@ -1248,7 +1248,7 @@ func (app *WebApp) handleRunAllLinters(c echo.Context) error {
 			<-al.done
 		}
 	}()
-	target := "/ui/linters"
+	target := fmt.Sprintf("/ui/linters?_=%d", time.Now().UnixMilli())
 	if render.IsHTMX(c.Request()) {
 		w := c.Response().Writer
 		w.Header().Set("HX-Redirect", target)

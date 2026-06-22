@@ -56,7 +56,7 @@ type TestContext struct {
 //  7. If opts.Project is non-empty, creates the project and registers cleanup
 //
 // The caller should defer tc.Done() immediately after NewTest.
-func NewTest(t *testing.T, opts TestOpts) *TestContext {
+func NewTest(t *testing.T, opts TestOpts) *TestContext {  //nolint:deadcode
 	t.Helper()
 
 	binary := opts.Binary
@@ -118,7 +118,7 @@ func NewTest(t *testing.T, opts TestOpts) *TestContext {
 //	tc.Step("Create agent", func(s *Step) {
 //	    s.CLI("agents", "create", "--name", "test").Contains("Created")
 //	})
-func (tc *TestContext) Step(name string, fn func(s *Step)) {
+func (tc *TestContext) Step(name string, fn func(s *Step)) {  //nolint:deadcode
 	tc.T.Helper()
 	tc.RunLog.Section(name)
 
@@ -138,7 +138,7 @@ func (tc *TestContext) Step(name string, fn func(s *Step)) {
 // immediately after NewTest.  It is safe to call multiple times.
 // Currently a no-op placeholder for future cleanup logic (RunLog.Close is
 // handled by t.Cleanup registered in NewTest).
-func (tc *TestContext) Done() {
+func (tc *TestContext) Done() {  //nolint:deadcode
 	tc.doneOnce.Do(func() {
 		// Placeholder for future finalization logic.
 		// RunLog.Close is already registered via t.Cleanup in NewTest.
@@ -146,17 +146,17 @@ func (tc *TestContext) Done() {
 }
 
 // Log writes a log event to RunLog.
-func (tc *TestContext) Log(format string, args ...any) {
+func (tc *TestContext) Log(format string, args ...any) {  //nolint:deadcode
 	tc.RunLog.Printf(format, args...)
 }
 
 // Tag appends variant tags to the RunLog.
-func (tc *TestContext) Tag(tags ...string) {
+func (tc *TestContext) Tag(tags ...string) {  //nolint:deadcode
 	tc.RunLog.Tag(tags...)
 }
 
 // Skip records a skip reason and skips the test.
-func (tc *TestContext) Skip(reason string) {
+func (tc *TestContext) Skip(reason string) {  //nolint:deadcode
 	tc.T.Helper()
 	tc.RunLog.Skipf("%s", reason)
 }

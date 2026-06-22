@@ -1281,20 +1281,30 @@ func linterRunDetailContent(data linterRunDetailData) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if data.Run.Output != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<pre class=\"text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] whitespace-pre-wrap leading-relaxed text-base-content/80 border border-base-content/10 bg-base-100\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<div class=\"text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] whitespace-pre-wrap leading-relaxed border border-base-content/10 bg-base-100\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var53 string
-			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(data.Run.Output)
+			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(ansiToHTML(data.Run.Output))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 285, Col: 193}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 285, Col: 184}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</pre>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "&nbsp;</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if data.Run.Status == "passed" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<div class=\"text-base-content/40 text-sm text-center py-8\">Linter passed — no issues found.</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if data.Run.Status == "failed" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<div class=\"text-base-content/40 text-sm text-center py-8\">Linter failed with no output captured.</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1304,7 +1314,7 @@ func linterRunDetailContent(data linterRunDetailData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1333,46 +1343,46 @@ func LinterLauncherView(data linterLauncherData) templ.Component {
 			templ_7745c5c3_Var54 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "<div class=\"border border-base-content/10 rounded-box bg-base-100 overflow-hidden\" data-testid=\"linter-launcher-view\" data-sse-url=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<div class=\"border border-base-content/10 rounded-box bg-base-100 overflow-hidden\" data-testid=\"linter-launcher-view\" data-sse-url=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var55 string
 		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.SSEURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 293, Col: 145}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 297, Col: 145}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" data-linter-name=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" data-linter-name=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var56 string
 		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.ResolveAttributeValue(data.LinterName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 293, Col: 182}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 297, Col: 182}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\"><div class=\"flex items-center gap-3 px-4 py-2.5 bg-base-200/50 border-b border-base-content/5\"><span id=\"linter-launch-status\" class=\"flex items-center gap-2\"><span class=\"loading loading-spinner loading-sm text-primary\" data-testid=\"linter-launch-spinner\"></span> <span class=\"badge gap-1 badge-info badge-outline badge-sm\">Running</span></span> <span class=\"text-xs font-mono text-base-content/50 truncate\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\"><div class=\"flex items-center gap-3 px-4 py-2.5 bg-base-200/50 border-b border-base-content/5\"><span id=\"linter-launch-status\" class=\"flex items-center gap-2\"><span class=\"loading loading-spinner loading-sm text-primary\" data-testid=\"linter-launch-spinner\"></span> <span class=\"badge gap-1 badge-info badge-outline badge-sm\">Running</span></span> <span class=\"text-xs font-mono text-base-content/50 truncate\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var57 string
 		templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(data.Command)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 299, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/linters.templ`, Line: 303, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "</span></div><pre id=\"linter-log-output\" class=\"text-xs font-mono p-4 overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed text-base-content/80\" data-testid=\"linter-log-output\"></pre></div><script type=\"text/javascript\">\n\t\t(function() {\n\t\t\tvar el = document.querySelector('[data-testid=\"linter-launcher-view\"]');\n\t\t\tif (!el) return;\n\t\t\tvar sseUrl = el.getAttribute('data-sse-url');\n\t\t\tvar linterName = el.getAttribute('data-linter-name');\n\t\t\tvar es = new EventSource(sseUrl);\n\t\t\tvar log = document.getElementById('linter-log-output');\n\t\t\tvar status = document.getElementById('linter-launch-status');\n\t\t\tes.onmessage = function(e) {\n\t\t\t\tif (log) log.textContent += e.data + '\\n';\n\t\t\t\tlog.scrollTop = log.scrollHeight;\n\t\t\t};\n\t\t\tes.addEventListener('done', function(e) {\n\t\t\t\tes.close();\n\t\t\t\tif (status) {\n\t\t\t\t\tvar data = JSON.parse(e.data || '{}');\n\t\t\t\t\tvar exitCode = data.exit_code;\n\t\t\t\t\tstatus.innerHTML = '<span class=\"badge gap-1 ' + (exitCode === 0 ? 'badge-success' : 'badge-error') + ' badge-outline badge-sm\">' + (exitCode === 0 ? 'Pass' : 'Fail') + '</span> <span class=\"text-xs text-base-content/40\">exit ' + exitCode + '</span>';\n\t\t\t\t}\n\t\t\t\tif (typeof htmx !== 'undefined') {\n\t\t\t\t\tsetTimeout(function() {\n\t\t\t\t\t\thtmx.ajax('GET', '/ui/linters/' + encodeURIComponent(linterName), {target: '#main-content', swap: 'innerHTML', pushUrl: 'true'});\n\t\t\t\t\t}, 1500);\n\t\t\t\t}\n\t\t\t});\n\t\t\tes.onerror = function() {\n\t\t\t\tes.close();\n\t\t\t};\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</span></div><pre id=\"linter-log-output\" class=\"text-xs font-mono p-4 overflow-auto max-h-96 whitespace-pre-wrap leading-relaxed text-base-content/80\" data-testid=\"linter-log-output\"></pre></div><script type=\"text/javascript\">\n\t\t(function() {\n\t\t\tvar el = document.querySelector('[data-testid=\"linter-launcher-view\"]');\n\t\t\tif (!el) return;\n\t\t\tvar sseUrl = el.getAttribute('data-sse-url');\n\t\t\tvar linterName = el.getAttribute('data-linter-name');\n\t\t\tvar es = new EventSource(sseUrl);\n\t\t\tvar log = document.getElementById('linter-log-output');\n\t\t\tvar status = document.getElementById('linter-launch-status');\n\t\t\tes.onmessage = function(e) {\n\t\t\t\tif (log) log.textContent += e.data + '\\n';\n\t\t\t\tlog.scrollTop = log.scrollHeight;\n\t\t\t};\n\t\t\tes.addEventListener('done', function(e) {\n\t\t\t\tes.close();\n\t\t\t\tif (status) {\n\t\t\t\t\tvar data = JSON.parse(e.data || '{}');\n\t\t\t\t\tvar exitCode = data.exit_code;\n\t\t\t\t\tstatus.innerHTML = '<span class=\"badge gap-1 ' + (exitCode === 0 ? 'badge-success' : 'badge-error') + ' badge-outline badge-sm\">' + (exitCode === 0 ? 'Pass' : 'Fail') + '</span> <span class=\"text-xs text-base-content/40\">exit ' + exitCode + '</span>';\n\t\t\t\t}\n\t\t\t\tif (typeof htmx !== 'undefined') {\n\t\t\t\t\tsetTimeout(function() {\n\t\t\t\t\t\thtmx.ajax('GET', '/ui/linters/' + encodeURIComponent(linterName), {target: '#main-content', swap: 'innerHTML', pushUrl: 'true'});\n\t\t\t\t\t}, 1500);\n\t\t\t\t}\n\t\t\t});\n\t\t\tes.onerror = function() {\n\t\t\t\tes.close();\n\t\t\t};\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1401,7 +1411,7 @@ func LintersSkeleton() templ.Component {
 			templ_7745c5c3_Var58 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<div class=\"flex items-center justify-center py-24\"><span class=\"loading loading-spinner loading-lg text-primary\"></span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<div class=\"flex items-center justify-center py-24\"><span class=\"loading loading-spinner loading-lg text-primary\"></span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

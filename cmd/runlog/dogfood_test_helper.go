@@ -74,7 +74,7 @@ func (df *DogfoodRun) Event(kind, message string) {
 }
 
 // Eventf formats and emits an event.
-func (df *DogfoodRun) Eventf(kind, format string, args ...any) {
+func (df *DogfoodRun) Eventf(kind, format string, args ...any) {  //nolint:deadcode
 	df.Event(kind, fmt.Sprintf(format, args...))
 }
 
@@ -206,7 +206,7 @@ func (df *DogfoodRun) Done() {
 }
 
 // Fail marks the run as failed with a reason (no-op if daemon not available).
-func (df *DogfoodRun) Fail(reason string) {
+func (df *DogfoodRun) Fail(reason string) {  //nolint:deadcode
 	if !df.active {
 		return
 	}

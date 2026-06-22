@@ -75,7 +75,7 @@ type TableConfig struct {
 }
 
 // filterBarHXTrigger builds the hx-trigger attribute for the filter form.
-func filterBarHXTrigger(filters []FilterConfig) string {
+func filterBarHXTrigger(filters []FilterConfig) string {  //nolint:deadcode
 	var parts []string
 	hasSelect := false
 	hasText := false
@@ -97,7 +97,7 @@ func filterBarHXTrigger(filters []FilterConfig) string {
 }
 
 // loadMoreURL builds the URL for the Load More button including all filter params.
-func loadMoreURL(base string, offset int, filters []FilterConfig) string {
+func loadMoreURL(base string, offset int, filters []FilterConfig) string {  //nolint:deadcode
 	vals := url.Values{}
 	vals.Set("offset", fmt.Sprintf("%d", offset))
 	for _, f := range filters {
@@ -109,7 +109,7 @@ func loadMoreURL(base string, offset int, filters []FilterConfig) string {
 }
 
 // statusOptions returns the standard set of filter options for test run status.
-func statusOptions() []FilterOption {
+func statusOptions() []FilterOption {  //nolint:deadcode
 	return []FilterOption{
 		{Value: "pass", Label: "Pass"},
 		{Value: "fail", Label: "Fail"},

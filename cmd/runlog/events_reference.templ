@@ -159,10 +159,7 @@ templ exampleChildRow(c runlog.ChildEvent) {
 templ SDKPage() {
 	@AppPage(fmt.Sprintf("Runlog - %s - SDK Reference", appName()), sidebarGroups) {
 		@styleTag(sdkPageCSS)
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"/>
 		@scriptTag(sdkPageJS)
-		<script>hljs.highlightAll();</script>
 		<div data-testid="sdk-reference-page" class="sdk-page">
 			@layout.ViewMenu() {
 				@layout.ViewMenuLabel("Helpers")
@@ -204,10 +201,7 @@ templ SDKPage() {
 
 templ SDKContent() {
 	@styleTag(sdkPageCSS)
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css"/>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 	@scriptTag(sdkPageJS)
-	<script>hljs.highlightAll();</script>
 	<div data-testid="sdk-reference-content" class="sdk-page">
 		@layout.ViewMenu() {
 			@layout.ViewMenuLabel("Helpers")
