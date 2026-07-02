@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emergent-company/go-daisy/staticfs"
 	runlog "github.com/emergent-company/runlog"
 )
 
@@ -56,9 +55,10 @@ func cmdDaemonStart(args []string, dbPath string) error {
 	cfg, _ := runlog.LoadConfig("")
 	port := cfg.DaemonPortOrDefault()
 
-	// Optional --port flag overrides the config default.
+	// Optional --port and --dev flags override config defaults.
 	fs := flag.NewFlagSet("daemon-start", flag.ContinueOnError)
 	startPort := fs.Int("port", port, "daemon HTTP port")
+	devMode := fs.Bool("dev", false, "disable binary-watch self-restart (for air/dev)")
 	// Discard parse errors; unrecognised args are ignored for backward compat.
 	_ = fs.Parse(args)
 	if *startPort > 0 {
@@ -87,6 +87,9 @@ func cmdDaemonStart(args []string, dbPath string) error {
 		daemonArgs = append(daemonArgs, "--db", dbPath)
 	}
 	daemonArgs = append(daemonArgs, fmt.Sprintf("--port=%d", port))
+	if *devMode {
+		daemonArgs = append(daemonArgs, "--dev")
+	}
 
 	cmd := exec.Command(self, daemonArgs...)
 	setSysProcAttr(cmd) // Setsid: true — new session, survives terminal close
@@ -266,6 +269,7 @@ func runDaemonInternal(args []string) error {
 	dbFlag := fs.String("db", "", "path to runs.db")
 	portFlag := fs.Int("port", 7430, "daemon HTTP port")
 	timeoutFlag := fs.Duration("timeout", 30*time.Minute, "max run duration before auto-timeout (e.g. 30m, 1h)")
+	devFlag := fs.Bool("dev", false, "disable binary-watch self-restart (for air-managed dev servers)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -336,14 +340,15 @@ func runDaemonInternal(args []string) error {
 	// Kill any existing process on the target port before starting.
 	killProcessOnPort(port)
 
-	srv := newDaemonServer(db, port, *timeoutFlag)
+	// Resolve artifacts directory: <workDir>/.runlog/artifacts/
+	artifactsDir := filepath.Join(workDir, ".runlog", "artifacts")
+
+	srv := newDaemonServer(db, port, *timeoutFlag, artifactsDir, *devFlag)
+	srv.pidFile = pidFile
 
 	// Mount web UI under /ui/
 	webApp := newWebApp(db, cfg, workDir)
 	srv.mux.Handle("/ui/", http.StripPrefix("/ui", webApp))
-
-	// Serve static assets (DaisyUI CSS, HTMX JS) from go-daisy embedded filesystem
-	srv.mux.Handle("/static/", staticfs.Handler("/static/"))
 
 	return srv.Start()
 }
@@ -426,6 +431,9 @@ func daemonURL() string {
 	if u := os.Getenv("RUNLOG_DAEMON_URL"); u != "" {
 		return u
 	}
-	cfg, _ := runlog.LoadConfig("")
+	cfg, err := runlog.LoadConfig("")
+	if err != nil || cfg == nil {
+		return "http://127.0.0.1:7430"
+	}
 	return fmt.Sprintf("http://127.0.0.1:%d", cfg.DaemonPortOrDefault())
 }

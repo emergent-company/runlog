@@ -13,6 +13,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -23,11 +24,15 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	runlog "github.com/emergent-company/runlog"
+
+	"github.com/emergent-company/go-daisy/staticfs"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,17 +66,32 @@ type DaemonServer struct {
 	sweepCh   chan struct{} // non-blocking trigger for immediate sweep
 	mu        sync.Mutex
 	timeout   time.Duration // max duration before a test run is auto-timed-out
+
+	srv          *http.Server  // stored for graceful shutdown during binary re-exec
+	devMode      bool          // if true, skip binary-change self-restart (for air-managed dev servers)
+	pidFile      string        // path to PID file, cleaned up before re-exec
+	restartCh    chan struct{} // closed by watchBinary; Start() does cleanup + Exec on main goroutine
+	cancel       context.CancelFunc
+	artifactsDir string        // path to directory for test artifacts (screenshots, etc.)
 }
 
 // newDaemonServer creates a DaemonServer backed by the given RunDB and port.
-func newDaemonServer(db *runlog.RunDB, port int, timeout time.Duration) *DaemonServer {
+// artifactsDir is the directory for test artifacts; if empty, artifacts handler is not mounted.
+func newDaemonServer(db *runlog.RunDB, port int, timeout time.Duration, artifactsDir string, devMode ...bool) *DaemonServer {
+	dv := false
+	if len(devMode) > 0 {
+		dv = devMode[0]
+	}
 	d := &DaemonServer{
-		db:        db,
-		port:      port,
-		startedAt: time.Now(),
-		mux:       http.NewServeMux(),
-		sweepCh:   make(chan struct{}, 1),
-		timeout:   timeout,
+		db:           db,
+		port:         port,
+		startedAt:    time.Now(),
+		mux:          http.NewServeMux(),
+		sweepCh:      make(chan struct{}, 1),
+		timeout:      timeout,
+		devMode:      dv,
+		restartCh:    make(chan struct{}),
+		artifactsDir: artifactsDir,
 	}
 	d.registerRoutes()
 	return d
@@ -81,13 +101,18 @@ func (d *DaemonServer) registerRoutes() {
 	d.mux.HandleFunc("/health", d.handleHealth)
 	d.mux.HandleFunc("/runs", d.handleRuns)
 	d.mux.HandleFunc("/runs/", d.handleRunsPath)
+	d.mux.HandleFunc("/test-runs", d.handleTestRuns)
+	d.mux.HandleFunc("/test-runs/", d.handleTestRunsPath)
 	d.mux.HandleFunc("/resources/orphaned", d.handleOrphaned)
 	d.mux.HandleFunc("/cleanup", d.handleCleanup)
 	d.mux.HandleFunc("/reap", d.handleReap)
 	d.mux.HandleFunc("/status", d.handleStatus)
-	// Serve e2e test artifacts (screenshots, traces) captured by Playwright.
-	d.mux.Handle("/artifact/", http.StripPrefix("/artifact/",
-		http.FileServer(http.Dir("/tmp/runlog-artifacts"))))
+	// Serve e2e test artifacts (screenshots, traces) — stored in .runlog/artifacts/.
+	if d.artifactsDir != "" {
+		os.MkdirAll(d.artifactsDir, 0o755) //nolint:errcheck
+		d.mux.Handle("/artifact/", http.StripPrefix("/artifact/",
+			http.FileServer(http.Dir(d.artifactsDir))))
+	}
 	d.mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
 			http.Redirect(w, r, "/ui/", http.StatusFound)
@@ -99,6 +124,10 @@ func (d *DaemonServer) registerRoutes() {
 
 // ServeHTTP implements http.Handler.
 func (d *DaemonServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if strings.HasPrefix(r.URL.Path, "/static/") {
+		staticfs.Handler("/static/").ServeHTTP(w, r)
+		return
+	}
 	d.mux.ServeHTTP(w, r)
 }
 
@@ -158,10 +187,22 @@ func (d *DaemonServer) handleRuns(w http.ResponseWriter, r *http.Request) {
 }
 
 type registerRunRequest struct {
-	PID        int    `json:"pid"`
-	EnvProfile string `json:"env_profile"`
-	ServerURL  string `json:"server_url"`
-	Token      string `json:"token"`
+	PID            int               `json:"pid"`
+	EnvProfile     string            `json:"env_profile"`
+	ServerURL      string            `json:"server_url"`
+	Token          string            `json:"token"`
+	Category       string            `json:"category,omitempty"`
+	Tags           []string          `json:"tags,omitempty"`
+	Description    string            `json:"description,omitempty"`
+	Experiment     string            `json:"experiment,omitempty"`
+	Runner         string            `json:"runner,omitempty"`
+	AppVersion     string            `json:"app_version,omitempty"`
+	TestVersion    string            `json:"test_version,omitempty"`
+	TestType       string            `json:"test_type,omitempty"`
+	EnvVars        map[string]string `json:"env_vars,omitempty"`
+	StartedAt      string            `json:"started_at,omitempty"`
+	TimeoutSeconds float64           `json:"timeout_seconds,omitempty"`
+	CoveragePct    *float64          `json:"coverage_pct,omitempty"`
 }
 
 func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request) {
@@ -175,13 +216,45 @@ func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if req.PID <= 0 {
+	if req.PID <= 0 && req.CoveragePct == nil {
 		http.Error(w, "pid required", http.StatusBadRequest)
 		return
 	}
 
 	id := newUUID()
 	rawDB := d.db.RawDB()
+
+	runner := req.Runner
+	if runner == "" {
+		runner = "dogfood"
+	}
+
+	startedAt := req.StartedAt
+	if startedAt == "" {
+		startedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+
+	var tagsJSON *string
+	if len(req.Tags) > 0 {
+		b, _ := json.Marshal(req.Tags)
+		s := string(b)
+		tagsJSON = &s
+	}
+
+	var descJSON *string
+	if req.Description != "" {
+		b, _ := json.Marshal(runlog.RunDescription{Summary: req.Description})
+		s := string(b)
+		descJSON = &s
+	}
+
+	var envVarsJSON *string
+	if len(req.EnvVars) > 0 {
+		b, _ := json.Marshal(req.EnvVars)
+		s := string(b)
+		envVarsJSON = &s
+	}
+
 	_, err = rawDB.Exec(
 		`INSERT INTO daemon_runs (id, pid, env_profile, server_url, token, status, started_at)
 		 VALUES (?, ?, ?, ?, ?, 'active', strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
@@ -191,17 +264,76 @@ func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request)
 		http.Error(w, fmt.Sprintf("db insert: %v", err), http.StatusInternalServerError)
 		return
 	}
-	// Also insert into test_runs so dogfood runs appear in the test dashboard.
+
 	testName := req.EnvProfile
 	if testName == "" {
 		testName = "unnamed"
 	}
-	_, _ = rawDB.Exec(
-		`INSERT INTO test_runs (test_name, started_at, runner, env_name, daemon_run_id)
-		 VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), 'dogfood', ?, ?)`,
-		testName, req.ServerURL, id,
-	)
-	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
+
+	q := `INSERT INTO test_runs (test_name, started_at, runner, env_name, daemon_run_id`
+	vals := []any{testName, startedAt, runner, req.ServerURL, id}
+	placeholders := `?, ?, ?, ?, ?`
+
+	if req.Category != "" {
+		q += `, category`
+		vals = append(vals, req.Category)
+		placeholders += `, ?`
+	}
+	if tagsJSON != nil {
+		q += `, tags`
+		vals = append(vals, *tagsJSON)
+		placeholders += `, ?`
+	}
+	if descJSON != nil {
+		q += `, description`
+		vals = append(vals, *descJSON)
+		placeholders += `, ?`
+	}
+	if req.Experiment != "" {
+		q += `, experiment`
+		vals = append(vals, req.Experiment)
+		placeholders += `, ?`
+	}
+	if req.AppVersion != "" {
+		q += `, app_version`
+		vals = append(vals, req.AppVersion)
+		placeholders += `, ?`
+	}
+	if req.TestVersion != "" {
+		q += `, test_version`
+		vals = append(vals, req.TestVersion)
+		placeholders += `, ?`
+	}
+	if envVarsJSON != nil {
+		q += `, env_vars`
+		vals = append(vals, *envVarsJSON)
+		placeholders += `, ?`
+	}
+	if req.TimeoutSeconds > 0 {
+		q += `, timeout_seconds`
+		vals = append(vals, req.TimeoutSeconds)
+		placeholders += `, ?`
+	}
+	if req.CoveragePct != nil {
+		q += `, coverage_pct`
+		vals = append(vals, *req.CoveragePct)
+		placeholders += `, ?`
+	}
+	if req.TestType != "" {
+		q += `, test_type`
+		vals = append(vals, req.TestType)
+		placeholders += `, ?`
+	}
+
+	q += `) VALUES (` + placeholders + `)`
+	res, execErr := rawDB.Exec(q, vals...)
+	if execErr == nil {
+		if testRunID, err := res.LastInsertId(); err == nil {
+			writeJSON(w, http.StatusCreated, map[string]any{"id": id, "test_run_id": testRunID})
+			return
+		}
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
 
 type runListEntry struct {
@@ -290,15 +422,20 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 
 	case "events":
-		if r.Method == http.MethodPost && len(parts) == 2 {
-			d.handleInsertEvent(w, r, runID)
-			return
+		if len(parts) == 2 {
+			if r.Method == http.MethodPost {
+				d.handleInsertEvent(w, r, runID)
+				return
+			}
+			if r.Method == http.MethodGet {
+				d.handleGetEvents(w, r, runID)
+				return
+			}
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 
 	case "resources":
 		if len(parts) == 2 {
-			// POST /runs/:id/resources
 			if r.Method == http.MethodPost {
 				d.handleRegisterResource(w, r, runID)
 				return
@@ -306,10 +443,58 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		// DELETE /runs/:id/resources/:resource_id
 		resourceID := parts[2]
 		if r.Method == http.MethodDelete {
 			d.handleDeregisterResource(w, r, runID, resourceID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "category":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunField(w, r, runID, "category")
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "tags":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunTags(w, r, runID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "description":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunField(w, r, runID, "description")
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "experiment":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunField(w, r, runID, "experiment")
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "version":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunVersion(w, r, runID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "timeout":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunField(w, r, runID, "timeout_seconds")
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "test_type":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunField(w, r, runID, "test_type")
 			return
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -366,15 +551,51 @@ func (d *DaemonServer) handleGetRun(w http.ResponseWriter, r *http.Request, runI
 }
 
 type markDoneRequest struct {
-	Passed *bool `json:"passed,omitempty"` // nil = assume pass
+	Passed       *bool    `json:"passed,omitempty"` // nil = assume pass
+	Skipped      *bool    `json:"skipped,omitempty"`
+	Reason       string   `json:"reason,omitempty"`
+	FinishedAt   string   `json:"finished_at,omitempty"`
+	InputTokens  *int64   `json:"input_tokens,omitempty"`
+	OutputTokens *int64   `json:"output_tokens,omitempty"`
+	CostUSD      *float64 `json:"cost_usd,omitempty"`
+	CoveragePct  *float64 `json:"coverage_pct,omitempty"`
+	CoverageData *string  `json:"coverage_data,omitempty"`
 }
 
 func (d *DaemonServer) handleMarkRunDone(w http.ResponseWriter, r *http.Request, runID string) {
 	rawDB := d.db.RawDB()
+
+	finishedAt := time.Now().UTC().Format(time.RFC3339)
+	passed := true
+	var skipped *bool
+	var reason string
+	var inputTokens, outputTokens *int64
+	var costUSD, coveragePct *float64
+	var coverageData *string
+
+	if r.Body != nil {
+		var req markDoneRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.Passed != nil {
+				passed = *req.Passed
+			}
+			skipped = req.Skipped
+			reason = req.Reason
+			if req.FinishedAt != "" {
+				finishedAt = req.FinishedAt
+			}
+			inputTokens = req.InputTokens
+			outputTokens = req.OutputTokens
+			costUSD = req.CostUSD
+			coveragePct = req.CoveragePct
+			coverageData = req.CoverageData
+		}
+	}
+
 	res, err := rawDB.Exec(`
 		UPDATE daemon_runs
-		SET status='done', finished_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')
-		WHERE id=? AND status='active'`, runID)
+		SET status='done', finished_at=?
+		WHERE id=? AND status='active'`, finishedAt, runID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
 		return
@@ -384,26 +605,276 @@ func (d *DaemonServer) handleMarkRunDone(w http.ResponseWriter, r *http.Request,
 		// Already done/dead or not found — still 200 (idempotent)
 	}
 
-	// Check for optional pass/fail status in request body.
-	passed := true // default: run completed = pass
-	if r.Body != nil {
-		var req markDoneRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err == nil && req.Passed != nil {
-			passed = *req.Passed
+	q := `UPDATE test_runs SET finished_at=?, passed=?`
+	args := []any{finishedAt, passed}
+
+	if skipped != nil {
+		if *skipped {
+			q += `, skipped=1`
+		} else {
+			q += `, skipped=0`
+		}
+	}
+	if reason != "" {
+		q += `, reason=?`
+		args = append(args, reason)
+	}
+	if inputTokens != nil {
+		q += `, input_tokens=?`
+		args = append(args, *inputTokens)
+	}
+	if outputTokens != nil {
+		q += `, output_tokens=?`
+		args = append(args, *outputTokens)
+	}
+	if costUSD != nil {
+		q += `, cost_usd=?`
+		args = append(args, *costUSD)
+	}
+	if coveragePct != nil {
+		q += `, coverage_pct=?`
+		args = append(args, *coveragePct)
+	}
+	if coverageData != nil {
+		q += `, coverage_data=?`
+		args = append(args, *coverageData)
+	}
+
+	q += ` WHERE daemon_run_id=?`
+	args = append(args, runID)
+	_, _ = rawDB.Exec(q, args...)
+
+	// Log a failure event when the test failed with a reason
+	if !passed && reason != "" {
+		var testRunID int64
+		if err := rawDB.QueryRow(`SELECT id FROM test_runs WHERE daemon_run_id=?`, runID).Scan(&testRunID); err == nil {
+			var maxSeq int
+			_ = rawDB.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM run_events WHERE run_id=?`, testRunID).Scan(&maxSeq)
+			now := time.Now().UTC().Format(time.RFC3339)
+			_, _ = rawDB.Exec(
+				`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message)
+				 VALUES (?, ?, ?, 0, 'failure', ?)`,
+				testRunID, maxSeq+1, now, reason)
 		}
 	}
 
-	// Also update the linked test_run so the dashboard reflects completion.
-	_, _ = rawDB.Exec(`
-		UPDATE test_runs
-		SET finished_at=strftime('%Y-%m-%dT%H:%M:%SZ','now'), passed=?
-		WHERE daemon_run_id=?`, passed, runID)
-	// Trigger immediate non-blocking sweep
 	select {
 	case d.sweepCh <- struct{}{}:
 	default:
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "done"})
+}
+
+// handleUpdateRunField updates a single text field on the linked test_runs row.
+func (d *DaemonServer) handleUpdateRunField(w http.ResponseWriter, r *http.Request, runID, field string) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_, _ = d.db.RawDB().Exec(
+		fmt.Sprintf(`UPDATE test_runs SET %s=? WHERE daemon_run_id=?`, field),
+		req.Value, runID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// handleUpdateRunTags updates tags on the linked test_runs row (JSON array).
+func (d *DaemonServer) handleUpdateRunTags(w http.ResponseWriter, r *http.Request, runID string) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Tags []string `json:"tags"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	b, _ := json.Marshal(req.Tags)
+	_, _ = d.db.RawDB().Exec(
+		`UPDATE test_runs SET tags=? WHERE daemon_run_id=?`, string(b), runID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// handleUpdateRunVersion updates app_version and test_version on the linked test_runs row.
+func (d *DaemonServer) handleUpdateRunVersion(w http.ResponseWriter, r *http.Request, runID string) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		AppVersion  string `json:"app_version,omitempty"`
+		TestVersion string `json:"test_version,omitempty"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_, _ = d.db.RawDB().Exec(
+		`UPDATE test_runs SET app_version=?, test_version=? WHERE daemon_run_id=?`,
+		req.AppVersion, req.TestVersion, runID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// ── GET /test-runs ─────────────────────────────────────────────────────────────
+
+type testRunSummary struct {
+	ID          int64   `json:"id"`
+	TestName    string  `json:"test_name"`
+	StartedAt   string  `json:"started_at"`
+	FinishedAt  *string `json:"finished_at,omitempty"`
+	Passed      *int    `json:"passed,omitempty"`
+	Skipped     bool    `json:"skipped"`
+	Category    string  `json:"category,omitempty"`
+	Runner      string  `json:"runner,omitempty"`
+	DaemonRunID string  `json:"daemon_run_id,omitempty"`
+	TestType    string  `json:"test_type,omitempty"`
+}
+
+func (d *DaemonServer) handleTestRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	rows, err := d.db.RawDB().Query(`
+		SELECT id, test_name, started_at, finished_at, passed, skipped, COALESCE(category,''), COALESCE(runner,''), COALESCE(daemon_run_id,''), COALESCE(test_type,'')
+		FROM test_runs ORDER BY started_at DESC LIMIT 1000`)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	var result []testRunSummary
+	for rows.Next() {
+		var s testRunSummary
+		var finishedAt sql.NullString
+		var passedInt sql.NullInt64
+		if err := rows.Scan(&s.ID, &s.TestName, &s.StartedAt, &finishedAt, &passedInt, &s.Skipped, &s.Category, &s.Runner, &s.DaemonRunID, &s.TestType); err != nil {
+			continue
+		}
+		if finishedAt.Valid {
+			s.FinishedAt = &finishedAt.String
+		}
+		if passedInt.Valid {
+			v := int(passedInt.Int64)
+			s.Passed = &v
+		}
+		result = append(result, s)
+	}
+	if result == nil {
+		result = []testRunSummary{}
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleTestRunsPath handles GET /test-runs/:id and GET /test-runs/:id/events.
+func (d *DaemonServer) handleTestRunsPath(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/test-runs/")
+	path = strings.TrimSuffix(path, "/")
+	parts := strings.SplitN(path, "/", 2)
+
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "missing run id", http.StatusBadRequest)
+		return
+	}
+
+	idStr := parts[0]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid run id", http.StatusBadRequest)
+		return
+	}
+
+	if len(parts) == 1 {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var s testRunSummary
+		var finishedAt sql.NullString
+		var passedInt sql.NullInt64
+		err := d.db.RawDB().QueryRow(`
+			SELECT id, test_name, started_at, finished_at, passed, skipped, COALESCE(category,''), COALESCE(runner,''), COALESCE(daemon_run_id,''), COALESCE(test_type,'')
+			FROM test_runs WHERE id=?`, id).Scan(&s.ID, &s.TestName, &s.StartedAt, &finishedAt, &passedInt, &s.Skipped, &s.Category, &s.Runner, &s.DaemonRunID, &s.TestType)
+		if err == sql.ErrNoRows {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if finishedAt.Valid {
+			s.FinishedAt = &finishedAt.String
+		}
+		if passedInt.Valid {
+			v := int(passedInt.Int64)
+			s.Passed = &v
+		}
+		writeJSON(w, http.StatusOK, s)
+		return
+	}
+
+	if parts[1] == "events" && r.Method == http.MethodGet {
+		rows, err := d.db.RawDB().Query(`
+			SELECT id, seq, occurred_at, elapsed_s, kind, message, COALESCE(details,'{}')
+			FROM run_events WHERE run_id=? ORDER BY seq`, id)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		type eventSummary struct {
+			ID       int64   `json:"id"`
+			Seq      int     `json:"seq"`
+			Occurred string  `json:"occurred_at"`
+			Elapsed  float64 `json:"elapsed_s"`
+			Kind     string  `json:"kind"`
+			Message  string  `json:"message"`
+			Details  string  `json:"details"`
+		}
+		var events []eventSummary
+		for rows.Next() {
+			var e eventSummary
+			if err := rows.Scan(&e.ID, &e.Seq, &e.Occurred, &e.Elapsed, &e.Kind, &e.Message, &e.Details); err != nil {
+				continue
+			}
+			events = append(events, e)
+		}
+		if events == nil {
+			events = []eventSummary{}
+		}
+		writeJSON(w, http.StatusOK, events)
+		return
+	}
+
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+// handleGetEvents returns all events for a daemon run (GET /runs/:id/events).
+func (d *DaemonServer) handleGetEvents(w http.ResponseWriter, r *http.Request, runID string) {
+	var testRunID int64
+	err := d.db.RawDB().QueryRow(`SELECT id FROM test_runs WHERE daemon_run_id=?`, runID).Scan(&testRunID)
+	if err != nil {
+		http.Error(w, "run not found", http.StatusNotFound)
+		return
+	}
+	// Reuse same logic: rewrite URL and delegate to handleTestRunsPath.
+	r.URL.Path = fmt.Sprintf("/test-runs/%d/events", testRunID)
+	d.handleTestRunsPath(w, r)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -715,7 +1186,7 @@ func sweepOrphans(rawDB *sql.DB) (deleted, failed int) {
 
 // runSweeper runs the orphan sweeper loop: ticks every 60 seconds and also
 // responds to immediate triggers sent on d.sweepCh.
-func (d *DaemonServer) runSweeper() {
+func (d *DaemonServer) runSweeper(ctx context.Context) {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	for {
@@ -730,6 +1201,8 @@ func (d *DaemonServer) runSweeper() {
 			if deleted > 0 || failed > 0 {
 				log.Printf("daemon: sweep immediate: deleted=%d failed=%d", deleted, failed)
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -740,11 +1213,16 @@ func (d *DaemonServer) runSweeper() {
 
 // runReaper polls every 10 seconds; for each active run whose PID is dead,
 // marks it as dead and triggers an immediate sweep.
-func (d *DaemonServer) runReaper() {
+func (d *DaemonServer) runReaper(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		d.reapDeadRuns()
+	for {
+		select {
+		case <-ticker.C:
+			d.reapDeadRuns()
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -848,16 +1326,29 @@ func (d *DaemonServer) reapTimedOutRuns() {
 		}
 
 		_ = d.db.FinishRun(s.id, time.Now(), runlog.OutcomeTimeout, "timed out")
+		// Insert a failure event so the UI shows why the run timed out
+		var maxSeq int
+		_ = rawDB.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM run_events WHERE run_id=?`, s.id).Scan(&maxSeq)
+		now := time.Now().UTC().Format(time.RFC3339)
+		_, _ = rawDB.Exec(
+			`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message)
+			 VALUES (?, ?, ?, 0, 'failure', ?)`,
+			s.id, maxSeq+1, now, "timed out — test did not finish within "+d.timeout.String())
 		log.Printf("daemon: timed out run %d (%s)", s.id, s.testName)
 	}
 }
 
 // runTimeoutWatcher polls every 30 seconds and reaps timed-out runs.
-func (d *DaemonServer) runTimeoutWatcher() {
+func (d *DaemonServer) runTimeoutWatcher(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	for range ticker.C {
-		d.reapTimedOutRuns()
+	for {
+		select {
+		case <-ticker.C:
+			d.reapTimedOutRuns()
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -916,20 +1407,130 @@ func (d *DaemonServer) recoverStaleRuns() {
 // Start starts the daemon HTTP server on d.port, runs the sweeper and reaper
 // goroutines, and blocks until the returned stop function is called or the
 // listener is closed.
-func (d *DaemonServer) Start() error {
-	ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", d.port))
-	if err != nil {
-		return fmt.Errorf("daemon: listen on port %d: %w", d.port, err)
-	}
+// ServeOn serves the daemon on the given listener (for tests). Runs the sweeper,
+// reaper, and timeout watcher goroutines. Blocks until the server is shut down.
+func (d *DaemonServer) ServeOn(ln net.Listener) error {
+	d.port = ln.Addr().(*net.TCPAddr).Port
+
+	ctx, cancel := context.WithCancel(context.Background())
+	d.cancel = cancel
 
 	// Startup recovery before accepting connections
 	d.recoverStaleRuns()
 
-	go d.runSweeper()
-	go d.runReaper()
-	go d.runTimeoutWatcher()
+	go d.runSweeper(ctx)
+	go d.runReaper(ctx)
+	go d.runTimeoutWatcher(ctx)
+
+	if !d.devMode {
+		go d.watchBinary()
+	}
 
 	log.Printf("daemon: listening on port %d (pid %d) timeout=%s", d.port, os.Getpid(), d.timeout)
-	srv := &http.Server{Handler: d}
-	return srv.Serve(ln)
+	d.srv = &http.Server{Handler: d}
+	if err := d.srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
+}
+
+func (d *DaemonServer) Start() error {
+	addr := os.Getenv("RUNLOG_LISTEN_ADDR")
+	if addr == "" {
+		addr = "0.0.0.0"
+	}
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", addr, d.port))
+	if err != nil {
+		return fmt.Errorf("daemon: listen on port %d: %w", d.port, err)
+	}
+
+	if err := d.ServeOn(ln); err != nil {
+		return err
+	}
+
+	// If the binary watcher requested a restart, clean up and re-exec on the
+	// main goroutine. syscall.Exec replaces the entire process atomically.
+	select {
+	case <-d.restartCh:
+		self, selfErr := os.Executable()
+		if selfErr != nil {
+			log.Printf("daemon: restart: os.Executable: %v", selfErr)
+			return nil
+		}
+		d.db.Close()
+		if d.pidFile != "" {
+			os.Remove(d.pidFile) //nolint:errcheck
+		}
+		log.Printf("daemon: re-execing %s (args=%v)", self, os.Args)
+		syscall.Exec(self, os.Args, os.Environ()) //nolint:errcheck
+	}
+
+	return nil
+}
+
+// Shutdown gracefully stops the daemon HTTP server.
+func (d *DaemonServer) Shutdown() {
+	if d.cancel != nil {
+		d.cancel()
+	}
+	if d.srv != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		d.srv.Shutdown(ctx)
+		cancel()
+	}
+	select {
+	case <-d.restartCh:
+	default:
+		close(d.restartCh)
+	}
+}
+
+// watchBinary polls the daemon binary's modification time every 5 seconds.
+// When the binary is replaced (e.g. by go build -o), it performs a graceful
+// shutdown of the HTTP server then re-execs with the new binary via syscall.Exec.
+// This gives zero-downtime-ish updates — the new process takes over the same PID.
+func (d *DaemonServer) watchBinary() {
+	self, err := os.Executable()
+	if err != nil {
+		log.Printf("daemon: binary watch: os.Executable: %v", err)
+		return
+	}
+
+	startStat, err := os.Stat(self)
+	if err != nil {
+		log.Printf("daemon: binary watch: stat %s: %v", self, err)
+		return
+	}
+	startMod := startStat.ModTime()
+
+	log.Printf("daemon: binary watch started for %s (mtime=%s)", self, startMod.Format(time.RFC3339Nano))
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		stat, err := os.Stat(self)
+		if err != nil {
+			log.Printf("daemon: binary watch: stat error: %v", err)
+			continue
+		}
+
+		if stat.ModTime().Equal(startMod) || stat.ModTime().Before(startMod) {
+			continue
+		}
+
+		log.Printf("daemon: binary changed (%s) old=%s new=%s, restarting...", self, startMod.Format(time.RFC3339Nano), stat.ModTime().Format(time.RFC3339Nano))
+
+		// Trigger graceful shutdown of the HTTP server.
+		// Start() (on the main goroutine) will detect the closed restartCh
+		// and perform DB/PID cleanup + syscall.Exec on its goroutine.
+		if d.srv != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			d.srv.Shutdown(ctx)
+			cancel()
+		}
+		close(d.restartCh)
+		return
+	}
 }

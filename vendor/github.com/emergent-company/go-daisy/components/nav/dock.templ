@@ -1,0 +1,41 @@
+package nav
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// DockItem is a bottom nav item (icon + label).
+type DockItem struct {
+	Label  string
+	Icon   string // iconify slug e.g. "lucide--home"
+	Href   string
+	Active bool
+}
+
+// Dock renders a DaisyUI dock (bottom navigation bar).
+templ Dock(items []DockItem) {
+	<div class="dock" { devmode.Attrs(ctx, "nav/Dock")... }>
+		for _, item := range items {
+			if item.Href != "" {
+				<a
+					href={ templ.URL(item.Href) }
+					class={ templ.KV("dock-active", item.Active) }
+				>
+					if item.Icon != "" {
+						<span class={ "iconify size-5 " + item.Icon }></span>
+					}
+					if item.Label != "" {
+						<span class="dock-label">{ item.Label }</span>
+					}
+				</a>
+			} else {
+				<button class={ templ.KV("dock-active", item.Active) }>
+					if item.Icon != "" {
+						<span class={ "iconify size-5 " + item.Icon }></span>
+					}
+					if item.Label != "" {
+						<span class="dock-label">{ item.Label }</span>
+					}
+				</button>
+			}
+		}
+	</div>
+}

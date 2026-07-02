@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -64,14 +65,40 @@ func (app *WebApp) handleDashboard(c echo.Context) error {
 		categories = []catSummary{{Name: "uncategorized", TestCount: len(allTestNames)}}
 	}
 
+	// Environment status
+	envCount := len(app.config.Environments)
+	envPassCount := 0
+	for _, env := range app.config.Environments {
+		if err := runlog.ValidateEnvSummary(&env); err == nil {
+			envPassCount++
+		}
+	}
+
+	var covSum float64
+	var covCount int
+	for _, r := range allRuns {
+		if r.CoveragePct != nil {
+			covSum += *r.CoveragePct
+			covCount++
+		}
+	}
+	var avgCov *float64
+	if covCount > 0 {
+		v := covSum / float64(covCount)
+		avgCov = &v
+	}
+
 	data := dashboardData{
-		TotalTests: len(allTestNames),
-		TotalRuns:  len(allRuns),
-		PassCount:  passCount,
-		FailCount:  failCount,
-		SkipCount:  skipCount,
-		RecentRuns: allRuns,
-		Categories: categories,
+		TotalTests:   len(allTestNames),
+		TotalRuns:    len(allRuns),
+		PassCount:    passCount,
+		FailCount:    failCount,
+		SkipCount:    skipCount,
+		RecentRuns:   allRuns,
+		Categories:   categories,
+		EnvCount:     envCount,
+		EnvPassCount: envPassCount,
+		CoveragePct:  avgCov,
 	}
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		DashboardPage(data), DashboardContent(data))
@@ -96,7 +123,7 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 	q := `SELECT r.id, r.test_name, r.started_at, r.finished_at, r.passed, r.skipped,
 	              r.description, r.tags, r.experiment, r.runner, r.reason, r.env_name,
 	              r.input_tokens, r.output_tokens, r.cost_usd, r.env_vars,
-	              r.app_version, r.test_version, r.category
+	              r.app_version, r.test_version, r.category, r.test_type
 	       FROM test_runs r`
 	args := []any{}
 
@@ -172,13 +199,14 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 		var passedInt *int
 		var skipped bool
 		var category *string
+		var testType string
 		if err := rows.Scan(
 			&r.ID, &r.TestName, &startedStr, &finishedStr,
 			&passedInt, &skipped,
 			&descJSON, &tagsJSON, &experiment,
 			&runner, &reason, &envName,
 			&inputTokens, &outputTokens, &costUSD, &envVarsJSON,
-			&appVersion, &testVersion, &category,
+			&appVersion, &testVersion, &category, &testType,
 		); err != nil {
 			continue
 		}
@@ -201,6 +229,7 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 		r.AppVersion = appVersion
 		r.TestVersion = testVersion
 		r.Category = category
+		r.TestType = testType
 		if descJSON != nil && *descJSON != "" {
 			var d runlog.RunDescription
 			if json.Unmarshal([]byte(*descJSON), &d) == nil {
@@ -265,12 +294,12 @@ func (app *WebApp) handleTests(c echo.Context) error {
 	// Uses idx_test_runs_name_started composite index for GROUP BY.
 	rows, err := rawDB.Query(`
 		SELECT t.test_name, t.run_count, t.last_started,
-		       t.passed, t.skipped, t.reason, t.category
+		       t.passed, t.skipped, t.reason, t.category, t.test_type
 		FROM (
 			SELECT test_name,
 			       COUNT(*)       OVER (PARTITION BY test_name) AS run_count,
 			       MAX(started_at) OVER (PARTITION BY test_name) AS last_started,
-			       passed, skipped, reason, category,
+			       passed, skipped, reason, category, test_type,
 			       ROW_NUMBER()   OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
 			FROM test_runs
 		) t
@@ -287,6 +316,7 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		RunCount    int
 		LastStarted string
 		Category    *string
+		TestType    string
 	}
 	var agg []aggRow
 	statusMap := make(map[string]string)
@@ -297,14 +327,15 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		var passed, skipped sql.NullInt64
 		var reason sql.NullString
 		var category sql.NullString
-		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped, &reason, &category); err != nil {
+		var testType string
+		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped, &reason, &category, &testType); err != nil {
 			continue
 		}
 		var catPtr *string
 		if category.Valid {
 			catPtr = &category.String
 		}
-		agg = append(agg, aggRow{Name: name, RunCount: runCount, LastStarted: lastStarted, Category: catPtr})
+		agg = append(agg, aggRow{Name: name, RunCount: runCount, LastStarted: lastStarted, Category: catPtr, TestType: testType})
 		switch {
 		case !passed.Valid:
 			statusMap[name] = "running"
@@ -350,6 +381,7 @@ func (app *WebApp) handleTests(c echo.Context) error {
 			LastStatus: status,
 			LastRunAt:  lastRunAt,
 			RunCount:   a.RunCount,
+			TestType:   a.TestType,
 		}
 		catMap[cat] = append(catMap[cat], entry)
 		seen[a.Name] = true
@@ -417,6 +449,9 @@ func (app *WebApp) handleTests(c echo.Context) error {
 
 func (app *WebApp) handleTestDetail(c echo.Context) error {
 	testName := c.Param("name")
+	if decoded, err := url.PathUnescape(testName); err == nil {
+		testName = decoded
+	}
 	offsetStr := c.QueryParam("offset")
 	tagFilter := c.QueryParam("tag")
 	offset := 0
@@ -706,16 +741,18 @@ func (app *WebApp) handleFooterStatus(c echo.Context) error {
 
 func (app *WebApp) handleLaunchTest(c echo.Context) error {
 	testName := c.Param("name")
-
+	if decoded, err := url.PathUnescape(testName); err == nil {
+		testName = decoded
+	}
 	// Pre-create test_runs row so we have an ID to redirect to.
-	runID, err := app.db.InsertRun(testName, time.Now(), "web-ui", "", nil)
+	runID, err := app.db.InsertRun(testName, time.Now(), "web-ui", "", nil, "")
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "create run: "+err.Error())
 	}
 
 	env := map[string]string{
-		"RUNLOG_RUN_ID": fmt.Sprintf("%d", runID),
-		"TEST_RUNS_DB":  app.db.Path(),
+		"RUNLOG_RUN_ID":     fmt.Sprintf("%d", runID),
+		"_RUNLOG_DAEMON_DB": app.db.Path(),
 	}
 	if _, err := app.lm.Launch(testName, runID, env); err != nil {
 		// Launch failed — clean up the pre-created run row.
@@ -1093,6 +1130,15 @@ func computeTestStats(rawDB *sql.DB, testName string) testStats {
 		}
 	}
 
+	// Average coverage
+	var avgCov sql.NullFloat64
+	_ = rawDB.QueryRow(`SELECT AVG(coverage_pct) FROM test_runs WHERE test_name=? AND coverage_pct IS NOT NULL`, testName).Scan(&avgCov)
+	if avgCov.Valid {
+		s.AvgCoverage = fmt.Sprintf("%.1f%%", avgCov.Float64)
+	} else {
+		s.AvgCoverage = "N/A"
+	}
+
 	return s
 }
 
@@ -1284,6 +1330,88 @@ func (app *WebApp) handleLinterRunDetail(c echo.Context) error {
 	return nil
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Environment handlers
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (app *WebApp) handleEnvironments(c echo.Context) error {
+	envs := app.config.Environments
+	var entries []envListEntry
+	for _, env := range envs {
+		results := runlog.ValidateEnv(&env)
+		status := "pass"
+		for _, r := range results {
+			if !r.Pass {
+				status = "fail"
+				break
+			}
+		}
+		entries = append(entries, envListEntry{
+			Name:           env.Name,
+			VarCount:       len(env.Env),
+			CheckCount:     len(env.Requires),
+			HasTestScript:  env.TestScript != "",
+			HasSetupScript: env.SetupScript != "",
+			Status:         status,
+		})
+	}
+
+	data := envListData{Envs: entries}
+	render.RenderAuto(c.Response().Writer, c.Request(),
+		EnvironmentsPage(data), EnvironmentsContent(data))
+	return nil
+}
+
+func (app *WebApp) handleEnvironmentDetail(c echo.Context) error {
+	name := c.Param("name")
+	var found *runlog.EnvironmentConfig
+	for i := range app.config.Environments {
+		if app.config.Environments[i].Name == name {
+			found = &app.config.Environments[i]
+			break
+		}
+	}
+	if found == nil {
+		return echo.NewHTTPError(http.StatusNotFound, "environment not found: "+name)
+	}
+
+	results := runlog.ValidateEnv(found)
+	status := "pass"
+	var checkResults []envCheckResult
+	for _, r := range results {
+		if !r.Pass {
+			status = "fail"
+		}
+		// Find the check type from config
+		checkType := ""
+		if ck, ok := found.Requires[r.Key]; ok {
+			checkType = ck.Check
+		}
+		checkResults = append(checkResults, envCheckResult{
+			Key:       r.Key,
+			CheckType: checkType,
+			Value:     r.Value,
+			Pass:      r.Pass,
+			Error:     r.Error,
+			Hint:      r.Hint,
+		})
+	}
+
+	data := envDetailData{
+		Name:         found.Name,
+		Status:       status,
+		VarCount:     len(found.Env),
+		CheckCount:   len(found.Requires),
+		EnvVars:      found.Env,
+		CheckResults: checkResults,
+		TestScript:   found.TestScript,
+		SetupScript:  found.SetupScript,
+	}
+	render.RenderAuto(c.Response().Writer, c.Request(),
+		EnvDetailPage(data), EnvDetailContent(data))
+	return nil
+}
+
 func (app *WebApp) handleLinterEvents(c echo.Context) error {
 	linterName := c.Param("name")
 	al := app.linterMgr.Get(linterName)
@@ -1364,4 +1492,126 @@ func (app *WebApp) handleLinterEventsStream(c echo.Context) error {
 			return nil
 		}
 	}
+}
+
+func (app *WebApp) handleSearch(c echo.Context) error {
+	q := strings.TrimSpace(c.QueryParam("q"))
+	rawDB := app.db.RawDB()
+
+	const perSection = 6
+	sections := []searchResultSection{}
+
+	if q == "" {
+		render.RenderPartial(c.Response().Writer, c.Request(), SearchResults(sections))
+		return nil
+	}
+	likeQ := "%" + q + "%"
+
+	testRows, err := rawDB.Query(
+		`SELECT DISTINCT test_name FROM test_runs WHERE test_name LIKE ? ORDER BY
+		 CASE WHEN test_name LIKE ? THEN 0 ELSE 1 END,
+		 test_name LIMIT ?`,
+		likeQ, q+"%", perSection,
+	)
+	if err == nil {
+		var items []searchResultItem
+		for testRows.Next() {
+			var name string
+			if testRows.Scan(&name) == nil {
+				items = append(items, searchResultItem{
+					Icon:  "lucide--flask-conical",
+					Label: name,
+					Href:  "/ui/tests/" + url.PathEscape(name),
+				})
+			}
+		}
+		testRows.Close()
+		if len(items) > 0 {
+			sections = append(sections, searchResultSection{Title: "Tests", Items: items})
+		}
+	}
+
+	runRows, err := rawDB.Query(
+		`SELECT id, test_name, started_at FROM test_runs
+		 WHERE test_name LIKE ? OR CAST(id AS TEXT) LIKE ?
+		 ORDER BY started_at DESC LIMIT ?`,
+		likeQ, likeQ, perSection,
+	)
+	if err == nil {
+		var items []searchResultItem
+		for runRows.Next() {
+			var id int64
+			var name, startedStr string
+			if runRows.Scan(&id, &name, &startedStr) == nil {
+				t, _ := time.Parse(time.RFC3339Nano, startedStr)
+				label := fmt.Sprintf("#%d  %s  (%s)", id, name, relativeTime(t))
+				items = append(items, searchResultItem{
+					Icon:  "lucide--list",
+					Label: label,
+					Href:  fmt.Sprintf("/ui/runs/%d", id),
+				})
+			}
+		}
+		runRows.Close()
+		if len(items) > 0 {
+			sections = append(sections, searchResultSection{Title: "Runs", Items: items})
+		}
+	}
+
+	lintRows, err := rawDB.Query(
+		`SELECT DISTINCT linter_name FROM linter_runs
+		 WHERE linter_name LIKE ? ORDER BY linter_name LIMIT ?`,
+		likeQ, perSection,
+	)
+	if err == nil {
+		var items []searchResultItem
+		for lintRows.Next() {
+			var name string
+			if lintRows.Scan(&name) == nil {
+				items = append(items, searchResultItem{
+					Icon:  "lucide--shield",
+					Label: name,
+					Href:  "/ui/linters/" + url.PathEscape(name),
+				})
+			}
+		}
+		lintRows.Close()
+		if len(items) > 0 {
+			sections = append(sections, searchResultSection{Title: "Linters", Items: items})
+		}
+	}
+
+	expRows, err := rawDB.Query(
+		`SELECT DISTINCT experiment FROM test_runs
+		 WHERE experiment IS NOT NULL AND experiment LIKE ?
+		 ORDER BY experiment LIMIT ?`,
+		likeQ, perSection,
+	)
+	if err == nil {
+		var items []searchResultItem
+		for expRows.Next() {
+			var name string
+			if expRows.Scan(&name) == nil {
+				items = append(items, searchResultItem{
+					Icon:  "lucide--layers",
+					Label: name,
+					Href:  "/ui/experiments/" + url.PathEscape(name),
+				})
+			}
+		}
+		expRows.Close()
+		if len(items) > 0 {
+			sections = append(sections, searchResultSection{Title: "Experiments", Items: items})
+		}
+	}
+
+	if len(sections) > 0 {
+		sort.Slice(sections, func(i, j int) bool {
+			order := map[string]int{"Tests": 0, "Runs": 1, "Linters": 2, "Experiments": 3}
+			return order[sections[i].Title] < order[sections[j].Title]
+		})
+	}
+
+	render.RenderPartial(c.Response().Writer, c.Request(), SearchResults(sections))
+	return nil
 }

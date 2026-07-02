@@ -5328,6 +5328,10 @@ USAGE
   runlog skills install [flags]         install embedded skills into tool directories
   runlog skills list                    list all embedded skills
   runlog test [<profile>] [<filter>]    load .env and run go test (profile = MEMORY_TEST_ENV)
+  runlog env list                       list configured environments
+  runlog env show <name>                show environment details and status
+  runlog env validate <name>            validate all checks for an environment
+  runlog lint [<linter-name> ...]       run linters from lefthook.yml or config
   runlog clear [--db <path>]            delete runs.db and all per-run log files
   runlog reap [--dry-run] [<run-id>]    mark stale/orphaned runs as FAIL
   runlog version                        print version and exit
@@ -5586,6 +5590,16 @@ func main() {
 		dbPath = resolveDBPath(*globalDB)
 		since = parseSince(*globalSince, "")
 
+	case "env":
+		// env shows/validates environment config; does not need DB.
+		dbPath = resolveDBPath(*globalDB)
+		since = parseSince(*globalSince, "")
+
+	case "lint":
+		// lint runs lefthook-discovered linters; does not need DB.
+		dbPath = resolveDBPath(*globalDB)
+		since = parseSince(*globalSince, "")
+
 	case "test":
 		// test loads .env and execs go test; does not need DB.
 		dbPath = resolveDBPath(*globalDB)
@@ -5614,6 +5628,22 @@ func main() {
 	if subcommand == "skills" {
 		if err := cmdSkills(subArgs); err != nil {
 			fmt.Fprintf(os.Stderr, "runlog skills: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if subcommand == "env" {
+		if err := cmdEnv(subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog env: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if subcommand == "lint" {
+		if err := cmdLint(subArgs); err != nil {
+			fmt.Fprintf(os.Stderr, "runlog lint: %v\n", err)
 			os.Exit(1)
 		}
 		return

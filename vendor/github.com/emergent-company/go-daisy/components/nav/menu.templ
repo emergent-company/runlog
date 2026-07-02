@@ -1,0 +1,59 @@
+package nav
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// MenuSize controls the size of a menu.
+type MenuSize string
+
+const (
+	MenuSM MenuSize = "menu-sm"
+	MenuMD MenuSize = ""
+	MenuLG MenuSize = "menu-lg"
+)
+
+// MenuItem is a navigation link entry.
+type MenuItem struct {
+	Label  string
+	Href   string
+	Icon   string // iconify slug e.g. "lucide--home"
+	Active bool
+}
+
+// Menu renders a DaisyUI vertical navigation menu.
+templ Menu(size MenuSize, items []MenuItem) {
+	<ul class={ "menu", templ.KV(string(size), size != "") } { devmode.Attrs(ctx, "nav/Menu")... }>
+		for _, item := range items {
+			<li>
+				<a
+					href={ templ.URL(item.Href) }
+					class={ templ.KV("active", item.Active) }
+				>
+					if item.Icon != "" {
+						<span class={ "iconify size-4 " + item.Icon }></span>
+					}
+					{ item.Label }
+				</a>
+			</li>
+		}
+	</ul>
+}
+
+// MenuSection renders a titled group of menu items.
+templ MenuSection(title string, items []MenuItem) {
+	if title != "" {
+		<li class="menu-title" { devmode.Attrs(ctx, "nav/MenuSection")... }>{ title }</li>
+	}
+	for _, item := range items {
+		<li>
+			<a
+				href={ templ.URL(item.Href) }
+				class={ templ.KV("active", item.Active) }
+			>
+				if item.Icon != "" {
+					<span class={ "iconify size-4 " + item.Icon }></span>
+				}
+				{ item.Label }
+			</a>
+		</li>
+	}
+}

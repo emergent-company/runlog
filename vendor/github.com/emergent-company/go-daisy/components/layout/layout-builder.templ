@@ -1,0 +1,146 @@
+package layout
+
+import (
+	"github.com/emergent-company/go-daisy/components/nav"
+	"github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+templ LayoutBuilder() {
+	<div
+		x-data="{
+			sidebar: 'ecommerce',
+			topbar: 'classic',
+			footer: 'minimal'
+		}"
+		class="flex flex-col h-screen overflow-hidden"
+		{ devmode.Attrs(ctx, "layout/LayoutBuilder")... }
+	>
+		<div class="border-base-300 bg-base-100 flex items-center justify-between border-b px-4 py-3 shrink-0">
+			<p class="font-semibold text-lg">Layout Builder</p>
+			<div class="flex items-center gap-4 text-sm">
+				<span class="text-base-content/60">Mix and match layout variants</span>
+				<div class="border-base-300 h-6 border-e"></div>
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonXS, ExtraClass: "gap-1", Attrs: templ.Attributes{"@click": "sidebar='ecommerce'; topbar='classic'; footer='minimal'"}}){
+					@ui.IconSpan("lucide--rotate-ccw", "size-3.5") "Reset"
+				}
+			</div>
+		</div>
+		<div class="bg-base-200/50 flex items-center gap-4 border-b border-base-200 px-4 py-2.5 shrink-0 flex-wrap">
+			<div class="flex items-center gap-2">
+				<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Sidebar</span>
+				<select class="select select-sm select-ghost w-40" x-model="sidebar">
+					<option value="ecommerce">Ecommerce</option>
+					<option value="payment">Payment</option>
+					<option value="project">Project</option>
+					<option value="chat">Chat</option>
+					<option value="documentation">Documentation</option>
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Topbar</span>
+				<select class="select select-sm select-ghost w-36" x-model="topbar">
+					<option value="classic">Classic</option>
+					<option value="greeting">Greeting</option>
+					<option value="nav-menu-1">Nav Menu 1</option>
+					<option value="nav-menu-2">Nav Menu 2</option>
+					<option value="editor">Editor</option>
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wider">Footer</span>
+				<select class="select select-sm select-ghost w-36" x-model="footer">
+					<option value="minimal">Minimal</option>
+					<option value="social">Social</option>
+					<option value="branding">Branding</option>
+					<option value="legal">Legal</option>
+					<option value="status">Status</option>
+					<option value="support">Support</option>
+					<option value="language-pills">Language Pills</option>
+					<option value="language-currency">Lang+Currency</option>
+				</select>
+			</div>
+		</div>
+		<div class="grow overflow-hidden relative">
+			<div class="size-full" id="_app-shell">
+				<input type="checkbox" id="_layout-sidebar-toggle-trigger" class="hidden peer" aria-label="Toggle layout sidebar" />
+				<input type="checkbox" id="_layout-sidebar-hover-trigger" class="hidden peer" aria-label="Toggle sidebar hover mode" />
+				<div class="flex size-full">
+					<div id="_layout-sidebar-hover" class="bg-base-300 h-full w-1"></div>
+					<div class="flex">
+						<template x-if="sidebar === 'ecommerce'">
+							@SidebarVariant("ecommerce", SidebarVariantOpts{AppName: "ACME Inc"})
+						</template>
+						<template x-if="sidebar === 'payment'">
+							@SidebarVariant("payment", SidebarVariantOpts{AppName: "PayFlow"})
+						</template>
+						<template x-if="sidebar === 'project'">
+							@SidebarVariant("project", SidebarVariantOpts{OrgName: "Design Studio"})
+						</template>
+						<template x-if="sidebar === 'chat'">
+							@SidebarVariant("chat", SidebarVariantOpts{AppName: "Chat", TokenUsed: 6500, TokenMax: 10000})
+						</template>
+						<template x-if="sidebar === 'documentation'">
+							@SidebarVariant("documentation", SidebarVariantOpts{AppName: "Docs", Version: "v3.0.0"})
+						</template>
+					</div>
+					<div class="flex min-w-0 grow flex-col overflow-hidden">
+						<template x-if="topbar === 'classic'">
+							@TopbarVariant("classic", TopbarVariantOpts{ShowSearch: true, ShowNotifications: true, ShowApps: true, ShowLanguage: true})
+						</template>
+						<template x-if="topbar === 'greeting'">
+							@TopbarVariant("greeting", TopbarVariantOpts{Greeting: "Good Morning", UserName: "Denish", Subtitle: "Welcome back"})
+						</template>
+						<template x-if="topbar === 'nav-menu-1'">
+							@TopbarVariant("nav-menu-1", TopbarVariantOpts{NavLinks: []TopbarNavLink{{Label: "Apps", Href: "#"}, {Label: "Components", Href: "#", Active: true}, {Label: "Pages", Href: "#"}}, ShowSearch: true, ShowNotifications: true})
+						</template>
+						<template x-if="topbar === 'nav-menu-2'">
+							@TopbarVariant("nav-menu-2", TopbarVariantOpts{ShowSearch: true, ShowNotifications: true, ShowApps: true})
+						</template>
+						<template x-if="topbar === 'editor'">
+							@TopbarVariant("editor", TopbarVariantOpts{ShowSearch: true, SaveStatus: "Saved just now"})
+						</template>
+						<main id="main-content" class="grow overflow-auto bg-base-200">
+							<div class="flex items-center justify-center h-full">
+								<div class="text-center p-8">
+									<div class="bg-base-100 rounded-box inline-flex items-center gap-3 border p-4 shadow-xs">
+										@ui.IconSpan("lucide--layout-panel-left", "size-6 text-base-content/30")
+										<div class="text-left">
+											<p class="text-sm font-medium">Content Area</p>
+											<p class="text-base-content/60 text-xs">Replace this with your page content</p>
+										</div>
+									</div>
+								</div>
+							</div>
+						</main>
+						<div x-show="footer === 'minimal'" x-cloak>
+							@nav.FooterVariant("minimal", nav.FooterVariantOpts{Copyright: "Layout Builder Demo"})
+						</div>
+						<div x-show="footer === 'social'" x-cloak>
+							@nav.FooterVariant("social", nav.FooterVariantOpts{Copyright: "Layout Builder Demo", BrandName: "Nexus", SocialLinks: []nav.SocialLink{{Icon: "lucide--github", Href: "#"}, {Icon: "lucide--twitter", Href: "#"}, {Icon: "lucide--linkedin", Href: "#"}}})
+						</div>
+						<div x-show="footer === 'branding'" x-cloak>
+							@nav.FooterVariant("branding", nav.FooterVariantOpts{Copyright: "Layout Builder Demo"})
+						</div>
+						<div x-show="footer === 'legal'" x-cloak>
+							@nav.FooterVariant("legal", nav.FooterVariantOpts{Copyright: "Layout Builder Demo", LegalLinks: []nav.FooterLink{{Label: "Terms", Href: "#"}, {Label: "Privacy", Href: "#"}, {Label: "Legal", Href: "#"}}})
+						</div>
+						<div x-show="footer === 'status'" x-cloak>
+							@nav.FooterVariant("status", nav.FooterVariantOpts{Copyright: "Layout Builder Demo", StatusLabel: "All systems normal", StatusOK: true})
+						</div>
+						<div x-show="footer === 'support'" x-cloak>
+							@nav.FooterVariant("support", nav.FooterVariantOpts{PhoneNumber: "+1 (555) 000-0000", SocialLinks: []nav.SocialLink{{Icon: "lucide--github", Href: "#"}, {Icon: "lucide--twitter", Href: "#"}}})
+						</div>
+						<div x-show="footer === 'language-pills'" x-cloak>
+							@nav.FooterVariant("language-pills", nav.FooterVariantOpts{Copyright: "Layout Builder Demo", Languages: []nav.LangOption{{Label: "EN", Href: "#"}, {Label: "ES", Href: "#"}, {Label: "ZH", Href: "#"}}})
+						</div>
+						<div x-show="footer === 'language-currency'" x-cloak>
+							@nav.FooterVariant("language-currency", nav.FooterVariantOpts{Copyright: "Layout Builder Demo", Languages: []nav.LangOption{{Label: "English", Href: "#"}, {Label: "Spanish", Href: "#"}}, Currencies: []nav.CurrencyOption{{Label: "USD", Symbol: "$", Href: "#"}, {Label: "EUR", Symbol: "€", Href: "#"}}})
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+}

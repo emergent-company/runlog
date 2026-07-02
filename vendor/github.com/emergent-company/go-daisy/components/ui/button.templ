@@ -11,6 +11,7 @@ const (
 	ButtonAccent    ButtonVariant = "btn-accent"
 	ButtonGhost     ButtonVariant = "btn-ghost"
 	ButtonError     ButtonVariant = "btn-error"
+	ButtonSuccess   ButtonVariant = "btn-success"
 	ButtonOutline   ButtonVariant = "btn-outline"
 	ButtonNeutral   ButtonVariant = "btn-neutral"
 )
@@ -25,6 +26,16 @@ const (
 	ButtonLG ButtonSize = "btn-lg"
 )
 
+// ButtonStyle controls the visual style variant of a button.
+type ButtonStyle string
+
+const (
+	ButtonStyleDefault ButtonStyle = ""
+	ButtonStyleOutline ButtonStyle = "btn-outline"
+	ButtonStyleSoft    ButtonStyle = "btn-soft"
+	ButtonStyleDash    ButtonStyle = "btn-dash"
+)
+
 // ButtonType controls the HTML element and type attribute rendered.
 // ButtonTypeLink renders an <a> element instead of <button>.
 type ButtonType string
@@ -34,6 +45,7 @@ const (
 	ButtonTypeSubmit ButtonType = "submit"
 	ButtonTypeReset  ButtonType = "reset"
 	ButtonTypeLink   ButtonType = "link"
+	ButtonTypeLabel  ButtonType = "label"
 )
 
 // ButtonShape controls whether the button is normal, square, or circle.
@@ -44,6 +56,22 @@ const (
 	ButtonShapeSquare  ButtonShape = "btn-square"
 	ButtonShapeCircle  ButtonShape = "btn-circle"
 )
+
+// ButtonProps configures a Button component.
+type ButtonProps struct {
+	Href    string
+	Variant ButtonVariant
+	Size    ButtonSize
+	Style   ButtonStyle
+	Type    ButtonType
+	Shape   ButtonShape
+	Icon    string           // lucide icon prefix e.g. "lucide--pencil"
+	Loading bool
+	Block   bool             // when true, adds btn-block
+	ExtraClass string        // additional CSS classes appended to the btn class list (e.g. "gap-2 me-3")
+	OnClick templ.ComponentScript // optional script-backed onclick, e.g. a `script` block call or templ.JSFuncCall(...)
+	Attrs   templ.Attributes // optional extra HTML attributes
+}
 
 // SimpleButton renders a DaisyUI button with a plain text label.
 // attrs is optional; pass nil when not needed.
@@ -61,52 +89,79 @@ templ SimpleButton(label string, variant ButtonVariant, size ButtonSize, attrs t
 // IconSpan renders an Iconify icon span with a configurable size class.
 // name: full iconify class e.g. "lucide--sun"; size: tailwind size class e.g. "size-8"
 templ IconSpan(name string, size string) {
-	<span class={ "iconify", name, size } { devmode.Attrs(ctx, "ui/IconSpan")... }></span>
+	<span class={ "iconify", name, size } aria-hidden="true" { devmode.Attrs(ctx, "ui/IconSpan")... }></span>
 }
 
 // IconSpanColored renders an Iconify icon span with a size and an extra color class.
 templ IconSpanColored(name string, size string, color string) {
-	<span class={ "iconify", name, size, color } { devmode.Attrs(ctx, "ui/IconSpanColored")... }></span>
+	<span class={ "iconify", name, size, color } aria-hidden="true" { devmode.Attrs(ctx, "ui/IconSpanColored")... }></span>
 }
 
-// Button renders a full-featured DaisyUI button.
-// Set typ=ButtonTypeLink to get an <a> element using href; otherwise renders <button>.
-// Set shape to square/circle for icon-only buttons.
-// attrs is optional; pass nil when not needed.
-templ Button(href string, variant ButtonVariant, size ButtonSize, typ ButtonType, shape ButtonShape, icon string, loading bool, attrs templ.Attributes) {
-	if typ == ButtonTypeLink {
+// Button renders a full-featured DaisyUI button using typed ButtonProps.
+// Set Type=ButtonTypeLink to get an <a> element using Href; otherwise renders <button>.
+// Set Shape=ButtonShapeSquare or ButtonShapeCircle for icon-only buttons.
+// Attrs is optional; pass nil when not needed.
+templ Button(props ButtonProps) {
+	if props.Type == ButtonTypeLink {
 		<a
-			href={ templ.URL(href) }
+			href={ templ.URL(props.Href) }
 			class={ "btn",
-				templ.KV(string(variant), variant != ""),
-				templ.KV(string(size), size != ""),
-				templ.KV(string(shape), shape != "") }
+				templ.KV(string(props.Variant), props.Variant != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV(string(props.Shape), props.Shape != ""),
+				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
+				templ.KV("btn-block", props.Block),
+				props.ExtraClass }
+			if props.OnClick.Name != "" {
+				onclick={ props.OnClick }
+			}
 			{ devmode.Attrs(ctx, "ui/Button")... }
-			{ attrs... }
+			{ props.Attrs... }
 		>
-			if icon != "" {
-				<span class={ "iconify size-4 " + icon }></span>
+			if props.Icon != "" {
+				@IconSpan(props.Icon, "size-4")
 			}
 			{ children... }
 		</a>
+	} else if props.Type == ButtonTypeLabel {
+		<label
+			class={ "btn",
+				templ.KV(string(props.Variant), props.Variant != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV(string(props.Shape), props.Shape != ""),
+				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
+				templ.KV("btn-block", props.Block),
+				props.ExtraClass }
+			{ devmode.Attrs(ctx, "ui/Button")... }
+			{ props.Attrs... }
+		>
+			if props.Icon != "" {
+				@IconSpan(props.Icon, "size-4")
+			}
+			{ children... }
+		</label>
 	} else {
 		<button
-			type={ string(typ) }
+			type={ string(props.Type) }
 			class={ "btn",
-				templ.KV(string(variant), variant != ""),
-				templ.KV(string(size), size != ""),
-				templ.KV(string(shape), shape != ""),
-				templ.KV("loading loading-spinner", loading) }
-			disabled?={ loading }
+				templ.KV(string(props.Variant), props.Variant != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV(string(props.Shape), props.Shape != ""),
+				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
+				templ.KV("btn-block", props.Block),
+				templ.KV("loading loading-spinner", props.Loading),
+				props.ExtraClass }
+			disabled?={ props.Loading }
+			if props.OnClick.Name != "" {
+				onclick={ props.OnClick }
+			}
 			{ devmode.Attrs(ctx, "ui/Button")... }
-			{ attrs... }
+			{ props.Attrs... }
 		>
-			if icon != "" {
-				<span class={ "iconify size-4 " + icon }></span>
+			if props.Icon != "" {
+				@IconSpan(props.Icon, "size-4")
 			}
-			if shape == ButtonShapeDefault {
-				{ children... }
-			}
+			{ children... }
 		</button>
 	}
 }

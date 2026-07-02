@@ -1,0 +1,42 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ThemeToggle renders an animated sun/moon theme toggle using Swap + inline JS.
+// Uses document.documentElement.getAttribute('data-theme') to detect current theme.
+templ ThemeToggle() {
+	<label class="swap swap-rotate cursor-pointer" { devmode.Attrs(ctx, "ui/ThemeToggle")... }>
+		<input type="checkbox" class="theme-controller hidden" value="dracula" onclick="themeToggleAnimated(this)" />
+		@IconSpan("lucide--sun", "size-5")
+		@IconSpan("lucide--moon", "size-5")
+	</label>
+	@themeToggleScript()
+}
+
+templ themeToggleScript() {
+	<script>
+	if (!window._themeToggleInit) {
+	  window._themeToggleInit = true;
+
+	  window.themeToggleAnimated = function(cb) {
+	    var current = document.documentElement.getAttribute('data-theme') || 'nord';
+	    var next = current === 'nord' || current === 'flow' ? 'dracula' : 'nord';
+	    document.documentElement.setAttribute('data-theme', next);
+	    try {
+	      var cfg = JSON.parse(localStorage.getItem('__NEXUS_CONFIG_v3.0__') || '{}');
+	      cfg.theme = next;
+	      localStorage.setItem('__NEXUS_CONFIG_v3.0__', JSON.stringify(cfg));
+	    } catch(e) {}
+	  };
+
+	  // Sync checkbox state on load
+	  (function() {
+	    var current = document.documentElement.getAttribute('data-theme') || 'nord';
+	    var isDark = current === 'dracula' || current === 'dim' || current === 'sunset';
+	    document.querySelectorAll('.theme-controller').forEach(function(el) {
+	      el.checked = isDark;
+	    });
+	  })();
+	}
+	</script>
+}

@@ -1,0 +1,119 @@
+package form
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// DatePickerMode represents the Flatpickr mode.
+type DatePickerMode string
+
+const (
+	DatePickerSingle   DatePickerMode = "single"
+	DatePickerMultiple DatePickerMode = "multiple"
+	DatePickerRange    DatePickerMode = "range"
+	DatePickerTime     DatePickerMode = "time"
+	DatePickerDateTime DatePickerMode = "datetime"
+	DatePickerMonth    DatePickerMode = "month"
+	DatePickerWeek     DatePickerMode = "week"
+)
+
+// DatePickerProps configures a Flatpickr date/time picker.
+type DatePickerProps struct {
+	Name        string
+	Label       string
+	Value       string
+	Placeholder string
+	Mode        DatePickerMode
+	Required    bool
+	Error       string
+	Class       string
+	MinDate     string // e.g. "today", "2024-01-01"
+	MaxDate     string
+	Inline      bool
+	Time24h     bool
+	Attrs       templ.Attributes
+}
+
+// DatePicker renders a Flatpickr date/time picker input.
+templ DatePicker(props DatePickerProps) {
+	<div class="form-control w-full" { devmode.Attrs(ctx, "form/DatePicker")... }>
+		if props.Label != "" {
+			<label class="label" for={ props.Name }>
+				<span class="label-text">{ props.Label }</span>
+			</label>
+		}
+		<input
+			id={ props.Name }
+			name={ props.Name }
+			type="text"
+			value={ props.Value }
+			placeholder={ props.Placeholder }
+			required?={ props.Required }
+			class={ "input input-bordered w-full",
+				templ.KV("input-error", props.Error != ""),
+				props.Class }
+			data-flatpickr
+			data-mode={ string(props.Mode) }
+			data-min-date={ props.MinDate }
+			data-max-date={ props.MaxDate }
+			data-inline={ ternary(props.Inline, "true", "false") }
+			data-time-24h={ ternary(props.Time24h, "true", "false") }
+			{ props.Attrs... }
+		/>
+		if props.Error != "" {
+			<span class="text-error text-xs mt-1">{ props.Error }</span>
+		}
+	</div>
+	@flatpickrScript()
+}
+
+templ flatpickrScript() {
+	<script>
+	if (!window._flatpickrInit) {
+	  window._flatpickrInit = true;
+
+	  window.initFlatpickr = function(el) {
+	    if (typeof flatpickr === 'undefined') {
+	      var s = document.createElement('script');
+	      s.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
+	      s.onload = function() { initFlatpickrElement(el); };
+	      document.head.appendChild(s);
+	      var l = document.createElement('link');
+	      l.rel = 'stylesheet';
+	      l.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
+	      document.head.appendChild(l);
+	    } else {
+	      initFlatpickrElement(el);
+	    }
+	  };
+
+	  function initFlatpickrElement(el) {
+	    if (el._fp) return;
+	    try {
+	      var config = {
+	        allowInput: true,
+	        dateFormat: el.dataset.mode === 'time' ? 'H:i' : 'Y-m-d',
+	        enableTime: el.dataset.mode === 'time' || el.dataset.mode === 'datetime',
+	        noCalendar: el.dataset.mode === 'time',
+	        mode: el.dataset.mode || 'single',
+	        minDate: el.dataset.minDate || null,
+	        maxDate: el.dataset.maxDate || null,
+	        inline: el.dataset.inline === 'true',
+	        time_24hr: el.dataset.time24h === 'true',
+	      };
+	      el._fp = flatpickr(el, config);
+	    } catch(e) { console.warn('Flatpickr init failed:', e); }
+	  }
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('[data-flatpickr]').forEach(initFlatpickrElement);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('[data-flatpickr]:not(._fp-initialized)').forEach(function(el) {
+	      el.classList.add('_fp-initialized');
+	      initFlatpickrElement(el);
+	    });
+	  });
+	}
+	</script>
+}

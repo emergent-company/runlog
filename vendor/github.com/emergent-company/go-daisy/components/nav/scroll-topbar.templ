@@ -1,0 +1,55 @@
+package nav
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ScrollTopbar renders a topbar that hides on scroll down and reveals on scroll up.
+// Uses inline JS with IntersectionObserver for performant scroll detection.
+templ ScrollTopbar(title string, attrs templ.Attributes) {
+	<div
+		id="_scroll-topbar"
+		class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-base-100/80 backdrop-blur-sm border-b border-base-200 transition-transform duration-300"
+		data-scroll-topbar
+		{ devmode.Attrs(ctx, "nav/ScrollTopbar")... }
+		{ attrs... }
+	>
+		<h1 class="text-xl font-semibold text-base-content">{ title }</h1>
+		<div class="flex items-center gap-2">
+			{ children... }
+		</div>
+	</div>
+	@scrollTopbarScript()
+}
+
+templ scrollTopbarScript() {
+	<script>
+	if (!window._scrollTopbarInit) {
+	  window._scrollTopbarInit = true;
+
+	  var topbar = document.getElementById('_scroll-topbar');
+	  if (!topbar || !topbar.dataset.scrollTopbar) return;
+
+	  var lastScrollY = window.scrollY;
+	  var ticking = false;
+
+	  window.addEventListener('scroll', function() {
+	    if (!ticking) {
+	      window.requestAnimationFrame(function() {
+	        var currentScrollY = window.scrollY;
+	        if (currentScrollY > 100) {
+	          if (currentScrollY > lastScrollY) {
+	            topbar.style.transform = 'translateY(-100%)';
+	          } else {
+	            topbar.style.transform = 'translateY(0)';
+	          }
+	        } else {
+	          topbar.style.transform = 'translateY(0)';
+	        }
+	        lastScrollY = currentScrollY;
+	        ticking = false;
+	      });
+	      ticking = true;
+	    }
+	  });
+	}
+	</script>
+}

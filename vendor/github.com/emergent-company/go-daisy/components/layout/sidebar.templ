@@ -23,10 +23,10 @@ type SidebarGroup struct {
 }
 
 // Sidebar renders the app sidebar.
-// Toggle is driven by hidden checkbox #layout-sidebar-toggle-trigger (sibling in AppShell).
+// Toggle is driven by hidden checkbox #_layout-sidebar-toggle-trigger (sibling in AppShell).
 // Pass a non-nil logo component to replace the plain appName text in the header.
 templ Sidebar(appName string, groups []SidebarGroup, logo ...templ.Component) {
-	<div id="layout-sidebar" class="flex flex-col bg-base-100" { devmode.Attrs(ctx, "layout/Sidebar")... }>
+	<div id="_layout-sidebar" class="flex flex-col bg-base-100" { devmode.Attrs(ctx, "layout/Sidebar")... }>
 		<!-- Header: logo or app name + fold button -->
 		<div class="flex min-h-10 items-center justify-between gap-3 px-5 py-3 pb-5 shrink-0">
 			if len(logo) > 0 && logo[0] != nil {
@@ -35,11 +35,11 @@ templ Sidebar(appName string, groups []SidebarGroup, logo ...templ.Component) {
 				<span class="text-xl font-semibold truncate">{ appName }</span>
 			}
 			<label
-				for="layout-sidebar-toggle-trigger"
+				for="_layout-sidebar-toggle-trigger"
 				title="Toggle sidebar"
 				class="btn btn-circle btn-ghost btn-sm text-base-content/50 max-lg:hidden"
 			>
-				<span class="iconify lucide--panel-left-close size-4.5"></span>
+				@ui.IconSpan("lucide--panel-left-close", "size-4.5")
 			</label>
 		</div>
 		<!-- Nav menu -->
@@ -58,14 +58,14 @@ templ Sidebar(appName string, groups []SidebarGroup, logo ...templ.Component) {
 	</div>
 	<script>
 		(function() {
-			var sidebar = document.getElementById('layout-sidebar');
+			var sidebar = document.getElementById('_layout-sidebar');
 			if (!sidebar) return;
 
 			sidebar.addEventListener('click', function(e) {
 				if (window.innerWidth >= 1024) return;
 				var link = e.target.closest('a');
 				if (!link) return;
-				var cb = document.getElementById('layout-sidebar-toggle-trigger');
+				var cb = document.getElementById('_layout-sidebar-toggle-trigger');
 				if (cb) cb.checked = false;
 			});
 

@@ -1,0 +1,153 @@
+package ui
+
+import (
+	"strconv"
+	"strings"
+)
+
+// StatCardSparklineProps configures a stat card with an inline sparkline.
+type StatCardSparklineProps struct {
+	Label      string
+	Value      string
+	Icon       string
+	IconColor  string
+	Trend      StatTrend // up, down, or empty
+	TrendLabel string
+	Data       []int  // sparkline data points, e.g. {5,12,8,15,20,18,25}
+	Color      string // sparkline stroke color, e.g. "stroke-primary", "stroke-success"
+	FillColor  string // sparkline fill, e.g. "fill-primary/20"
+	Height     string // sparkline SVG height, e.g. "h-8", "h-10"
+	Attrs      templ.Attributes
+}
+
+// sparklineHeight returns the height class with default fallback.
+func sparklineHeight(s string) string {
+	if s == "" {
+		return "h-10"
+	}
+	return s
+}
+
+// sparklineColor returns the stroke color with default fallback.
+func sparklineColor(s string) string {
+	if s == "" {
+		return "stroke-primary"
+	}
+	return s
+}
+
+// sparklineFillColor returns the fill color with default fallback.
+func sparklineFillColor(s string) string {
+	if s == "" {
+		return "fill-primary/20"
+	}
+	return s
+}
+
+// StatCardSparkline renders a KPI stat card with an inline SVG sparkline chart.
+templ StatCardSparkline(props StatCardSparklineProps) {
+	@CardRaw("border border-base-content/10 shadow-sm h-full", "p-4 flex flex-col gap-3 h-full", props.Attrs) {
+		// Icon + value + trend row
+		<div class="flex items-start justify-between gap-2">
+			<div class="min-w-0">
+				<p class="text-xs text-base-content/50 mb-0.5">{ props.Label }</p>
+				<p class="text-2xl font-bold text-base-content leading-tight">{ props.Value }</p>
+				if props.TrendLabel != "" {
+					<p class={ "text-xs mt-0.5 font-medium",
+						templ.KV("text-success", props.Trend == StatTrendUp),
+						templ.KV("text-error", props.Trend == StatTrendDown),
+						templ.KV("text-base-content/50", props.Trend == "") }>
+						@trendArrow(props.Trend)
+						{ " " + props.TrendLabel }
+					</p>
+				}
+			</div>
+			if props.Icon != "" {
+				<div class={ "rounded-xl p-2.5 shrink-0", props.IconColor }>
+					@IconSpan(props.Icon, "size-5")
+				</div>
+			}
+		</div>
+		// Inline SVG sparkline
+		if len(props.Data) > 1 {
+			<div class={ "w-full", sparklineHeight(props.Height) }>
+				@sparklineSVG(props.Data, sparklineColor(props.Color), sparklineFillColor(props.FillColor))
+			</div>
+		}
+	}
+}
+
+// trendArrow returns the arrow icon for the given trend direction.
+templ trendArrow(trend StatTrend) {
+	if trend == StatTrendUp {
+		<span class="iconify lucide--trending-up size-3 inline-block"></span>
+	} else if trend == StatTrendDown {
+		<span class="iconify lucide--trending-down size-3 inline-block"></span>
+	}
+}
+
+// sparklineSVG renders a simple polyline SVG sparkline chart.
+templ sparklineSVG(data []int, strokeColor string, fillColor string) {
+	<svg
+		viewBox={ "0 0 " + strconv.Itoa(len(data)-1) + " 100" }
+		preserveAspectRatio="none"
+		class="w-full h-full"
+		aria-hidden="true"
+	>
+		<polyline
+			fill="none"
+			class={ strokeColor }
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			points={ sparklinePoints(data) }
+		/>
+		<polygon
+			class={ fillColor }
+			points={ sparklineFillArea(data) }
+		/>
+	</svg>
+}
+
+// sparklinePoints generates SVG polyline points from data.
+func sparklinePoints(data []int) string {
+	if len(data) == 0 {
+		return ""
+	}
+	min, max := data[0], data[0]
+	for _, v := range data {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+	}
+	rangeVal := max - min
+	if rangeVal == 0 {
+		rangeVal = 1
+	}
+	var pts []string
+	for i, v := range data {
+		x := float64(i)
+		y := 100.0 - (float64(v-min)/float64(rangeVal))*90.0 - 5.0
+		pts = append(pts, formatPoint(x, y))
+	}
+	return strings.Join(pts, " ")
+}
+
+// sparklineFillArea generates polygon points for the filled area under the sparkline.
+func sparklineFillArea(data []int) string {
+	if len(data) == 0 {
+		return ""
+	}
+	pts := "0 100 " + sparklinePoints(data) + " " + strconv.Itoa(len(data)-1) + " 100"
+	return pts
+}
+
+// formatPoint formats a single SVG point coordinate.
+func formatPoint(x, y float64) string {
+	xi := int(x)
+	yi := int(y)
+	return strconv.Itoa(xi) + "," + strconv.Itoa(yi)
+}

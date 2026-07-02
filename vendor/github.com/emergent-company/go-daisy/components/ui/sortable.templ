@@ -1,0 +1,90 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// SortableOptions configures a SortableJS drag-and-drop list.
+type SortableOptions struct {
+	Animation int               // drag animation duration in ms
+	Handle    string            // CSS selector for drag handle, e.g. ".drag-handle"
+	Direction string            // "vertical" (default) or "horizontal"
+	Attrs     templ.Attributes
+}
+
+// SortableList renders a container with SortableJS drag-and-drop enabled.
+// Children are the draggable items.
+templ SortableList(id string, opts SortableOptions) {
+	<div
+		id={ id }
+		data-sortable
+		data-animation={ ternary(opts.Animation > 0, strconv.Itoa(opts.Animation), "150") }
+		data-handle={ opts.Handle }
+		data-direction={ opts.Direction }
+		class={ "flex flex-col gap-2",
+			templ.KV("flex-row", opts.Direction == "horizontal") }
+		{ devmode.Attrs(ctx, "ui/SortableList")... }
+		{ opts.Attrs... }
+	>
+		{ children... }
+	</div>
+	@sortableScript()
+}
+
+// SortableItem renders a draggable list item inside a SortableList.
+templ SortableItem(extraClass string, attrs templ.Attributes) {
+	<div
+		class={ "rounded-box border border-base-content/10 bg-base-100 px-4 py-3 flex items-center gap-3 cursor-grab active:cursor-grabbing",
+			extraClass }
+		{ attrs... }
+	>
+		{ children... }
+	</div>
+}
+
+// SortableHandle renders a drag handle icon for use inside SortableItem.
+templ SortableHandle() {
+	<span class="iconify lucide--grip-vertical size-4 text-base-content/30 shrink-0 drag-handle" aria-hidden="true"></span>
+}
+
+templ sortableScript() {
+	<script>
+	if (!window._sortableInit) {
+	  window._sortableInit = true;
+
+	  window.initSortable = function(el) {
+	    if (typeof Sortable === 'undefined') {
+	      var s = document.createElement('script');
+	      s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
+	      s.onload = function() { initSortableElement(el); };
+	      document.head.appendChild(s);
+	    } else {
+	      initSortableElement(el);
+	    }
+	  };
+
+	  function initSortableElement(el) {
+	    if (el._sortable) return;
+	    try {
+	      el._sortable = new Sortable(el, {
+	        animation: parseInt(el.dataset.animation) || 150,
+	        handle: el.dataset.handle || undefined,
+	        direction: el.dataset.direction || undefined,
+	      });
+	    } catch(e) { console.warn('Sortable init failed:', e); }
+	  }
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('[data-sortable]').forEach(initSortableElement);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('[data-sortable]:not(._sortable-initialized)').forEach(function(el) {
+	      el.classList.add('_sortable-initialized');
+	      initSortableElement(el);
+	    });
+	  });
+	}
+	</script>
+}

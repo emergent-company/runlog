@@ -1,0 +1,108 @@
+package form
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// FileUploadStyle represents the FilePond style.
+type FileUploadStyle string
+
+const (
+	FileUploadDefault      FileUploadStyle = "default"
+	FileUploadAvatar       FileUploadStyle = "avatar"
+	FileUploadImagePreview FileUploadStyle = "image-preview"
+)
+
+// FileUploadProps configures a FilePond file upload.
+type FileUploadProps struct {
+	Name        string
+	Label       string
+	Accept      string // comma-separated MIME types, e.g. "image/*"
+	Multiple    bool
+	MaxFiles    int
+	MaxFileSize string // e.g. "5MB"
+	Style       FileUploadStyle
+	Required    bool
+	Error       string
+	Attrs       templ.Attributes
+}
+
+// FileUpload renders a FilePond file upload area.
+templ FileUpload(props FileUploadProps) {
+	<div class="form-control w-full" { devmode.Attrs(ctx, "form/FileUpload")... }>
+		if props.Label != "" {
+			<label class="label" for={ props.Name }>
+				<span class="label-text">{ props.Label }</span>
+			</label>
+		}
+		<input
+			type="file"
+			id={ props.Name }
+			name={ props.Name }
+			accept={ props.Accept }
+			multiple?={ props.Multiple }
+			required?={ props.Required }
+			data-filepond
+			data-max-files={ ternary(props.MaxFiles > 0, strconv.Itoa(props.MaxFiles), "null") }
+			data-max-file-size={ props.MaxFileSize }
+			data-style={ string(props.Style) }
+			class={ templ.KV("filepond-avatar", props.Style == FileUploadAvatar) }
+			{ props.Attrs... }
+		/>
+		if props.Error != "" {
+			<span class="text-error text-xs mt-1">{ props.Error }</span>
+		}
+	</div>
+	@filepondScript()
+}
+
+templ filepondScript() {
+	<script>
+	if (!window._filepondInit) {
+	  window._filepondInit = true;
+
+	  window.initFilePond = function(el) {
+	    if (typeof FilePond === 'undefined') {
+	      var s = document.createElement('script');
+	      s.src = 'https://cdn.jsdelivr.net/npm/filepond@4.32.6/dist/filepond.min.js';
+	      s.onload = function() { initFilePondElement(el); };
+	      document.head.appendChild(s);
+	      var l = document.createElement('link');
+	      l.rel = 'stylesheet';
+	      l.href = 'https://cdn.jsdelivr.net/npm/filepond@4.32.6/dist/filepond.min.css';
+	      document.head.appendChild(l);
+	    } else {
+	      initFilePondElement(el);
+	    }
+	  };
+
+	  function initFilePondElement(el) {
+	    if (el._pond) return;
+	    try {
+	      var maxFiles = parseInt(el.dataset.maxFiles) || null;
+	      el._pond = FilePond.create(el, {
+	        allowMultiple: el.hasAttribute('multiple'),
+	        maxFiles: maxFiles,
+	        maxFileSize: el.dataset.maxFileSize || null,
+	        labelIdle: el.dataset.style === 'avatar'
+	          ? 'Drag & drop your photo or <span class="filepond--label-action">Browse</span>'
+	          : 'Drag & drop files or <span class="filepond--label-action">Browse</span>',
+	        store: null,
+	      });
+	    } catch(e) { console.warn('FilePond init failed:', e); }
+	  }
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('[data-filepond]').forEach(initFilePondElement);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('[data-filepond]:not(._fp-initialized)').forEach(function(el) {
+	      el.classList.add('_fp-initialized');
+	      initFilePondElement(el);
+	    });
+	  });
+	}
+	</script>
+}

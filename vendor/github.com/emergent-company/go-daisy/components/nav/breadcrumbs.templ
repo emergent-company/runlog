@@ -1,0 +1,26 @@
+package nav
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// BreadcrumbItem is a single breadcrumb entry.
+type BreadcrumbItem struct {
+	Label string
+	Href  string // empty = current page (rendered as plain text, no link)
+}
+
+// Breadcrumbs renders a DaisyUI breadcrumb navigation trail.
+templ Breadcrumbs(items []BreadcrumbItem) {
+	<div class="breadcrumbs text-sm" { devmode.Attrs(ctx, "nav/Breadcrumbs")... }>
+		<ul>
+			for _, item := range items {
+				<li>
+					if item.Href != "" {
+						<a href={ templ.URL(item.Href) }>{ item.Label }</a>
+					} else {
+						{ item.Label }
+					}
+				</li>
+			}
+		</ul>
+	</div>
+}

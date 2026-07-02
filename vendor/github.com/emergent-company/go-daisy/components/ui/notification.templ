@@ -1,6 +1,10 @@
 package ui
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
 
 // NotificationItem holds the data for a single notification entry.
 type NotificationItem struct {
@@ -43,14 +47,14 @@ templ NotificationPanel(unreadCount int, viewAllHref string) {
 	<div class="bg-base-100 border border-base-200 rounded-box shadow-lg w-80" { devmode.Attrs(ctx, "ui/NotificationPanel")... }>
 		<div class="flex items-center justify-between px-4 pt-4 pb-2">
 			<p class="font-semibold text-sm">Notifications</p>
-			<button class="btn btn-ghost btn-xs text-primary">Mark all read</button>
+			@Button(ButtonProps{Variant: ButtonGhost, Size: ButtonXS, ExtraClass: "text-primary"}) { Mark all read }
 		</div>
 		<div role="tablist" class="tabs tabs-border px-4">
 			<a role="tab" class="tab tab-active tab-sm">All</a>
 			<a role="tab" class="tab tab-sm">
 				Unread
 				if unreadCount > 0 {
-					<span class="badge badge-xs badge-primary ml-1">{ intStr(unreadCount) }</span>
+					<span class="badge badge-xs badge-primary ml-1">{ strconv.Itoa(unreadCount) }</span>
 				}
 			</a>
 		</div>
@@ -63,22 +67,4 @@ templ NotificationPanel(unreadCount int, viewAllHref string) {
 	</div>
 }
 
-// intStr converts an int to a string for use inside templ templates.
-func intStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	if neg {
-		return "-" + s
-	}
-	return s
-}
+

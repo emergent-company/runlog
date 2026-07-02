@@ -1,0 +1,271 @@
+package layout
+
+import (
+	"github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+type TopbarNavLink struct {
+	Label  string
+	Href   string
+	Active bool
+}
+
+type TopbarVariantOpts struct {
+	AppName           string
+	SearchPlaceholder string
+
+	Greeting string
+	Subtitle string
+	UserName string
+
+	NavLinks []TopbarNavLink
+
+	SaveStatus string
+
+	ShowSearch       bool
+	ShowNotifications bool
+	ShowApps         bool
+	ShowLanguage     bool
+
+	AvatarSrc string
+	AvatarAlt string
+
+	ExtraClass string
+}
+
+templ TopbarVariant(style string, inOpts TopbarVariantOpts) {
+	@topbarVariantInner(style, fillTopbarDefaults(inOpts, style))
+}
+
+templ topbarVariantInner(style string, opts TopbarVariantOpts) {
+	<div
+		role="navigation"
+		aria-label="Navbar"
+		class={ "border-base-300/80 bg-base-100 sticky top-0 z-1 flex h-16 items-center justify-between border-b border-dashed px-4 md:px-8 xl:px-12 2xl:px-20", opts.ExtraClass }
+		id="_layout-topbar"
+		{ devmode.Attrs(ctx, "layout/TopbarVariant")... }
+	>
+
+		switch style {
+		case "classic":
+			<div class="flex items-center gap-3">
+				<label class="btn btn-square btn-ghost btn-sm group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:hidden" aria-label="Sidebar toggle" for="_layout-sidebar-toggle-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<label class="btn btn-square btn-ghost btn-sm hidden group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:flex" aria-label="Leftmenu toggle" for="_layout-sidebar-hover-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				if opts.ShowSearch {
+					<div class="btn btn-outline border-base-300 btn-sm max-sm:btn-square w-56 gap-2 sm:justify-start">
+						@ui.IconSpan("lucide--search", "size-3.5")
+						<p class="text-base-content/60 text-sm font-normal max-sm:hidden">{ opts.SearchPlaceholder }</p>
+					</div>
+				}
+			</div>
+			<div class="flex items-center">
+			if opts.ShowNotifications {
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, ExtraClass: "me-3", Attrs: templ.Attributes{"aria-label": "Notifications"}}){
+					@ui.IconSpan("lucide--bell-ring", "size-5")
+				}
+			}
+			if opts.ShowApps {
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeCircle, ExtraClass: "me-3", Attrs: templ.Attributes{"aria-label": "Apps"}}){
+					@ui.IconSpan("lucide--component", "text-base-content/80 size-5.5 rotate-45")
+				}
+			}
+				if opts.ShowLanguage {
+					<div class="dropdown dropdown-bottom dropdown-center me-3">
+						<div tabindex="0" class="cursor-pointer">
+							<img alt="Language" class="rounded-box size-5.5 object-cover" src="https://flagcdn.com/us.svg" />
+						</div>
+						<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-2 w-40 shadow">
+							<ul class="menu w-full p-2">
+								<li><a class="flex items-center gap-2" href="#"><img alt="US" class="rounded-box size-4.5 object-cover" src="https://flagcdn.com/us.svg" /><span>English</span></a></li>
+								<li><a class="flex items-center gap-2" href="#"><img alt="IN" class="rounded-box size-4.5 object-cover" src="https://flagcdn.com/in.svg" /><span>Hindi</span></a></li>
+								<li><a class="flex items-center gap-2" href="#"><img alt="ES" class="rounded-box size-4.5 object-cover" src="https://flagcdn.com/es.svg" /><span>Spanish</span></a></li>
+								<li><a class="flex items-center gap-2" href="#"><img alt="CN" class="rounded-box size-4.5 object-cover" src="https://flagcdn.com/cn.svg" /><span>Chinese</span></a></li>
+								<li><a class="flex items-center gap-2" href="#"><img alt="RS" class="rounded-box size-4.5 object-cover" src="https://flagcdn.com/rs.svg" /><span>Arabic</span></a></li>
+							</ul>
+						</div>
+					</div>
+				}
+				<div class="border-base-300 me-3 h-7 border-e"></div>
+				<div class="dropdown dropdown-bottom dropdown-end">
+					<div tabindex="0" class="cursor-pointer">
+						<div class="avatar bg-base-200 rounded-box size-7 overflow-hidden">
+							if opts.AvatarSrc != "" {
+								<img alt={ opts.AvatarAlt } src={ opts.AvatarSrc } />
+							} else {
+								<div class="bg-primary text-primary-content flex size-full items-center justify-center font-semibold text-xs">U</div>
+							}
+						</div>
+					</div>
+					<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-2 w-44 shadow">
+						<ul class="menu w-full p-2">
+							<li><a href="#">@ui.IconSpan("lucide--user", "size-4") My Profile</a></li>
+							<li><a href="#">@ui.IconSpan("lucide--settings", "size-4") Settings</a></li>
+							<li><a href="#">@ui.IconSpan("lucide--help-circle", "size-4") Help</a></li>
+						</ul>
+						<hr class="border-base-300" />
+						<ul class="menu w-full p-2">
+							<li><div>@ui.IconSpan("lucide--arrow-left-right", "size-4") Switch Account</div></li>
+							<li><a class="text-error hover:bg-error/10" href="#">@ui.IconSpan("lucide--log-out", "size-4") Logout</a></li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+		case "greeting":
+			<div class="flex items-center gap-2 sm:gap-3">
+				<label class="btn btn-square btn-ghost btn-sm group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:hidden" aria-label="Sidebar toggle" for="_layout-sidebar-toggle-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<label class="btn btn-square btn-ghost btn-sm hidden group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:flex" aria-label="Leftmenu toggle" for="_layout-sidebar-hover-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<div>
+					<p class="leading-none font-medium md:text-lg">{ opts.Greeting }<span class="max-sm:hidden">{ ", " + opts.UserName }!</span></p>
+					<p class="text-base-content/60 mt-1 text-sm/none max-sm:hidden">{ opts.Subtitle }</p>
+				</div>
+			</div>
+			<div class="flex items-center gap-4">
+				<div class="dropdown dropdown-bottom dropdown-end">
+					<div tabindex="0" class="flex cursor-pointer items-center gap-2">
+						<div class="avatar bg-base-200 rounded-box size-7 overflow-hidden">
+							if opts.AvatarSrc != "" {
+								<img alt={ opts.AvatarAlt } src={ opts.AvatarSrc } />
+							} else {
+								<div class="bg-primary text-primary-content flex size-full items-center justify-center font-semibold text-xs">U</div>
+							}
+						</div>
+						<div>
+							<p class="leading-none font-medium">{ opts.UserName }</p>
+							<p class="text-base-content/60 mt-0 text-xs/none">{ "@" + opts.UserName }</p>
+						</div>
+					</div>
+					<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-2 w-44 shadow">
+						<ul class="menu w-full p-2">
+							<li><a href="#">@ui.IconSpan("lucide--user", "size-4") My Profile</a></li>
+							<li><a href="#">@ui.IconSpan("lucide--settings", "size-4") Settings</a></li>
+							<li><a href="#">@ui.IconSpan("lucide--help-circle", "size-4") Help</a></li>
+						</ul>
+						<hr class="border-base-300" />
+						<ul class="menu w-full p-2">
+							<li><div>@ui.IconSpan("lucide--arrow-left-right", "size-4") Switch Account</div></li>
+							<li><a class="text-error hover:bg-error/10" href="#">@ui.IconSpan("lucide--log-out", "size-4") Logout</a></li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+		case "nav-menu-1", "nav-menu-2":
+			<div class="flex items-center gap-3">
+				<label class="btn btn-square btn-ghost btn-sm group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:hidden" aria-label="Sidebar toggle" for="_layout-sidebar-toggle-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<label class="btn btn-square btn-ghost btn-sm hidden group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:flex" aria-label="Leftmenu toggle" for="_layout-sidebar-hover-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<nav class="hidden items-center gap-1 md:flex" aria-label="Top nav">
+					for _, link := range opts.NavLinks {
+						<a href={ templ.SafeURL(link.Href) } class={ "px-2 py-1 text-sm rounded-md transition-colors", templ.KV("text-primary font-medium", link.Active), templ.KV("text-base-content/70 hover:text-base-content hover:bg-base-200/50", !link.Active) }>{ link.Label }</a>
+					}
+				</nav>
+			</div>
+			<div class="flex items-center">
+				if opts.ShowSearch {
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, ExtraClass: "me-2", Attrs: templ.Attributes{"aria-label": "Search"}}){
+						@ui.IconSpan("lucide--search", "size-4.5")
+					}
+				}
+				if opts.ShowNotifications {
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, ExtraClass: "me-2", Attrs: templ.Attributes{"aria-label": "Notifications"}}){
+						@ui.IconSpan("lucide--bell-ring", "size-4.5")
+					}
+				}
+				if opts.ShowApps {
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeCircle, ExtraClass: "me-2", Attrs: templ.Attributes{"aria-label": "Apps"}}){
+						@ui.IconSpan("lucide--component", "text-base-content/80 size-5 rotate-45")
+					}
+				}
+				if opts.ShowLanguage {
+					<div class="dropdown dropdown-bottom dropdown-center me-2">
+						<div tabindex="0" class="cursor-pointer">
+							<img alt="Language" class="rounded-box size-5 object-cover" src="https://flagcdn.com/us.svg" />
+						</div>
+						<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-2 w-40 shadow">
+							<ul class="menu menu-xs w-full p-1">
+								<li><a class="flex items-center gap-2" href="#"><img alt="US" class="rounded-box size-4 object-cover" src="https://flagcdn.com/us.svg" /><span>English</span></a></li>
+								<li><a class="flex items-center gap-2" href="#"><img alt="IN" class="rounded-box size-4 object-cover" src="https://flagcdn.com/in.svg" /><span>Hindi</span></a></li>
+								<li><a class="flex items-center gap-2" href="#"><img alt="ES" class="rounded-box size-4 object-cover" src="https://flagcdn.com/es.svg" /><span>Spanish</span></a></li>
+							</ul>
+						</div>
+					</div>
+				}
+				<div class="border-base-300 ms-1 h-7 border-e"></div>
+				<div class="dropdown dropdown-bottom dropdown-end ms-2">
+					<div tabindex="0" class="cursor-pointer">
+						<div class="avatar bg-base-200 rounded-box size-7 overflow-hidden">
+							if opts.AvatarSrc != "" {
+								<img alt={ opts.AvatarAlt } src={ opts.AvatarSrc } />
+							} else {
+								<div class="bg-primary text-primary-content flex size-full items-center justify-center font-semibold text-xs">U</div>
+							}
+						</div>
+					</div>
+					<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-2 w-44 shadow">
+						<ul class="menu w-full p-2">
+							<li><a href="#">@ui.IconSpan("lucide--user", "size-4") My Profile</a></li>
+							<li><a href="#">@ui.IconSpan("lucide--settings", "size-4") Settings</a></li>
+							<li><a href="#">@ui.IconSpan("lucide--help-circle", "size-4") Help</a></li>
+						</ul>
+						<hr class="border-base-300" />
+						<ul class="menu w-full p-2">
+							<li><a class="text-error hover:bg-error/10" href="#">@ui.IconSpan("lucide--log-out", "size-4") Logout</a></li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+		case "editor":
+			<div class="flex items-center gap-3">
+				<label class="btn btn-square btn-ghost btn-sm group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:hidden" aria-label="Sidebar toggle" for="_layout-sidebar-toggle-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<label class="btn btn-square btn-ghost btn-sm hidden group-has-[[id=_layout-sidebar-hover-trigger]:checked]/html:flex" aria-label="Leftmenu toggle" for="_layout-sidebar-hover-trigger">
+					@ui.IconSpan("lucide--menu", "size-5")
+				</label>
+				<div class="hidden items-center gap-1.5 text-sm md:flex">
+					<span class="text-base-content/60">Design Draft</span>
+					@ui.IconSpan("lucide--chevron-right", "size-3.5 text-base-content/30")
+					<span class="text-base-content/60">Projects</span>
+					@ui.IconSpan("lucide--chevron-right", "size-3.5 text-base-content/30")
+					<span class="text-base-content font-medium">Client</span>
+				</div>
+				if opts.ShowSearch {
+					<div class="btn btn-outline border-base-300 btn-sm max-sm:btn-square w-48 gap-2 sm:justify-start max-md:hidden">
+						@ui.IconSpan("lucide--search", "size-3.5")
+						<p class="text-base-content/60 text-sm font-normal">{ opts.SearchPlaceholder }</p>
+					</div>
+				}
+			</div>
+			<div class="flex items-center gap-3">
+				if opts.SaveStatus != "" {
+					<span class="text-base-content/40 text-sm max-md:hidden">{ opts.SaveStatus }</span>
+				}
+				<div class="flex -space-x-2">
+					<div class="avatar bg-base-200 size-7 rounded-full border-2 border-base-100 overflow-hidden"><div class="bg-primary text-primary-content flex size-full items-center justify-center text-[10px] font-semibold">U1</div></div>
+					<div class="avatar bg-base-200 size-7 rounded-full border-2 border-base-100 overflow-hidden"><div class="bg-secondary text-secondary-content flex size-full items-center justify-center text-[10px] font-semibold">U2</div></div>
+					<div class="avatar bg-base-200 size-7 rounded-full border-2 border-base-100 overflow-hidden"><div class="bg-accent text-accent-content flex size-full items-center justify-center text-[10px] font-semibold">U3</div></div>
+				</div>
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, ExtraClass: "max-md:btn-square gap-2"}){
+					@ui.IconSpan("lucide--pencil", "size-4")
+					<span class="max-md:hidden">Edit</span>
+				}
+			</div>
+		}
+	</div>
+}
+
+

@@ -1,6 +1,9 @@
 package layout
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
 
 // Navbar renders the topbar. The children slot is for the right-side content
 // (theme toggle, user dropdown, etc.). Pass nil/empty for a minimal navbar.
@@ -10,18 +13,18 @@ templ Navbar(appName string, logo ...templ.Component) {
 		role="navigation"
 		aria-label="Navbar"
 		class="flex items-center justify-between px-4 bg-base-100"
-		id="layout-topbar"
+		id="_layout-topbar"
 		{ devmode.Attrs(ctx, "layout/Navbar")... }
 	>
 		<!-- LEFT: sidebar toggle + app name or logo -->
 		<div class="flex items-center gap-3">
 			<label
-				for="layout-sidebar-toggle-trigger"
+				for="_layout-sidebar-toggle-trigger"
 				class="btn btn-square btn-ghost btn-sm"
 				aria-label="Toggle sidebar"
 			>
-				<span id="topbar-menu-icon" class="iconify lucide--menu size-5"></span>
-				<span id="topbar-close-icon" class="iconify lucide--panel-left-close size-5"></span>
+				<span id="_topbar-menu-icon" class="iconify lucide--menu size-5"></span>
+				<span id="_topbar-close-icon" class="iconify lucide--panel-left-close size-5"></span>
 			</label>
 			if len(logo) > 0 && logo[0] != nil {
 				@logo[0]
@@ -39,15 +42,16 @@ templ Navbar(appName string, logo ...templ.Component) {
 // ThemeToggle renders a sun/moon button that switches between two DaisyUI themes.
 // lightTheme and darkTheme are DaisyUI theme names (e.g. "nord", "dark").
 templ ThemeToggle(lightTheme string, darkTheme string) {
-	<button
-		class="btn btn-sm btn-circle btn-ghost"
-		aria-label="Toggle theme"
-		onclick={ toggleTheme(lightTheme, darkTheme) }
-		{ devmode.Attrs(ctx, "layout/ThemeToggle")... }
-	>
+	@ui.Button(ui.ButtonProps{
+		Variant: ui.ButtonGhost,
+		Size:    ui.ButtonSM,
+		Shape:   ui.ButtonShapeCircle,
+		OnClick: toggleTheme(lightTheme, darkTheme),
+		Attrs:   templ.Attributes{"aria-label": "Toggle theme"},
+	}) {
 		<span id="theme-icon-sun" class="iconify lucide--sun size-4.5"></span>
 		<span id="theme-icon-moon" class="iconify lucide--moon size-4.5" style="display:none"></span>
-	</button>
+	}
 }
 
 // NavbarDropdownItem is a single option in a NavbarDropdown.
@@ -74,7 +78,7 @@ templ NavbarDropdown(currentLabel string, placeholder string, icon string, hxTar
 				} else {
 					<span class="text-sm text-base-content/60">{ placeholder }</span>
 				}
-				<span class="iconify lucide--chevron-down size-3.5 text-base-content/40"></span>
+				@ui.IconSpan("lucide--chevron-down", "size-3.5 text-base-content/40")
 			</label>
 			<ul
 				tabindex="0"

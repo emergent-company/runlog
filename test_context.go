@@ -7,6 +7,9 @@
 package runlog
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +32,10 @@ type TestOpts struct {
 	// Binary is the CLI binary to execute in Step.CLI calls.
 	// Defaults to "memory" when empty.
 	Binary string
+	// TestType overrides the auto-derived test classification
+	// (unit/integration/e2e/component/etc.). When empty, the type is derived
+	// from the test source file name.
+	TestType string
 }
 
 // TestContext bundles the per-test lifecycle state: a *testing.T, a RunLog,
@@ -85,6 +92,11 @@ func NewTest(t *testing.T, opts TestOpts) *TestContext { //nolint:deadcode
 	// Apply tags.
 	if len(opts.Tags) > 0 {
 		rl.Tag(opts.Tags...)
+	}
+
+	// Override test type (if provided).
+	if opts.TestType != "" {
+		rl.testType = opts.TestType
 	}
 
 	// Set app version (if provided).
@@ -159,4 +171,76 @@ func (tc *TestContext) Tag(tags ...string) { //nolint:deadcode
 func (tc *TestContext) Skip(reason string) { //nolint:deadcode
 	tc.T.Helper()
 	tc.RunLog.Skipf("%s", reason)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TestMain integration — validates environment before running any tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+// EnvTestMain runs environment validation + scripts before m.Run().
+// Call from TestMain to fail-fast if env is not ready:
+//
+//	func TestMain(m *testing.M) {
+//	    os.Exit(runlog.EnvTestMain(m, "mcj-emergent"))
+//	}
+//
+// It loads config, validates all requirements, runs test_script and
+// setup_script (if configured), then runs m.Run(). Returns 1 if any
+// env check fails, m.Run() exit code otherwise.
+func EnvTestMain(m *testing.M, envName string) int { //nolint:deadcode
+	cfg, err := LoadConfig("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "env: cannot load config: %v\n", err)
+		return 1
+	}
+
+	env := cfg.LookupEnvironment(envName)
+	if env == nil {
+		fmt.Fprintf(os.Stderr, "env: environment %q not found in config\n", envName)
+		return 1
+	}
+
+	fmt.Printf("═══ Environment: %s ═══\n\n", envName)
+
+	// 1. Validate requirements
+	if err := ValidateEnvSummary(env); err != nil {
+		fmt.Fprintf(os.Stderr, "env: %v\n", err)
+		return 1
+	}
+	fmt.Printf("  ✓ requirements passed\n\n")
+
+	// 2. Run test_script if configured
+	if env.TestScript != "" {
+		fmt.Printf("  Running test_script: %s\n", env.TestScript)
+		if err := runEnvScript(env.TestScript); err != nil {
+			fmt.Fprintf(os.Stderr, "env: test_script failed: %v\n", err)
+			return 1
+		}
+		fmt.Printf("  ✓ test_script passed\n\n")
+	}
+
+	// 3. Run setup_script if configured
+	if env.SetupScript != "" {
+		fmt.Printf("  Running setup_script: %s\n", env.SetupScript)
+		if err := runEnvScript(env.SetupScript); err != nil {
+			fmt.Fprintf(os.Stderr, "env: setup_script failed: %v\n", err)
+			return 1
+		}
+		fmt.Printf("  ✓ setup_script passed\n\n")
+	}
+
+	fmt.Printf("═══ Running tests ═══\n\n")
+	return m.Run()
+}
+
+// runEnvScript executes a shell script with output forwarded to stderr.
+func runEnvScript(script string) error { //nolint:deadcode
+	wd, _ := os.Getwd()
+	cmd := exec.Command("sh", script)
+	if wd != "" {
+		cmd.Dir = wd
+	}
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

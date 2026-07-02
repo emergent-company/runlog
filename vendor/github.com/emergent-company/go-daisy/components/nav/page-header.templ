@@ -1,0 +1,39 @@
+package nav
+
+import (
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// PageHeader renders the standard page header with a breadcrumb trail on the
+// left and an optional action slot on the right.
+//
+// Use nav.Crumbs() to build the steps slice cleanly:
+//
+//	@nav.PageHeader(nav.Crumbs("Sessions")) { ... }
+//	@nav.PageHeader(nav.Crumbs("Sessions", "/dashboard/sessions", "Detail")) { ... }
+// attrs is optional; pass nil when not needed.
+templ PageHeader(steps []BreadcrumbStep, attrs templ.Attributes) {
+	<div class="flex items-center justify-between px-6 py-0 h-16 bg-base-100 border-b border-base-200 shrink-0" { devmode.Attrs(ctx, "nav/PageHeader")... } { attrs... }>
+		<!-- Breadcrumb -->
+		<nav class="flex items-center gap-2 text-xl font-semibold overflow-x-hidden min-w-0" aria-label="Breadcrumb">
+			for i, step := range steps {
+				if i > 0 {
+					@ui.IconSpan("lucide--chevron-right", "w-4 h-4 shrink-0 text-base-content/30")
+				}
+				if step.URL != "" {
+					<a
+						href={ templ.SafeURL(step.URL) }
+						class="text-base-content hover:text-primary transition-colors truncate"
+					>{ step.Label }</a>
+				} else {
+					<span class="text-base-content/50 truncate">{ step.Label }</span>
+				}
+			}
+		</nav>
+		<!-- Actions -->
+		<div class="flex items-center gap-2 shrink-0 ml-4">
+			{ children... }
+		</div>
+	</div>
+}

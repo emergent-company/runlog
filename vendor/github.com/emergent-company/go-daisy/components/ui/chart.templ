@@ -1,0 +1,208 @@
+package ui
+
+import (
+	"encoding/json"
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// ChartType represents the ApexCharts chart type.
+type ChartType string
+
+const (
+	ChartArea   ChartType = "area"
+	ChartBar    ChartType = "bar"
+	ChartColumn ChartType = "column"
+	ChartLine   ChartType = "line"
+	ChartPie    ChartType = "pie"
+	ChartDonut  ChartType = "donut"
+	ChartRadial ChartType = "radial"
+)
+
+// ChartSeries is a single data series for ApexCharts.
+type ChartSeries struct {
+	Name string    `json:"name"`
+	Data []float64 `json:"data"`
+}
+
+// ChartProps configures an ApexCharts chart.
+type ChartProps struct {
+	ID         string
+	Type       ChartType
+	Title      string
+	Height     string // e.g. "350", "200"
+	Width      string // e.g. "100%"
+	Series     []ChartSeries
+	Categories []string // x-axis labels
+	Colors     []string // optional color palette
+	Sparkline  bool     // enable sparkline mode
+	Attrs      templ.Attributes
+}
+
+// chartHeight returns height with default fallback.
+func chartHeight(s string) string {
+	if s == "" {
+		return "350"
+	}
+	return s
+}
+
+// chartWidth returns width with default fallback.
+func chartWidth(s string) string {
+	if s == "" {
+		return "100%"
+	}
+	return s
+}
+
+// chartTypeToApex converts ChartType to the ApexCharts wire string.
+func chartTypeToApex(t ChartType) string {
+	if t == ChartColumn {
+		return "bar"
+	}
+	return string(t)
+}
+
+// Chart renders an ApexCharts chart div with Alpine.js init.
+templ Chart(props ChartProps) {
+	<div
+		id={ props.ID }
+		class="chart-container"
+		style={ "width:" + chartWidth(props.Width) + ";height:" + chartHeight(props.Height) + "px" }
+		data-chart
+		data-options={ chartOptionsJSON(props) }
+		{ devmode.Attrs(ctx, "ui/Chart")... }
+		{ props.Attrs... }
+	></div>
+	@apexChartScript()
+}
+
+// chartOptionsJSON builds the ApexCharts options JSON.
+func chartOptionsJSON(props ChartProps) string {
+	type chart struct {
+		Type      string `json:"type"`
+		Sparkline struct {
+			Enabled bool `json:"enabled"`
+		} `json:"sparkline,omitempty"`
+		Toolbar struct {
+			Show bool `json:"show"`
+		} `json:"toolbar,omitempty"`
+	}
+	type title struct {
+		Text  string            `json:"text,omitempty"`
+		Style map[string]string `json:"style,omitempty"`
+	}
+	type xaxis struct {
+		Categories []string `json:"categories,omitempty"`
+	}
+	type stroke struct {
+		Curve string `json:"curve,omitempty"`
+	}
+	type dataLabels struct {
+		Enabled bool `json:"enabled"`
+	}
+	type plotOptsBar struct {
+		Horizontal bool `json:"horizontal"`
+	}
+	type plotOptions struct {
+		Bar plotOptsBar `json:"bar,omitempty"`
+	}
+	type options struct {
+		Chart       chart       `json:"chart"`
+		Title       title       `json:"title,omitempty"`
+		Series      []ChartSeries `json:"series"`
+		Xaxis       xaxis       `json:"xaxis,omitempty"`
+		Stroke      stroke      `json:"stroke,omitempty"`
+		DataLabels  dataLabels  `json:"dataLabels"`
+		PlotOptions plotOptions `json:"plotOptions,omitempty"`
+		Colors      []string    `json:"colors,omitempty"`
+		Labels      []string    `json:"labels,omitempty"`
+	}
+
+	chartType := chartTypeToApex(props.Type)
+	sparklineEnabled := props.Sparkline
+
+	opts := options{
+		Chart: chart{
+			Type: chartType,
+			Sparkline: struct {
+				Enabled bool `json:"enabled"`
+			}{Enabled: sparklineEnabled},
+			Toolbar: struct {
+				Show bool `json:"show"`
+			}{Show: !sparklineEnabled},
+		},
+		Title:      title{Text: props.Title},
+		Series:     props.Series,
+		Xaxis:      xaxis{Categories: props.Categories},
+		DataLabels: dataLabels{Enabled: false},
+	}
+
+	if chartType == "bar" && props.Type == ChartBar {
+		opts.PlotOptions.Bar.Horizontal = true
+	}
+
+	if chartType == "pie" || chartType == "donut" || chartType == "radial" {
+		opts.Labels = props.Categories
+	}
+
+	if len(props.Colors) > 0 {
+		opts.Colors = props.Colors
+	}
+
+	if !sparklineEnabled && chartType != "pie" && chartType != "donut" && chartType != "radial" {
+		opts.Stroke.Curve = "smooth"
+	}
+
+	b, _ := json.Marshal(opts)
+	return string(b)
+}
+
+// parseIntHeight extracts a numeric height from a string like "350" or "350px".
+func parseIntHeight(h string) int {
+	// For standalone use (not render-time)
+	n, _ := strconv.Atoi(h)
+	return n
+}
+
+templ apexChartScript() {
+	<script>
+	if (!window._apexChartInit) {
+	  window._apexChartInit = true;
+
+	  window.initApexChart = function(el) {
+	    if (typeof ApexCharts === 'undefined') {
+	      var s = document.createElement('script');
+	      s.src = 'https://cdn.jsdelivr.net/npm/apexcharts@4.5.0/dist/apexcharts.min.js';
+	      s.onload = function() { renderApexChart(el); };
+	      document.head.appendChild(s);
+	    } else {
+	      renderApexChart(el);
+	    }
+	  };
+
+	  function renderApexChart(el) {
+	    if (el._chart) {
+	      el._chart.updateOptions(JSON.parse(el.dataset.options));
+	      return;
+	    }
+	    try {
+	      var opts = JSON.parse(el.dataset.options);
+	      el._chart = new ApexCharts(el, opts);
+	      el._chart.render();
+	    } catch(e) { console.warn('ApexChart init failed:', e); }
+	  }
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('[data-chart]').forEach(initApexChart);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('[data-chart]:not(._ac-initialized)').forEach(function(el) {
+	      el.classList.add('_ac-initialized');
+	      initApexChart(el);
+	    });
+	  });
+	}
+	</script>
+}

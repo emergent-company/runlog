@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"html"
 	"io"
+
+	"github.com/emergent-company/go-daisy/components/table"
+	"github.com/emergent-company/go-daisy/components/ui"
+	runlog "github.com/emergent-company/runlog"
 )
 
 // EventChildrenPartial renders expanded event children (HTMX partial).
@@ -16,37 +20,69 @@ templ EventChildrenPartial(data eventChildrenData) {
 			@renderGanttChart(data.EventID, data.Details)
 		} else if data.Kind == "http_call" && isJSON(data.Details) {
 			@renderHttpCall(data.Details)
+		} else if data.Kind == "cli" && isJSON(data.Details) {
+			@renderTopLevelCLI(data.Details)
 		} else if data.Kind == "artifact" && isJSON(data.Details) {
 			@renderArtifact(data.Details)
 		} else if data.Kind == "log" && isJSON(data.Details) {
 			@renderLogDetail(data.Details)
 		} else if data.Kind == "assertion" && isJSON(data.Details) {
 			@renderAssertionDetail(data.Details)
+		} else if data.Kind == "coverage" && isJSON(data.Details) {
+			@renderCoverage(data.Details)
 		} else if len(data.Children) > 0 {
-			<div class="text-sm">
-				<table class="table table-xs w-full" data-testid={ fmt.Sprintf("child-table-%d", data.EventID) }>
-					<thead>
-						<!-- lint:allow-raw -->
-						<tr>
-							<!-- lint:allow-raw -->
-							<th class="w-16">Kind</th> <!-- lint:allow-raw -->
-							<th>Message</th> <!-- lint:allow-raw -->
-							<th class="w-20">Elapsed</th> <!-- lint:allow-raw -->
-						</tr>
-					</thead>
+			<div class="ml-4 border-l-2 border-base-300 pl-3">
+				<table class="table table-xs w-full">
 					<tbody>
 						<!-- lint:allow-raw -->
-						for _, c := range data.Children {
-							<tr>
+						for i, c := range data.Children {
+							<tr
+								id={ fmt.Sprintf("child-row-%d-%d", data.EventID, i) }
+								data-event-id={ fmt.Sprintf("%d", data.EventID) }
+								data-child-idx={ fmt.Sprintf("%d", i) }
+								class="hover cursor-pointer child-row"
+							>
+								@table.TableCell("text-right w-12", nil) {
+									@text(fmt.Sprintf("%d", i+1))
+								}
+								@table.TableCell("", nil) {
+									@ui.Badge(ui.BadgeProps{Label: c.Kind, Variant: runBadgeIntent(childKindIntent(c.Kind)), Size: ui.BadgeSizeSM})
+								}
+								@table.TableCell("", nil) {
+									@text(truncateMessage(c.Message, 80))
+								}
+								@table.TableCell("text-right w-20", nil) {
+									@text(fmtElapsed(c.ElapsedS))
+								}
+							</tr>
+							<!-- lint:allow-raw -->
+							<tr id={ fmt.Sprintf("child-detail-%d-%d", data.EventID, i) } class="hidden">
 								<!-- lint:allow-raw -->
-								<td><span class="badge badge-ghost badge-sm">{ c.Kind }</span></td> <!-- lint:allow-raw -->
-								<td class="font-mono text-xs whitespace-pre-wrap max-w-lg">{ c.Message }</td> <!-- lint:allow-raw -->
-								<td>{ fmtElapsed(c.ElapsedS) }</td> <!-- lint:allow-raw -->
+								<td colspan="4" class="bg-base-200 p-3 pl-6">
+									@renderChildDetail(c)
+								</td>
 							</tr>
 						}
 					</tbody>
 				</table>
 			</div>
+			<script>
+				(function() {
+					var tables = document.querySelectorAll('[data-event-id]');
+					for (var t = 0; t < tables.length; t++) {
+						(function(table) {
+							table.addEventListener('click', function(e) {
+								var row = e.target.closest('tr.child-row');
+								if (!row) return;
+								var idx = row.getAttribute('data-child-idx');
+								var eid = row.getAttribute('data-event-id');
+								var detail = document.getElementById('child-detail-' + eid + '-' + idx);
+								if (detail) detail.classList.toggle('hidden');
+							});
+						})(tables[t]);
+					}
+				})();
+			</script>
 		} else if data.Details != "" {
 			@renderedDetails(data.Details)
 		} else {
@@ -101,6 +137,48 @@ templ renderGanttChart(eventID int64, details string) {
 	</script>
 }
 
+// renderCoverage renders a per-file coverage breakdown table.
+func renderCoverage(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		total := getFloatField(details, "total_pct")
+		filesRaw, hasFiles := details["files"]
+		var files []any
+		if hasFiles {
+			files, _ = filesRaw.([]any)
+		}
+
+		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="font-semibold">Total Coverage</span><span class="badge badge-sm badge-primary">%.1f%%</span></div>`, total)
+		if err != nil { return err }
+
+		if len(files) > 0 {
+			_, err = fmt.Fprint(w, `<table class="table table-xs w-full mt-2"><thead><tr><th>File</th><th>Coverage</th><th class="w-1/2">Bar</th></tr></thead><tbody>`)
+			if err != nil { return err }
+			for _, fRaw := range files {
+				f, _ := fRaw.(map[string]any)
+				fileName, _ := f["file"].(string)
+				cov, _ := f["coverage"].(float64)
+				barPct := cov
+				if barPct > 100 { barPct = 100 }
+				if barPct < 0 { barPct = 0 }
+				barColor := "bg-error"
+				if cov >= 80 {
+					barColor = "bg-success"
+				} else if cov >= 50 {
+					barColor = "bg-warning"
+				}
+				_, err = fmt.Fprintf(w, `<tr><td class="font-mono text-xs">%s</td><td class="text-xs">%.1f%%</td><td><div class="w-full bg-base-300 rounded-full h-2"><div class="%s h-2 rounded-full" style="width:%.0f%%"></div></div></td></tr>`,
+					html.EscapeString(fileName), cov, barColor, barPct)
+				if err != nil { return err }
+			}
+			_, err = fmt.Fprint(w, `</tbody></table>`)
+			if err != nil { return err }
+		}
+		_, err = fmt.Fprint(w, `</div>`)
+		return err
+	})
+}
+
 func mapToJSON(v any) string {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -135,16 +213,44 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		if err != nil {
 			return err
 		}
-		if headers, ok := details["headers"].(map[string]any); ok && len(headers) > 0 {
-			hJSON := mapToJSON(headers)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box"><summary class="collapse-title text-xs font-semibold">Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(headers), html.EscapeString(hJSON))
+		// Request headers
+		if hdrs, ok := details["request_headers"].(map[string]any); ok && len(hdrs) > 0 {
+			hJSON := mapToJSON(hdrs)
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
 			if err != nil {
 				return err
 			}
 		}
+		// Response headers
+		if hdrs, ok := details["response_headers"].(map[string]any); ok && len(hdrs) > 0 {
+			hJSON := mapToJSON(hdrs)
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Response Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
+			if err != nil {
+				return err
+			}
+		}
+		// Legacy flat "headers" field (backward compat)
+		if hdrs, ok := details["headers"].(map[string]any); ok && len(hdrs) > 0 {
+			if _, ok := details["request_headers"]; !ok {
+				hJSON := mapToJSON(hdrs)
+				_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
+				if err != nil {
+					return err
+				}
+			}
+		}
+		// Request body
+		if body, ok := details["request_body"]; ok && body != nil {
+			rendered := renderBody(body)
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto">%s</pre></div></details>`, html.EscapeString(rendered))
+			if err != nil {
+				return err
+			}
+		}
+		// Response body
 		if body, ok := details["response_body"]; ok && body != nil {
-			bJSON := mapToJSON(body)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box"><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto">%s</pre></div></details>`, html.EscapeString(bJSON))
+			rendered := renderBody(body)
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box" open><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-base-300 p-2 rounded mt-1">%s</pre></div></details>`, html.EscapeString(rendered))
 			if err != nil {
 				return err
 			}
@@ -152,6 +258,93 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		_, err = fmt.Fprint(w, `</div>`)
 		return err
 	})
+}
+
+func renderTopLevelCLI(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		cmd := getStrField(details, "command")
+		if cmd == "" {
+			cmd = getStrField(details, "invocation")
+		}
+		output := getStrField(details, "output")
+		exitCode := getFloatField(details, "exit_code")
+		stdoutLen := getFloatField(details, "stdout_len")
+
+		exitClass := "badge-success"
+		exitText := "exit 0"
+		if exitCode != 0 {
+			exitClass = "badge-error"
+			exitText = fmt.Sprintf("exit %.0f", exitCode)
+		}
+
+		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2 flex-wrap"><span class="badge badge-sm badge-ghost font-mono">$ %s</span><span class="badge badge-sm %s">%s</span>`,
+			html.EscapeString(cmd), exitClass, exitText)
+		if err != nil {
+			return err
+		}
+
+		if stdoutLen > 0 {
+			_, err = fmt.Fprintf(w, `<span class="text-xs text-base-content/40">(%d bytes)</span>`, int(stdoutLen))
+			if err != nil {
+				return err
+			}
+		}
+		_, err = fmt.Fprint(w, `</div>`)
+		if err != nil {
+			return err
+		}
+
+		if output != "" {
+			_, err = fmt.Fprintf(w, `<pre class="font-mono text-xs whitespace-pre-wrap max-h-96 overflow-auto bg-base-300 p-3 rounded mt-2">%s</pre>`, ansiToHTML(output))
+			if err != nil {
+				return err
+			}
+		}
+
+		_, err = fmt.Fprint(w, `</div>`)
+		return err
+	})
+}
+
+// tryFormatJSON attempts to parse s as JSON and re-indent it.
+// Returns the original string if parsing fails (so raw text shows as-is).
+// renderBody converts a request/response body to formatted JSON string.
+// body can be a string (raw JSON) or a map (parsed JSON object).
+func renderBody(body any) string {
+	switch v := body.(type) {
+	case string:
+		return tryFormatJSON(v)
+	case map[string]any:
+		return mapToJSON(v)
+	case []any:
+		return mapToJSON(v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+func tryFormatJSON(s string) string {
+	if s == "" {
+		return s
+	}
+	// If s is wrapped in extra quotes (double-encoded), strip them first.
+	raw := s
+	if len(raw) >= 2 && raw[0] == '"' && raw[len(raw)-1] == '"' {
+		var unquoted string
+		if err := json.Unmarshal([]byte(raw), &unquoted); err == nil {
+			raw = unquoted
+		}
+	}
+	var anyVal any
+	if err := json.Unmarshal([]byte(raw), &anyVal); err != nil {
+		return s // not JSON — return original
+	}
+	formatted, err := json.MarshalIndent(anyVal, "", "  ")
+	if err != nil {
+		return s
+	}
+	return string(formatted)
 }
 
 func renderArtifact(detailsJSON string) templ.Component {
@@ -165,7 +358,7 @@ func renderArtifact(detailsJSON string) templ.Component {
 			return err
 		}
 		if mime == "image/png" || mime == "image/jpeg" || mime == "image/webp" {
-			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" rel="noopener noreferrer"><img src="%s" class="max-w-full max-h-96 rounded-box border border-base-300 cursor-pointer hover:opacity-90 transition-opacity" alt="artifact"/></a>`, html.EscapeString(artURL), html.EscapeString(artURL))
+			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" rel="noopener noreferrer"><img src="%s" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\"flex items-center justify-center bg-base-200 rounded-box p-8 text-base-content/40\\"><span>Artifact not available</span></div>'" class="max-w-full max-h-96 rounded-box border border-base-300 cursor-pointer hover:opacity-90 transition-opacity" alt="artifact"/></a>`, html.EscapeString(artURL), html.EscapeString(artURL))
 		} else {
 			_, err = fmt.Fprintf(w, `<a href="%s" target="_blank" class="btn btn-ghost btn-sm"><span class="iconify lucide--download size-4"></span> Download artifact</a>`, html.EscapeString(artURL))
 		}
@@ -193,6 +386,79 @@ func getStrField(d map[string]any, key string) string {
 func getFloatField(d map[string]any, key string) float64 {
 	v, _ := d[key].(float64)
 	return v
+}
+
+templ renderChildDetail(c runlog.ChildEvent) {
+	if c.Details == "" || !isJSON(c.Details) {
+		<div class="text-base-content/40 text-xs">No details</div>
+	} else if c.Kind == "cli" {
+		@renderChildCLI(c.Details)
+	} else if c.Kind == "http_call" {
+		@renderHttpCall(c.Details)
+	} else if c.Kind == "assertion" {
+		@renderAssertionDetail(c.Details)
+	} else if c.Kind == "log" && isJSON(c.Details) {
+		@renderLogDetail(c.Details)
+	} else {
+		@renderedDetails(c.Details)
+	}
+}
+
+func renderChildCLI(details string) templ.Component {
+	detailsMap := parseEventDetails(details)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		cmd := getStrField(detailsMap, "command")
+		if cmd == "" {
+			cmd = getStrField(detailsMap, "invocation")
+		}
+		output := getStrField(detailsMap, "output")
+		errMsg := getStrField(detailsMap, "error_msg")
+		exitCode := getFloatField(detailsMap, "exit_code")
+		exitBadge := `<span class="badge badge-sm badge-success">exit 0</span>`
+		if exitCode != 0 {
+			exitBadge = fmt.Sprintf(`<span class="badge badge-sm badge-error">exit %.0f</span>`, exitCode)
+		}
+		_, err := fmt.Fprintf(w, `<div class="text-sm space-y-2"><div class="flex items-center gap-2"><span class="badge badge-sm badge-ghost font-mono">$ %s</span>%s</div>`,
+			html.EscapeString(cmd), exitBadge)
+		if err != nil {
+			return err
+		}
+		if output != "" {
+			_, err = fmt.Fprintf(w, `<pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-base-300 p-2 rounded mt-2">%s</pre>`, ansiToHTML(output))
+			if err != nil {
+				return err
+			}
+		}
+		if errMsg != "" {
+			_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2 mt-1"><span class="font-semibold text-xs text-error">Error:</span><span class="font-mono text-xs">%s</span></div>`, html.EscapeString(errMsg))
+			if err != nil {
+				return err
+			}
+		}
+		_, err = fmt.Fprint(w, `</div>`)
+		return err
+	})
+}
+
+func childKindIntent(kind string) string {
+	switch kind {
+	case "cli":
+		return "info"
+	case "log":
+		return "info"
+	case "assertion":
+		return "pass"
+	case "http_call":
+		return "info"
+	case "section":
+		return "info"
+	case "failure":
+		return "fail"
+	case "skip":
+		return "skip"
+	default:
+		return "neutral"
+	}
 }
 
 func isJSON(s string) bool {

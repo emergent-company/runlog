@@ -1,6 +1,10 @@
 package table
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
 
 // SortDir indicates the current sort direction.
 type SortDir string
@@ -95,13 +99,8 @@ templ TableHeadRow() {
 }
 
 // TableHeadCell renders a plain (non-sortable) <th> column header.
-// Pass an optional extra class for alignment/sizing.
-templ TableHeadCell(label string, extra ...string) {
-	if len(extra) > 0 {
-		<th class={ "text-xs font-semibold text-base-content/60 uppercase " + extra[0] }>{ label }</th>
-	} else {
-		<th class="text-xs font-semibold text-base-content/60 uppercase">{ label }</th>
-	}
+templ TableHeadCell(label string) {
+	<th class="text-xs font-semibold text-base-content/60 uppercase">{ label }</th>
 }
 
 // TableBody renders a <tbody> wrapper accepting row children.
@@ -114,7 +113,7 @@ templ TableBody() {
 // TableEmpty renders a full-width empty-state row inside a <tbody>.
 templ TableEmpty(colspan int, message string) {
 	<tr>
-		<td colspan={ intToStr(colspan) } class="text-center text-base-content/60 py-8">{ message }</td>
+		<td colspan={ strconv.Itoa(max(colspan, 1)) } class="text-center text-base-content/60 py-8">{ message }</td>
 	</tr>
 }
 
@@ -145,19 +144,6 @@ templ TableActionCell() {
 	<td class="text-right">
 		{ children... }
 	</td>
-}
-
-// intToStr converts an int to string for use in HTML attributes.
-func intToStr(n int) string {
-	if n <= 0 {
-		return "1"
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	return s
 }
 
 // TableHeader renders a <th> cell that is optionally sortable.
@@ -193,56 +179,4 @@ func sortURL(base string, key string, currentKey string, currentDir SortDir) str
 		dir = "desc"
 	}
 	return base + "&sort=" + key + "&dir=" + dir
-}
-
-// FilterDate renders a date filter input that triggers HTMX on change.
-// Pass attrs for extra HTML attributes such as data-testid.
-templ FilterDate(name string, value string, hxTarget string, hxGet string, attrs templ.Attributes) {
-	<input
-		type="date"
-		name={ name }
-		value={ value }
-		class="input input-bordered input-sm w-36"
-		hx-get={ hxGet }
-		hx-target={ hxTarget }
-		hx-trigger="change"
-		hx-include="closest form"
-		{ devmode.Attrs(ctx, "table/FilterDate")... }
-		{ attrs... }
-	/>
-}
-
-// FilterText renders a text filter input that triggers HTMX on input.
-// Pass attrs for extra HTML attributes such as data-testid.
-templ FilterText(name string, value string, placeholder string, hxTarget string, hxGet string, attrs templ.Attributes) {
-	<input
-		type="search"
-		name={ name }
-		value={ value }
-		placeholder={ placeholder }
-		class="input input-bordered input-sm w-full max-w-xs"
-		hx-get={ hxGet }
-		hx-target={ hxTarget }
-		hx-trigger="input delay:300ms, search"
-		hx-include="closest form"
-		{ devmode.Attrs(ctx, "table/FilterText")... }
-		{ attrs... }
-	/>
-}
-
-// FilterSelect renders a select filter that triggers HTMX on change.
-// Pass attrs for extra HTML attributes such as data-testid.
-templ FilterSelect(name string, hxTarget string, hxGet string, attrs templ.Attributes) {
-	<select
-		name={ name }
-		class="select select-bordered select-sm w-full max-w-xs"
-		hx-get={ hxGet }
-		hx-target={ hxTarget }
-		hx-trigger="change"
-		hx-include="closest form"
-		{ devmode.Attrs(ctx, "table/FilterSelect")... }
-		{ attrs... }
-	>
-		{ children... }
-	</select>
 }

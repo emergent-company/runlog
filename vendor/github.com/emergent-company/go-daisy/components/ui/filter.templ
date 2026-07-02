@@ -39,8 +39,8 @@ templ FilterCard(props FilterCardProps) {
 		>
 			{ children... }
 			<div class="flex gap-2">
-				<button type="submit" class="btn btn-primary btn-sm">Filter</button>
-				<a href={ templ.URL(props.Action) } class="btn btn-ghost btn-sm">Clear</a>
+				@Button(ButtonProps{Type: ButtonTypeSubmit, Variant: ButtonPrimary, Size: ButtonSM}) { Filter }
+				@Button(ButtonProps{Type: ButtonTypeLink, Href: props.Action, Variant: ButtonGhost, Size: ButtonSM}) { Clear }
 			</div>
 		</form>
 	} else {
@@ -60,8 +60,8 @@ templ FilterCard(props FilterCardProps) {
 					<div class="flex flex-wrap gap-3 items-end">
 						{ children... }
 						<div class="flex gap-2">
-							<button type="submit" class="btn btn-primary btn-sm">Filter</button>
-							<a href={ templ.URL(props.Action) } class="btn btn-ghost btn-sm">Clear</a>
+							@Button(ButtonProps{Type: ButtonTypeSubmit, Variant: ButtonPrimary, Size: ButtonSM}) { Filter }
+							@Button(ButtonProps{Type: ButtonTypeLink, Href: props.Action, Variant: ButtonGhost, Size: ButtonSM}) { Clear }
 						</div>
 					</div>
 				</form>

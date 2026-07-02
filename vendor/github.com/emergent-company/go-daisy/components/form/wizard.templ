@@ -1,6 +1,12 @@
 package form
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+)
 
 // WizardStep holds data for one step in the wizard indicator.
 type WizardStep struct {
@@ -12,8 +18,8 @@ type WizardStep struct {
 type WizardStepPanel struct {
 	// Title is the heading shown inside the panel.
 	Title string
-	// Content is the HTML content rendered inside the panel body.
-	Content string
+	// Content is rendered inside the panel body.
+	Content templ.Component
 }
 
 // WizardStepper renders a multi-step form wizard with step indicators,
@@ -24,11 +30,11 @@ templ WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) {
 		<!-- Step indicator -->
 		<div class="flex items-center gap-2 mb-6">
 			for i, step := range steps {
-				<div class="wizard-step-indicator flex items-center gap-2 cursor-pointer" data-step={ spinnerIntStr(i+1) } onclick={ templ.JSFuncCall("wizardGoTo_"+id, i+1) }>
+				<div class="wizard-step-indicator flex items-center gap-2 cursor-pointer" data-step={ strconv.Itoa(i+1) } onclick={ templ.JSFuncCall("wizardGoTo_"+id, i+1) }>
 					<div
-						id={ id + "-dot-" + spinnerIntStr(i+1) }
+						id={ id + "-dot-" + strconv.Itoa(i+1) }
 						class={ "flex size-7 items-center justify-center rounded-full font-semibold text-sm", templ.KV("bg-primary text-primary-content", i == 0), templ.KV("bg-base-200 text-base-content/50", i != 0) }
-					>{ spinnerIntStr(i + 1) }</div>
+					>{ strconv.Itoa(i + 1) }</div>
 					<span class={ "font-medium text-sm max-lg:hidden", templ.KV("text-base-content/50", i != 0) }>{ step.Label }</span>
 				</div>
 				if i < len(steps)-1 {
@@ -39,22 +45,22 @@ templ WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) {
 		<!-- Step panels -->
 		<div class="bg-base-100 border border-base-300 rounded-box p-5 min-h-40">
 			for i, panel := range panels {
-				<div id={ id + "-panel-" + spinnerIntStr(i+1) } class={ templ.KV("hidden", i != 0) }>
+				<div id={ id + "-panel-" + strconv.Itoa(i+1) } class={ templ.KV("hidden", i != 0) }>
 					<h3 class="font-semibold mb-3">{ panel.Title }</h3>
-					@templ.Raw(panel.Content)
+					@panel.Content
 				</div>
 			}
 		</div>
 		<!-- Navigation -->
 		<div class="mt-4 flex justify-between">
-			<button id={ id + "-prev" } class="btn btn-ghost btn-sm" onclick={ templ.JSFuncCall("wizardPrev_"+id) } disabled>
-				<span class="iconify lucide--chevron-left size-4" aria-hidden="true"></span>
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, OnClick: templ.JSFuncCall("wizardPrev_"+id), Attrs: templ.Attributes{"id": id + "-prev", "disabled": true}}) {
+				@ui.IconSpan("lucide--chevron-left", "size-4")
 				Back
-			</button>
-			<button id={ id + "-next" } class="btn btn-primary btn-sm" onclick={ templ.JSFuncCall("wizardNext_"+id) }>
+			}
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, OnClick: templ.JSFuncCall("wizardNext_"+id), Attrs: templ.Attributes{"id": id + "-next"}}) {
 				Next
-				<span class="iconify lucide--chevron-right size-4" aria-hidden="true"></span>
-			</button>
+				@ui.IconSpan("lucide--chevron-right", "size-4")
+			}
 		</div>
 	</div>
 	@wizardScript(id, len(steps))
@@ -64,7 +70,7 @@ templ wizardScript(id string, total int) {
 	<script>
 	(function() {
 	  var wid = { templ.JSONString(id) };
-	  var current = 1, total = { templ.JSONString(spinnerIntStr(total)) } * 1;
+	  var current = 1, total = { templ.JSONString(strconv.Itoa(total)) } * 1;
 	  function goTo(n) {
 	    document.getElementById(wid+'-panel-'+current).classList.add('hidden');
 	    current = Math.max(1, Math.min(total, n));

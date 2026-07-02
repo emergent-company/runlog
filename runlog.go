@@ -76,6 +76,9 @@ type RunLog struct {
 	timeoutSeconds float64
 	// Category set by SetCategory.
 	category string
+	// Test type — classification: unit, integration, e2e, component, etc.
+	// Auto-derived from source file name in NewRunLog.
+	testType string
 
 	// Outcome reason tracking.
 	// skipReason is set by Skipf() before calling t.Skip().
@@ -91,10 +94,37 @@ type RunLog struct {
 
 	// TracePoller lifecycle (optional; started via StartTracePoller).
 	tracePoller *TracePoller
+
+	// Coverage tracking (optional; set via SetCoverage).
+	coveragePct  float64
+	coverageData string
 }
 
 // ActiveRunLogs maps t.Name() → *RunLog for tests that have an active run log.
 var ActiveRunLogs sync.Map
+
+// deriveTestType classifies a test file by its path suffix.
+func deriveTestType(srcFile string) string {
+	if strings.Contains(srcFile, "/tests/e2e/") || strings.Contains(srcFile, "tests/cli/") || strings.Contains(srcFile, "tests/blueprints/") || strings.Contains(srcFile, "tests/tools/") {
+		return "e2e"
+	}
+	if strings.Contains(srcFile, "tests/api/") || strings.Contains(srcFile, "tests/production/") {
+		return "e2e"
+	}
+	if strings.Contains(srcFile, "tests/integration/") || strings.Contains(srcFile, ".integration.") || strings.Contains(srcFile, "/tests-integration/") {
+		return "integration"
+	}
+	if strings.Contains(srcFile, "tests/experiments/") || strings.Contains(srcFile, "tests/experiments/") {
+		return "benchmark"
+	}
+	if strings.Contains(srcFile, "tests/docs/") {
+		return "docs"
+	}
+	if strings.Contains(srcFile, ".spec.") || strings.Contains(srcFile, "_test.") {
+		return "unit"
+	}
+	return "other"
+}
 
 // NewRunLog creates a per-test log folder and opens run.log inside it.
 // The folder is placed under the logs/ directory used by LogSession.
@@ -146,6 +176,7 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	if db, err := SharedDB(); err == nil && db != nil {
 		envName := os.Getenv("MEMORY_TEST_ENV")
 		envVars := captureEnvVars()
+		rl.testType = deriveTestType(srcFile)
 
 		// If RUNLOG_RUN_ID is set, use the existing row instead of creating a new one.
 		if ridStr := os.Getenv("RUNLOG_RUN_ID"); ridStr != "" {
@@ -156,7 +187,7 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 			} else {
 				t.Logf("warn: RunLog: invalid RUNLOG_RUN_ID %q: %v", ridStr, err)
 			}
-		} else if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars); err == nil {
+		} else if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars, rl.testType); err == nil {
 			rl.db = db
 			rl.runID = id
 		} else {
@@ -207,6 +238,7 @@ func (rl *RunLog) Dir() string { //nolint:deadcode
 // Close flushes and closes the log file and deregisters from LogSession routing.
 // It records the test outcome (passed/failed) in the DB.
 func (rl *RunLog) Close() { //nolint:deadcode
+	rl.t.Helper()
 	// Stop trace poller before acquiring the log mutex (poller may call dbEvent).
 	if rl.tracePoller != nil {
 		rl.tracePoller.Stop()
@@ -249,6 +281,11 @@ func (rl *RunLog) Close() { //nolint:deadcode
 		}
 		if err := rl.db.FinishRunWithCost(rl.runID, now, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD); err != nil {
 			rl.t.Logf("warn: RunLog: DB FinishRunWithCost: %v", err)
+		}
+		if rl.coverageData != "" && rl.coveragePct > 0 {
+			if err := rl.db.UpdateRunCoverage(rl.runID, rl.coveragePct, rl.coverageData); err != nil {
+				rl.t.Logf("warn: RunLog: DB UpdateRunCoverage: %v", err)
+			}
 		}
 	}
 }
@@ -413,6 +450,26 @@ func (rl *RunLog) SetCategory(category string) { //nolint:deadcode
 	}
 }
 
+// SetTestType sets the test classification (unit, integration, e2e, component, etc.)
+// and persists it to the DB. Overrides the auto-derived type from the test file path.
+func (rl *RunLog) SetTestType(testType string) { //nolint:deadcode
+	if testType == "" {
+		return
+	}
+
+	rl.mu.Lock()
+	rl.testType = testType
+	rl.mu.Unlock()
+
+	rl.writef("test_type: %s\n", testType)
+
+	if rl.db != nil && rl.runID != 0 {
+		if err := rl.db.UpdateRunField(rl.runID, "test_type", testType); err != nil {
+			rl.t.Logf("warn: RunLog.SetTestType: DB UpdateRunField: %v", err)
+		}
+	}
+}
+
 // SetTimeout registers a per-test timeout duration.  The background timeout
 // worker will mark the run as timed out if it exceeds this duration.
 // Call this at the start of a test to prevent stuck runs.
@@ -430,6 +487,22 @@ func (rl *RunLog) SetTimeout(d time.Duration) { //nolint:deadcode
 	if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunTimeout(rl.runID, sec); err != nil {
 			rl.t.Logf("warn: RunLog.SetTimeout: DB UpdateRunTimeout: %v", err)
+		}
+	}
+}
+
+// SetCoverage stores the code coverage percentage and per-function coverage data
+// for this test run. coveragePct is 0.0-100.0, data is the raw coverage JSON.
+// Call this at the end of a test when --coverprofile is available.
+func (rl *RunLog) SetCoverage(coveragePct float64, coverageData string) { //nolint:deadcode
+	rl.mu.Lock()
+	rl.coveragePct = coveragePct
+	rl.coverageData = coverageData
+	rl.mu.Unlock()
+	rl.writef("coverage: %.1f%%\n", coveragePct)
+	if rl.db != nil && rl.runID != 0 {
+		if err := rl.db.UpdateRunCoverage(rl.runID, coveragePct, coverageData); err != nil {
+			rl.t.Logf("warn: RunLog.SetCoverage: DB UpdateRunCoverage: %v", err)
 		}
 	}
 }
@@ -601,12 +674,14 @@ func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[st
 // instead (e.g. "Revoke token") while still recording the full command and
 // output in the inspector details.
 func (rl *RunLog) CLI(invocation, output string) { //nolint:deadcode
+	rl.t.Helper()
 	rl.CLIStepErr("$ "+invocation, invocation, output, nil)
 }
 
 // CLIErr is like CLI but also records the command error (exit code) in the
 // event details so the TUI can highlight the row in red on failure.
 func (rl *RunLog) CLIErr(invocation, output string, err error) { //nolint:deadcode
+	rl.t.Helper()
 	rl.CLIStepErr("$ "+invocation, invocation, output, err)
 }
 
@@ -634,6 +709,7 @@ func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) stri
 // (e.g. "Revoke token") instead of the raw invocation string.  The full
 // invocation and output are still recorded in the inspector details.
 func (rl *RunLog) CLIStep(desc, invocation, output string) { //nolint:deadcode
+	rl.t.Helper()
 	rl.CLIStepErr(desc, invocation, output, nil)
 }
 

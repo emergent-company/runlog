@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/emergent-company/go-daisy/devmode"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
 // TextInput renders a labeled text input with error support.
@@ -64,7 +66,7 @@ templ FormActions() {
 // FormActionsWithLoading renders FormActions with a loading submit button.
 templ FormActionsWithLoading(submitText string, indicatorID string) {
 	@FormActions() {
-		<button type="submit" class="btn btn-primary btn-sm">
+		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeSubmit, Variant: ui.ButtonPrimary, Size: ui.ButtonSM}) {
 			<span
 				if indicatorID != "" {
 					id={ indicatorID }
@@ -72,25 +74,31 @@ templ FormActionsWithLoading(submitText string, indicatorID string) {
 				class="htmx-indicator loading loading-spinner loading-xs"
 			></span>
 			{ submitText }
-		</button>
+		}
 	}
 }
 
 // SearchInput renders a text input with HTMX search debounce.
-templ SearchInput(name string, value string, placeholder string, hxTarget string, hxGet string) {
-	<label class="input input-sm w-full flex items-center gap-2" { devmode.Attrs(ctx, "form/SearchInput")... }>
-		<span class="iconify lucide--search size-4 opacity-50 shrink-0"></span>
+// Use children slot for extra content after the input (close button, keyboard badge, etc.).
+// HTMX attrs are only emitted when both hxGet and hxTarget are non-empty.
+// Pass class to override the default wrapper classes, or empty string for default.
+templ SearchInput(name string, value string, placeholder string, hxTarget string, hxGet string, class string) {
+	<label class={ templ.KV(class, class != ""), templ.KV("input input-sm w-full flex items-center gap-2", class == "") } { devmode.Attrs(ctx, "form/SearchInput")... }>
+		@ui.IconSpan("lucide--search", "size-4 opacity-50 shrink-0")
 		<input
 			type="search"
 			name={ name }
 			value={ value }
 			placeholder={ placeholder }
 			class="grow"
-			hx-get={ hxGet }
-			hx-target={ hxTarget }
-			hx-trigger="input delay:300ms, search"
-			hx-include="closest form"
+			if hxGet != "" && hxTarget != "" {
+				hx-get={ hxGet }
+				hx-target={ hxTarget }
+				hx-trigger="input delay:300ms, search"
+				hx-include="closest form"
+			}
 		/>
+		{ children... }
 	</label>
 }
 
@@ -135,6 +143,25 @@ templ Toggle(name string, checked bool, label string) {
 			<span class="label-text">{ label }</span>
 		}
 	</label>
+}
+
+// FilterSelect renders a compact, HTMX-aware select for table filter toolbars.
+// Uses a children slot (caller provides <option> elements), no label/error wrapper.
+// Pass class to override width, or empty string for default (w-36).
+templ FilterSelect(name string, hxTarget string, hxGet string, class string) {
+	<select
+		class={ "select", templ.KV(class, class != ""), templ.KV("select-sm w-36", class == "") }
+		aria-label={ name }
+		name={ name }
+		if hxGet != "" && hxTarget != "" {
+			hx-get={ hxGet }
+			hx-target={ "#" + hxTarget }
+			hx-trigger="change"
+			hx-include="closest form"
+		}
+	>
+		{ children... }
+	</select>
 }
 
 // FieldError renders a standalone field error message.

@@ -1,0 +1,119 @@
+package form
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// EnhancedSelectOption is a single option in an enhanced select.
+type EnhancedSelectOption struct {
+	Value       string
+	Label       string
+	Disabled    bool
+	GroupLabel  string // optional optgroup label
+}
+
+// EnhancedSelectProps configures a Choices.js enhanced select.
+type EnhancedSelectProps struct {
+	Name        string
+	Label       string
+	Value       string   // selected value(s)
+	Options     []EnhancedSelectOption
+	Placeholder string
+	Required    bool
+	Multiple    bool
+	Searchable  bool
+	RemoveItems bool
+	Error       string
+	Class       string
+	Attrs       templ.Attributes
+}
+
+// EnhancedSelect renders a Choices.js-powered select with search, groups, tags.
+templ EnhancedSelect(props EnhancedSelectProps) {
+	<div class="form-control w-full" { devmode.Attrs(ctx, "form/EnhancedSelect")... }>
+		if props.Label != "" {
+			<label class="label" for={ props.Name }>
+				<span class="label-text">{ props.Label }</span>
+			</label>
+		}
+		<select
+			id={ props.Name }
+			name={ props.Name }
+			class={ "select select-bordered w-full",
+				templ.KV("select-error", props.Error != ""),
+				props.Class }
+			required?={ props.Required }
+			multiple?={ props.Multiple }
+			data-choices data-placeholder={ props.Placeholder }
+			data-search={ ternary(props.Searchable, "true", "false") }
+			data-remove-items={ ternary(props.RemoveItems, "true", "false") }
+			{ props.Attrs... }
+		>
+			if props.Placeholder != "" && !props.Multiple {
+				<option value="" disabled selected>{ props.Placeholder }</option>
+			}
+			for _, opt := range props.Options {
+				if opt.GroupLabel != "" {
+					<optgroup label={ opt.GroupLabel }>
+						<option value={ opt.Value } selected?={ opt.Value == props.Value } disabled?={ opt.Disabled }>{ opt.Label }</option>
+					</optgroup>
+				} else {
+					<option value={ opt.Value } selected?={ opt.Value == props.Value } disabled?={ opt.Disabled }>{ opt.Label }</option>
+				}
+			}
+		</select>
+		if props.Error != "" {
+			<span class="text-error text-xs mt-1">{ props.Error }</span>
+		}
+	</div>
+	@choicesScript()
+}
+
+templ choicesScript() {
+	<script>
+	if (!window._choicesInit) {
+	  window._choicesInit = true;
+
+	  window.initChoices = function(el) {
+	    if (typeof Choices === 'undefined') {
+	      var s = document.createElement('script');
+	      s.src = 'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js';
+	      s.onload = function() { initChoicesElement(el); };
+	      document.head.appendChild(s);
+	      var l = document.createElement('link');
+	      l.rel = 'stylesheet';
+	      l.href = 'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css';
+	      document.head.appendChild(l);
+	    } else {
+	      initChoicesElement(el);
+	    }
+	  };
+
+	  function initChoicesElement(el) {
+	    if (el._choicesInstance) return;
+	    try {
+	      el._choicesInstance = new Choices(el, {
+	        allowHTML: false,
+	        searchEnabled: el.dataset.search !== 'false',
+	        removeItemButton: el.dataset.removeItems === 'true',
+	        itemSelectText: '',
+	        placeholderValue: el.dataset.placeholder || '',
+	        shouldSort: false,
+	      });
+	    } catch(e) { console.warn('Choices init failed:', e); }
+	  }
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('select[data-choices]').forEach(initChoicesElement);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('select[data-choices]:not(._choices-initialized)').forEach(function(el) {
+	      el.classList.add('_choices-initialized');
+	      initChoicesElement(el);
+	    });
+	  });
+	}
+	</script>
+}
+
+

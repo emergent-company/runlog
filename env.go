@@ -6,10 +6,15 @@ package runlog
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // LoadDotEnv reads KEY=VALUE pairs from .env (and optionally .env.<name>)
@@ -106,6 +111,14 @@ func loadDotEnvDir(dir string) {
 	}
 }
 
+// LoadEnvFile reads KEY=VALUE pairs from path into the process environment.
+// If overwrite is true, existing env vars are replaced (used for named
+// overlays); if false, existing vars are preserved (shell wins).
+// Missing file is silently skipped.
+func LoadEnvFile(path string, overwrite bool) {
+	loadEnvFile(path, overwrite)
+}
+
 // loadEnvFile reads KEY=VALUE pairs from path into the process environment.
 // If overwrite is true, existing env vars are replaced (used for named
 // overlays); if false, existing vars are preserved (shell wins).
@@ -150,6 +163,157 @@ func BlueprintEnvVar(dir, key string) string { //nolint:deadcode
 		return v
 	}
 	return os.Getenv(key)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Environment validation
+// ─────────────────────────────────────────────────────────────────────────────
+
+// EnvResult is the outcome of validating a single requirement.
+type EnvResult struct {
+	Key   string `json:"key"`
+	Pass  bool   `json:"pass"`
+	Value string `json:"value,omitempty"`
+	Error string `json:"error,omitempty"`
+	Hint  string `json:"hint,omitempty"`
+}
+
+// ValidateEnv runs all requirement checks for an environment config.
+// Returns nil if all pass, or a composite error listing all failures.
+func ValidateEnv(env *EnvironmentConfig) []EnvResult {
+	var results []EnvResult
+	for key, check := range env.Requires {
+		val := os.Getenv(key)
+		_ = os.WriteFile("/tmp/env_debug.log", []byte("ValidateEnv: key="+key+" getenv="+os.Getenv(key)+" envVal="+env.Env[key]+" default="+check.Default+"\n"), 0644)
+		if val == "" {
+			val = env.Env[key]
+		}
+		if val == "" {
+			val = check.Default
+		}
+		r := EnvResult{Key: key, Value: val, Hint: check.Hint}
+		err := CheckRequirement(key, val, check)
+		if err != nil {
+			r.Pass = false
+			r.Error = err.Error()
+		} else {
+			r.Pass = true
+		}
+		results = append(results, r)
+	}
+	return results
+}
+
+// ValidateEnvSummary returns a quick pass/fail for the whole environment.
+func ValidateEnvSummary(env *EnvironmentConfig) error {
+	results := ValidateEnv(env)
+	var failures []string
+	for _, r := range results {
+		if !r.Pass {
+			msg := r.Key + ": " + r.Error
+			if r.Hint != "" {
+				msg += " (" + r.Hint + ")"
+			}
+			failures = append(failures, msg)
+		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("environment %q validation failed:\n  - %s", env.Name, strings.Join(failures, "\n  - "))
+	}
+	return nil
+}
+
+// CheckRequirement validates a single env var against an EnvCheck.
+func CheckRequirement(key, val string, check EnvCheck) error {
+	switch check.Check {
+	case "nonempty":
+		return checkNonempty(key, val)
+	case "reachable":
+		return checkReachable(key, val, check)
+	case "port_open":
+		return checkPortOpen(key, val, check)
+	case "executable":
+		return checkExecutable(val)
+	case "file_exists":
+		return checkFileExists(val)
+	case "":
+		return nil // no check configured
+	default:
+		return fmt.Errorf("unknown check type %q", check.Check)
+	}
+}
+
+func checkNonempty(key, val string) error {
+	if val == "" {
+		return fmt.Errorf("%s is not set", key)
+	}
+	return nil
+}
+
+func checkReachable(key, val string, check EnvCheck) error {
+	url := val
+	if check.URL != "" {
+		url = check.URL
+	}
+	if url == "" {
+		return fmt.Errorf("no URL to check for %s", key)
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("%s unreachable at %s: %w", key, url, err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("%s at %s returned HTTP %d", key, url, resp.StatusCode)
+	}
+	return nil
+}
+
+func checkPortOpen(key, val string, check EnvCheck) error {
+	addr := val
+	if addr == "" {
+		addr = check.Default
+	}
+	if addr == "" {
+		return fmt.Errorf("no address to dial for %s", key)
+	}
+	// Support "host:port" or just "port"
+	if !strings.Contains(addr, ":") {
+		host := os.Getenv(strings.TrimSuffix(key, "_PORT") + "_HOST")
+		if host == "" {
+			host = "localhost"
+		}
+		addr = host + ":" + addr
+	}
+	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+	if err != nil {
+		return fmt.Errorf("%s not reachable at %s: %w", key, addr, err)
+	}
+	conn.Close()
+	return nil
+}
+
+func checkExecutable(val string) error {
+	if val == "" {
+		return fmt.Errorf("no executable path specified")
+	}
+	_, err := exec.LookPath(val)
+	if err != nil {
+		return fmt.Errorf("executable %q not found on PATH: %w", val, err)
+	}
+	return nil
+}
+
+func checkFileExists(val string) error {
+	if val == "" {
+		return fmt.Errorf("no file path specified")
+	}
+	_, err := os.Stat(val)
+	if err != nil {
+		return fmt.Errorf("file %q not found: %w", val, err)
+	}
+	return nil
 }
 
 // ParseBlueprintEnvFiles reads .env then .env.local from dir and returns the

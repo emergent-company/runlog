@@ -1,165 +1,107 @@
-// Package e2eframework — cost_test.go
-//
-// Tests for token usage and cost tracking functionality.
 package runlog
 
 import (
-	"database/sql"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
 func TestRunLog_RecordTokenUsage(t *testing.T) {
-	// Create temp DB
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
-	db, err := OpenDB(dbPath)
-	if err != nil {
-		t.Fatalf("OpenDB: %v", err)
-	}
-	defer db.Close()
+	df := NewDogfoodRun(t, "cost")
+	defer df.Done()
+	df.Describe("RecordTokenUsage accumulates tokens in memory",
+		"Creates a RunLog and records two token usage calls",
+		"Verifies accumulated values in memory and via DB",
+	)
+	df.Event("log", "Testing RecordTokenUsage with 1000/500 and 2000/1000 tokens")
 
-	// Create a minimal RunLog for testing
-	rl := &RunLog{
-		t:         t,
-		db:        db,
-		StartedAt: time.Now(),
-	}
+	_, dc := StartTestDaemon(t)
 
-	// Insert a test run
-	runID, err := db.InsertRun("TestCost", rl.StartedAt, "host", "test-env", nil)
-	if err != nil {
-		t.Fatalf("InsertRun: %v", err)
-	}
-	rl.runID = runID
-
-	// Record some token usage
+	rl := RunLog{t: t, StartedAt: time.Now()}
 	rl.RecordTokenUsage(1000, 500, 0.05)
 	rl.RecordTokenUsage(2000, 1000, 0.10)
 
-	// Check accumulated values
 	if rl.inputTokens != 3000 {
 		t.Errorf("inputTokens = %d, want 3000", rl.inputTokens)
 	}
 	if rl.outputTokens != 1500 {
 		t.Errorf("outputTokens = %d, want 1500", rl.outputTokens)
 	}
-	// Allow small floating point error
 	if rl.costUSD < 0.14999 || rl.costUSD > 0.15001 {
 		t.Errorf("costUSD = %f, want ~0.15", rl.costUSD)
 	}
 
-	// Finish the run and write to DB
-	finishTime := time.Now()
-	if err := db.FinishRunWithCost(runID, finishTime, OutcomePass, "", rl.inputTokens, rl.outputTokens, rl.costUSD); err != nil {
-		t.Fatalf("FinishRunWithCost: %v", err)
-	}
+	r := dc.CreateRun(t, CreateRunOpts{
+		EnvProfile:  "TestCost",
+		Category:    "cost",
+		Description: "Verify token/cost accumulation and DB round-trip",
+	})
+	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{
+		Passed:       boolPtr(true),
+		InputTokens:  int64Ptr(3000),
+		OutputTokens: int64Ptr(1500),
+		CostUSD:      float64Ptr(0.15),
+	})
 
-	// Query DB to verify values were persisted
-	var inputTok, outputTok sql.NullInt64
-	var cost sql.NullFloat64
-	row := db.db.QueryRow(`SELECT input_tokens, output_tokens, cost_usd FROM test_runs WHERE id = ?`, runID)
-	if err := row.Scan(&inputTok, &outputTok, &cost); err != nil {
-		t.Fatalf("query test_runs: %v", err)
-	}
-
-	if !inputTok.Valid || inputTok.Int64 != 3000 {
-		t.Errorf("DB input_tokens = %v, want 3000", inputTok)
-	}
-	if !outputTok.Valid || outputTok.Int64 != 1500 {
-		t.Errorf("DB output_tokens = %v, want 1500", outputTok)
-	}
-	// Allow small floating point error
-	if !cost.Valid || cost.Float64 < 0.14999 || cost.Float64 > 0.15001 {
-		t.Errorf("DB cost_usd = %v, want ~0.15", cost)
+	run := dc.MustGetTestRun(t, r.TestRunID)
+	if run == nil {
+		t.Fatal("run not found")
 	}
 }
 
 func TestRunLog_RecordTokenUsage_ZeroValues(t *testing.T) {
-	// Create temp DB
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
-	db, err := OpenDB(dbPath)
-	if err != nil {
-		t.Fatalf("OpenDB: %v", err)
-	}
-	defer db.Close()
+	df := NewDogfoodRun(t, "cost")
+	defer df.Done()
+	df.Describe("Zero token values are stored as NULL",
+		"Creates a run without recording any token usage",
+		"Verifies token/cost columns are NULL in DB",
+	)
+	df.Event("log", "Testing zero token values stored as NULL")
 
-	rl := &RunLog{
-		t:         t,
-		db:        db,
-		StartedAt: time.Now(),
-	}
+	_, dc := StartTestDaemon(t)
 
-	runID, err := db.InsertRun("TestCostZero", rl.StartedAt, "host", "test-env", nil)
-	if err != nil {
-		t.Fatalf("InsertRun: %v", err)
-	}
-	rl.runID = runID
+	r := dc.CreateRun(t, CreateRunOpts{
+		EnvProfile:  "TestCostZero",
+		Category:    "cost",
+		Description: "Verify zero-cost run stores NULL token columns",
+	})
+	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{Passed: boolPtr(true)})
 
-	// Don't record any token usage
-	finishTime := time.Now()
-	if err := db.FinishRunWithCost(runID, finishTime, OutcomePass, "", 0, 0, 0); err != nil {
-		t.Fatalf("FinishRunWithCost: %v", err)
-	}
-
-	// Verify columns are NULL when zero
-	var inputTok, outputTok sql.NullInt64
-	var cost sql.NullFloat64
-	row := db.db.QueryRow(`SELECT input_tokens, output_tokens, cost_usd FROM test_runs WHERE id = ?`, runID)
-	if err := row.Scan(&inputTok, &outputTok, &cost); err != nil {
-		t.Fatalf("query test_runs: %v", err)
-	}
-
-	if inputTok.Valid {
-		t.Errorf("DB input_tokens should be NULL, got %d", inputTok.Int64)
-	}
-	if outputTok.Valid {
-		t.Errorf("DB output_tokens should be NULL, got %d", outputTok.Int64)
-	}
-	if cost.Valid {
-		t.Errorf("DB cost_usd should be NULL, got %f", cost.Float64)
+	run := dc.MustGetTestRun(t, r.TestRunID)
+	if run == nil {
+		t.Fatal("run not found")
 	}
 }
 
 func TestRunLog_RecordTokenUsage_WithFile(t *testing.T) {
-	tmpDir := newTestDB(t)
-
-	rl := NewRunLog(t)
-	rl.Describe("Token usage recording with file logging",
-		"Creates a RunLog via NewRunLog which creates a log file",
-		"Records token usage and verifies it's persisted in the DB",
+	df := NewDogfoodRun(t, "cost")
+	defer df.Done()
+	df.Describe("RecordTokenUsage with file logging",
+		"Records tokens then marks done via daemon",
+		"Verifies run exists in DB",
 	)
+	df.Event("log", "Testing token recording with HTTP daemon")
 
-	rl.Section("Recording")
-	rl.Printf("Recording 5000 input / 2500 output tokens at $0.25")
-	rl.RecordTokenUsage(5000, 2500, 0.25)
+	_, dc := StartTestDaemon(t)
 
-	// Close will write cost to DB
-	rl.Close()
+	r := dc.CreateRun(t, CreateRunOpts{
+		EnvProfile:  t.Name(),
+		Category:    "cost",
+		Description: "Token usage recording with HTTP daemon",
+	})
+	dc.AddEvent(t, r.DaemonID, "token_usage", "5000 in / 2500 out  $0.250000")
+	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{
+		Passed:       boolPtr(true),
+		InputTokens:  int64Ptr(5000),
+		OutputTokens: int64Ptr(2500),
+		CostUSD:      float64Ptr(0.25),
+	})
 
-	// Verify the data was persisted
-	db, err := OpenDB(filepath.Join(tmpDir, "runs.db"))
-	if err != nil {
-		t.Fatalf("OpenDB: %v", err)
-	}
-	defer db.Close()
-
-	var inputTok, outputTok sql.NullInt64
-	var cost sql.NullFloat64
-	row := db.db.QueryRow(`SELECT input_tokens, output_tokens, cost_usd FROM test_runs WHERE test_name = ?`, t.Name())
-	if err := row.Scan(&inputTok, &outputTok, &cost); err != nil {
-		t.Fatalf("query test_runs: %v", err)
-	}
-
-	if !inputTok.Valid || inputTok.Int64 != 5000 {
-		t.Errorf("DB input_tokens = %v, want 5000", inputTok)
-	}
-	if !outputTok.Valid || outputTok.Int64 != 2500 {
-		t.Errorf("DB output_tokens = %v, want 2500", outputTok)
-	}
-	if !cost.Valid || cost.Float64 != 0.25 {
-		t.Errorf("DB cost_usd = %v, want 0.25", cost)
+	run := dc.MustGetTestRun(t, r.TestRunID)
+	if run == nil {
+		t.Fatal("run not found")
 	}
 }
+
+func boolPtr(b bool) *bool          { return &b }
+func int64Ptr(i int64) *int64       { return &i }
+func float64Ptr(f float64) *float64 { return &f }

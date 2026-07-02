@@ -59,6 +59,7 @@ github.com/dustin/go-humanize
 ## explicit; go 1.25.6
 github.com/emergent-company/go-daisy/components/form
 github.com/emergent-company/go-daisy/components/layout
+github.com/emergent-company/go-daisy/components/nav
 github.com/emergent-company/go-daisy/components/table
 github.com/emergent-company/go-daisy/components/ui
 github.com/emergent-company/go-daisy/devmode

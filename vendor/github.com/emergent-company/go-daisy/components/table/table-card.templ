@@ -1,0 +1,60 @@
+package table
+
+import (
+	"strconv"
+
+	form "github.com/emergent-company/go-daisy/components/form"
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// TableCardWrapper renders a card container for table compositions.
+templ TableCardWrapper() {
+	<div class="card bg-base-100 shadow-sm border border-base-200" { devmode.Attrs(ctx, "table/TableCardWrapper")... }>
+		<div class="card-body p-0">
+			{ children... }
+		</div>
+	</div>
+}
+
+// TableCardHeader renders the header bar inside a table card.
+templ TableCardHeader() {
+	<div class="flex items-center justify-between px-5 pt-5" { devmode.Attrs(ctx, "table/TableCardHeader")... }>
+		{ children... }
+	</div>
+}
+
+// TableCardFooter renders per-page selector, item count, and circle pagination.
+templ TableCardFooter(props TableCardFooterProps) {
+	<div class="flex items-center justify-between p-6" { devmode.Attrs(ctx, "table/TableCardFooter")... } { props.Attrs... }>
+		<div class="text-base-content/80 hover:text-base-content flex gap-2 text-sm">
+			<span class="hidden sm:inline">Per page</span>
+			@form.FilterSelect("pageSize", props.TargetID, props.BaseURL, "select-xs w-18") {
+				<option value="10" if props.PageSize == 10 { selected="" }>10</option>
+				<option value="20" if props.PageSize == 20 { selected="" }>20</option>
+				<option value="50" if props.PageSize == 50 { selected="" }>50</option>
+				<option value="100" if props.PageSize == 100 { selected="" }>100</option>
+			}
+		</div>
+		<span class="text-base-content/80 hidden text-sm lg:inline">
+			Showing
+			<span class="text-base-content font-medium">{ strconv.FormatInt(props.StartItem(), 10) }–{ strconv.FormatInt(props.EndItem(), 10) }</span>
+			of
+			<span class="text-base-content font-medium">{ strconv.FormatInt(props.TotalItems, 10) }</span>
+			items
+		</span>
+		@ui.PaginationCircle(props.CurrentPage, props.TotalPages, props.BaseURL, props.TargetID)
+	</div>
+}
+
+// TableSearch is a thin wrapper around form.SearchInput for table card headers.
+templ TableSearch(name, value, placeholder, hxTarget, hxGet string) {
+	@form.SearchInput(name, value, placeholder, hxTarget, hxGet, "")
+}
+
+// TableSelect is a thin wrapper around form.FilterSelect for table card headers.
+templ TableSelect(name string, hxTarget string, hxGet string) {
+	@form.FilterSelect(name, hxTarget, hxGet, "") {
+		{ children... }
+	}
+}

@@ -1,0 +1,70 @@
+package ui
+
+import (
+	"strconv"
+)
+
+// TestimonialCardProps configures a testimonial card.
+type TestimonialCardProps struct {
+	Quote        string
+	Name         string
+	Role         string
+	AvatarSrc    string // optional image URL; empty = initials
+	AvatarIcon   string // optional lucide icon, e.g. "lucide--user"
+	Rating       int    // 1-5 star rating, 0 = no stars shown
+	RatingColor  string // e.g. "bg-orange-400", "rating-warning"
+	MaxRating    int    // defaults to 5
+	CardBordered bool
+	Attrs        templ.Attributes
+}
+
+// testimonialMaxRating returns max rating with default 5.
+func testimonialMaxRating(max int) int {
+	if max == 0 {
+		return 5
+	}
+	return max
+}
+
+// testimonialCardClass builds the card class string based on bordered flag.
+func testimonialCardClass(bordered bool) string {
+	if bordered {
+		return "card-border shadow-sm border border-base-content/10 h-full flex flex-col p-6"
+	}
+	return "shadow-sm border border-base-content/10 h-full flex flex-col p-6"
+}
+
+// TestimonialCard renders a quote card with avatar, name, role, and optional star rating.
+templ TestimonialCard(props TestimonialCardProps) {
+	@CardRaw(testimonialCardClass(props.CardBordered), "", props.Attrs) {
+		// Star rating
+		if props.Rating > 0 {
+			<div class="rating mb-3">
+				for i := 1; i <= testimonialMaxRating(props.MaxRating); i++ {
+					<input
+						type="radio"
+						name={ "testimonial-rating-" + props.Name }
+						class={ "mask mask-star-2", props.RatingColor }
+						checked?={ i == props.Rating }
+						aria-label={ strconv.Itoa(i) + " star" }
+						disabled
+					/>
+				}
+			</div>
+		}
+		// Quote
+		<blockquote class="text-base text-base-content/80 leading-relaxed mb-4 flex-1">
+			"{ props.Quote }"
+		</blockquote>
+		// Avatar + name/role
+		<div class="flex items-center gap-3 mt-auto pt-3 border-t border-base-content/10">
+			@Avatar(props.Name, props.AvatarSrc, props.AvatarIcon, AvatarSM, nil)
+			<div>
+				<p class="text-sm font-semibold text-base-content">{ props.Name }</p>
+				if props.Role != "" {
+					<p class="text-xs text-base-content/50">{ props.Role }</p>
+				}
+			</div>
+		</div>
+	}
+}

@@ -183,7 +183,7 @@ func experimentDetailContent(exp runlog.ExperimentSummary) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(exp.Runs) > 0 {
-			templ_7745c5c3_Err = runsTable(exp.Runs, runsTableOpts{ShowID: true, ShowTags: true}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = runsTable(exp.Runs, runsTableOpts{ShowID: true, ShowTags: true, ShowTestType: true}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

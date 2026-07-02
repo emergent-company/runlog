@@ -1,0 +1,77 @@
+package main
+
+// SearchModal renders the DaisyUI dialog for global search.
+templ SearchModal() {
+	<dialog id="search-modal" class="modal" data-testid="search-modal">
+		<!-- lint:allow-raw: go-daisy has no Modal component -->
+		<div class="modal-box max-w-xl p-0 overflow-hidden">
+			<form method="dialog" class="flex items-center gap-3 px-4 py-3 border-b border-base-200">
+				<span class="iconify lucide--search size-5 text-base-content/40 shrink-0"></span>
+				<input
+					id="search-input"
+					type="text"
+					placeholder="Search tests, runs, linters..."
+					class="grow bg-transparent text-sm focus:outline-none"
+					autofocus
+					autocomplete="off"
+					name="q"
+					data-testid="search-input"
+					hx-get="/ui/search"
+					hx-trigger="keyup changed delay:300ms"
+					hx-target="#search-results"
+					hx-swap="outerHTML"
+					aria-label="Search"
+				/>
+				<button type="button" class="btn btn-ghost btn-xs gap-1.5" onclick="document.getElementById('search-modal').close()">
+					<span class="text-xs text-base-content/40">ESC</span>
+				</button>
+			</form>
+			<div id="search-results" class="max-h-96 overflow-y-auto" data-testid="search-results">
+				@SearchResults(nil)
+			</div>
+		</div>
+		<form method="dialog" class="modal-backdrop">
+			<button type="submit">close</button>
+		</form>
+	</dialog>
+}
+
+// SearchResults renders the grouped search results inside the modal body.
+// This component is also returned as an HTMX partial from /ui/search.
+templ SearchResults(sections []searchResultSection) {
+	if len(sections) == 0 {
+		<div id="search-results" class="max-h-96 overflow-y-auto flex flex-col items-center justify-center py-12 text-base-content/40">
+			<span class="iconify lucide--search size-8 mb-3"></span>
+			<p class="text-sm">Type to search tests, runs, linters, and experiments</p>
+		</div>
+	} else {
+		<div id="search-results" class="max-h-96 overflow-y-auto">
+			for _, sec := range sections {
+				if len(sec.Items) > 0 {
+					<div class="px-3 pt-3 pb-1">
+						<p class="text-xs font-semibold text-base-content/50 uppercase tracking-wider px-2">{ sec.Title }</p>
+					</div>
+					<ul class="menu menu-sm px-1 pb-2">
+						for _, item := range sec.Items {
+							<li>
+								<a
+									href={ templ.URL(item.Href) }
+									class="flex items-center gap-3 px-2 py-2 rounded-lg"
+									onclick="document.getElementById('search-modal').close()"
+									hx-get={ templ.URL(item.Href) }
+									hx-target="#main-content"
+									hx-swap="innerHTML"
+									hx-push-url="true"
+									data-testid="search-result-item"
+								>
+									<span class={ "iconify size-4 text-base-content/50 shrink-0 " + item.Icon }></span>
+									<span class="text-sm truncate">{ item.Label }</span>
+								</a>
+							</li>
+						}
+					</ul>
+				}
+			}
+		</div>
+	}
+}

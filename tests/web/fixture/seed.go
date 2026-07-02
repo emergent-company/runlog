@@ -11,7 +11,7 @@ func seed(db *runlog.RunDB) error {
 	startBase := now.Add(-2 * time.Hour)
 
 	// --- TestPass: one passing run with sections, CLI, log, state_change events ---
-	passRun1, err := db.InsertRun("TestPass", startBase, "host", "localhost", nil)
+	passRun1, err := db.InsertRun("TestPass", startBase, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func seed(db *runlog.RunDB) error {
 
 	// --- TestFail: one failing run ---
 	failStart := startBase.Add(30 * time.Minute)
-	failRun1, err := db.InsertRun("TestFail", failStart, "host", "localhost", nil)
+	failRun1, err := db.InsertRun("TestFail", failStart, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func seed(db *runlog.RunDB) error {
 	db.FinishRun(failRun1, failStart.Add(6*time.Second), runlog.OutcomeFail, "expected 42, got 0")
 
 	// second run of TestFail — passes
-	failRun2, err := db.InsertRun("TestFail", failStart.Add(1*time.Hour), "host", "localhost", nil)
+	failRun2, err := db.InsertRun("TestFail", failStart.Add(1*time.Hour), "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func seed(db *runlog.RunDB) error {
 
 	// --- TestSkip: one skipped run ---
 	skipStart := startBase.Add(1 * time.Hour)
-	skipRun1, err := db.InsertRun("TestSkip", skipStart, "host", "localhost", nil)
+	skipRun1, err := db.InsertRun("TestSkip", skipStart, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func seed(db *runlog.RunDB) error {
 	// --- TestMetrics: one pass run with token usage, cost, env_vars ---
 	metricsStart := startBase.Add(90 * time.Minute)
 	envVars := map[string]string{"GOOGLE_AI_API_KEY": "sk-xxxx", "MODEL": "gemini-2.0-flash"}
-	metricsRun1, err := db.InsertRun("TestMetrics", metricsStart, "docker", "staging", envVars)
+	metricsRun1, err := db.InsertRun("TestMetrics", metricsStart, "docker", "staging", envVars, "")
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func seed(db *runlog.RunDB) error {
 
 	// --- TestWithTags: one pass run with tags and experiment ---
 	tagsStart := startBase.Add(105 * time.Minute)
-	tagsRun1, err := db.InsertRun("TestWithTags", tagsStart, "host", "localhost", nil)
+	tagsRun1, err := db.InsertRun("TestWithTags", tagsStart, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func seed(db *runlog.RunDB) error {
 	db.UpdateRunTags(tagsRun1, []string{"variant:baseline", "run:1"})
 
 	// Add a second run for TestPass to have multi-run history
-	passRun2, err := db.InsertRun("TestPass", startBase.Add(115*time.Minute), "host", "localhost", nil)
+	passRun2, err := db.InsertRun("TestPass", startBase.Add(115*time.Minute), "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func seed(db *runlog.RunDB) error {
 	db.FinishRun(passRun2, startBase.Add(115*time.Minute).Add(3*time.Second), runlog.OutcomePass, "")
 
 	// Add a skipped run for TestPass
-	passRun3, err := db.InsertRun("TestPass", startBase.Add(125*time.Minute), "docker", "staging", nil)
+	passRun3, err := db.InsertRun("TestPass", startBase.Add(125*time.Minute), "docker", "staging", nil, "")
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func seed(db *runlog.RunDB) error {
 
 	// one more failing run for TestFail — with trace_span event
 	failRun3, err := db.InsertRun("TestFail", startBase.Add(135*time.Minute), "docker", "staging",
-		map[string]string{"REDIS_URL": "redis://localhost:6379"})
+		map[string]string{"REDIS_URL": "redis://localhost:6379"}, "")
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func seed(db *runlog.RunDB) error {
 	// A run that was never finished (stale) to test the timeout mechanism.
 	// Start time set in the past so the timeout worker catches it.
 	staleStart := startBase.Add(90 * time.Minute)
-	staleRun1, err := db.InsertRun("TestPass", staleStart, "host", "localhost", nil)
+	staleRun1, err := db.InsertRun("TestPass", staleStart, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}

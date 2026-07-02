@@ -1,6 +1,14 @@
 package form
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+)
+
+
 
 // PromptBarProps configures a PromptBar component.
 type PromptBarProps struct {
@@ -37,36 +45,36 @@ templ PromptBar(props PromptBarProps) {
 			<div class="mt-2 flex items-end justify-between">
 				<div class="flex items-center gap-0.5">
 					if props.ShowAttach {
-						<button type="button" class="btn btn-sm btn-square btn-ghost" aria-label="Attach file" disabled?={ props.Loading }>
-							<span class="iconify lucide--paperclip size-4 text-base-content/60" aria-hidden="true"></span>
-						</button>
+						@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Attach file", "disabled": props.Loading}}) {
+							@ui.IconSpan("lucide--paperclip", "size-4 text-base-content/60")
+						}
 					}
 					if props.ShowImage {
-						<button type="button" class="btn btn-sm btn-square btn-ghost" aria-label="Insert image" disabled?={ props.Loading }>
-							<span class="iconify lucide--image-plus size-4 text-base-content/60" aria-hidden="true"></span>
-						</button>
+						@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Insert image", "disabled": props.Loading}}) {
+							@ui.IconSpan("lucide--image-plus", "size-4 text-base-content/60")
+						}
 					}
 				</div>
 				if props.ShowTokenCounter && props.TokenMax > 0 {
 					<span class="text-xs">
 						<span class="text-base-content/80">Tokens:</span>
-						<span class={ templ.KV("text-error font-medium", props.TokenCurrent >= props.TokenMax*80/100) }>{ promptIntStr(props.TokenCurrent) }</span>
-						<span class="text-base-content/60">/{ promptIntStr(props.TokenMax) }</span>
+						<span class={ templ.KV("text-error font-medium", props.TokenCurrent >= props.TokenMax*80/100) }>{ strconv.Itoa(props.TokenCurrent) }</span>
+						<span class="text-base-content/60">/{ strconv.Itoa(props.TokenMax) }</span>
 					</span>
 				}
 				<div class="flex items-center gap-1">
 					if props.ShowVoice {
-						<button type="button" class="btn btn-sm btn-square btn-ghost" aria-label="Voice input" disabled?={ props.Loading }>
-							<span class="iconify lucide--mic size-4 text-base-content/60" aria-hidden="true"></span>
-						</button>
+						@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Voice input", "disabled": props.Loading}}) {
+							@ui.IconSpan("lucide--mic", "size-4 text-base-content/60")
+						}
 					}
-					<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ props.Loading }>
+					@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Send", "disabled": props.Loading}}) {
 						if props.Loading {
 							<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 						} else {
-							<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+							@ui.IconSpan("lucide--arrow-up", "size-4")
 						}
-					</button>
+					}
 				</div>
 			</div>
 		</div>
@@ -93,19 +101,19 @@ templ PromptBarAction(placeholder string, actions []PromptBarActionItem, loading
 			<div class="mt-2 flex items-end justify-between">
 				<div class="flex items-center gap-2">
 					for _, action := range actions {
-						<button type="button" class="btn btn-sm btn-outline border-base-300 text-base-content/80 gap-1" disabled?={ loading }>
+						@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Style: ui.ButtonStyleOutline, Size: ui.ButtonSM, ExtraClass: "border-base-300 text-base-content/80 gap-1", Attrs: templ.Attributes{"disabled": loading}}) {
 							<span class={ "iconify size-4", action.Icon } aria-hidden="true"></span>
 							{ action.Label }
-						</button>
+						}
 					}
 				</div>
-				<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ loading }>
+				@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Send", "disabled": loading}}) {
 					if loading {
 						<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 					} else {
-						<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+						@ui.IconSpan("lucide--arrow-up", "size-4")
 					}
-				</button>
+				}
 			</div>
 		</div>
 	</div>
@@ -150,11 +158,9 @@ templ PromptBarModelSelector(props PromptBarModelSelectorProps) {
 		if props.InfoBanner != "" {
 			<div class="card bg-primary/10 mb-0">
 				<div class="flex items-center gap-2 px-4 py-1.5">
-					<span class="iconify lucide--info text-primary size-3.5" aria-hidden="true"></span>
+					@ui.IconSpan("lucide--info", "text-primary size-3.5")
 					<p class="text-primary grow text-xs">{ props.InfoBanner }</p>
-					<button class="btn btn-xs btn-circle btn-ghost hover:bg-primary/20 border-0" type="button" aria-label="Dismiss">
-						<span class="iconify lucide--x text-primary/60 size-4" aria-hidden="true"></span>
-					</button>
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonXS, Shape: ui.ButtonShapeCircle, ExtraClass: "hover:bg-primary/20 border-0", Type: ui.ButtonTypeButton, Icon: "lucide--x", Attrs: templ.Attributes{"aria-label": "Dismiss"}})
 				</div>
 			</div>
 		}
@@ -170,9 +176,9 @@ templ PromptBarModelSelector(props PromptBarModelSelectorProps) {
 						if len(props.Models) > 0 {
 							<div class="dropdown dropdown-start">
 								<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2" aria-label="Model selector">
-									<span class="iconify lucide--cpu size-4 text-base-content/60" aria-hidden="true"></span>
+									@ui.IconSpan("lucide--cpu", "size-4 text-base-content/60")
 									<span>{ props.SelectedModel }</span>
-									<span class="iconify lucide--chevron-down size-3.5 text-base-content/60" aria-hidden="true"></span>
+									@ui.IconSpan("lucide--chevron-down", "size-3.5 text-base-content/60")
 								</div>
 								<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
 									for _, m := range props.Models {
@@ -191,17 +197,17 @@ templ PromptBarModelSelector(props PromptBarModelSelectorProps) {
 					</div>
 					if props.ShowTokenCounter && props.TokenMax > 0 {
 						<span class="text-xs">
-							<span class={ templ.KV("text-error font-medium", props.TokenCurrent >= props.TokenMax*80/100) }>{ promptIntStr(props.TokenCurrent) }</span>
-							<span class="text-base-content/60"> / { promptIntStr(props.TokenMax) } tokens</span>
+							<span class={ templ.KV("text-error font-medium", props.TokenCurrent >= props.TokenMax*80/100) }>{ strconv.Itoa(props.TokenCurrent) }</span>
+							<span class="text-base-content/60"> / { strconv.Itoa(props.TokenMax) } tokens</span>
 						</span>
 					}
-					<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ props.Loading }>
+					@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Send", "disabled": props.Loading}}) {
 						if props.Loading {
 							<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 						} else {
-							<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+							@ui.IconSpan("lucide--arrow-up", "size-4")
 						}
-					</button>
+					}
 				</div>
 			</div>
 		</div>
@@ -246,7 +252,7 @@ templ PromptBarAbility(props PromptBarAbilityProps) {
 				}
 				if props.TokensLeft > 0 {
 					<p class="text-base-content/60 text-xs font-medium ms-auto">
-						<span class="text-error">{ promptIntStr(props.TokensLeft) }</span> Tokens left
+						<span class="text-error">{ strconv.Itoa(props.TokensLeft) }</span> Tokens left
 					</p>
 				}
 			</div>
@@ -263,9 +269,9 @@ templ PromptBarAbility(props PromptBarAbilityProps) {
 						if len(props.Abilities) > 0 {
 							<div class="dropdown dropdown-start">
 								<div tabindex="0" role="button" class="btn btn-sm btn-ghost gap-2" aria-label="Ability selector">
-									<span class="iconify lucide--zap size-4 text-base-content/60" aria-hidden="true"></span>
+									@ui.IconSpan("lucide--zap", "size-4 text-base-content/60")
 									<span>{ props.SelectedAbility }</span>
-									<span class="iconify lucide--chevron-down size-3.5 text-base-content/60" aria-hidden="true"></span>
+									@ui.IconSpan("lucide--chevron-down", "size-3.5 text-base-content/60")
 								</div>
 								<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
 									for _, a := range props.Abilities {
@@ -282,35 +288,15 @@ templ PromptBarAbility(props PromptBarAbilityProps) {
 							</div>
 						}
 					</div>
-					<button type="button" class="btn btn-primary btn-square btn-sm" aria-label="Send" disabled?={ props.Loading }>
+					@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, Attrs: templ.Attributes{"aria-label": "Send", "disabled": props.Loading}}) {
 						if props.Loading {
 							<span class="loading loading-spinner loading-xs" aria-hidden="true"></span>
 						} else {
-							<span class="iconify lucide--arrow-up size-4" aria-hidden="true"></span>
+							@ui.IconSpan("lucide--arrow-up", "size-4")
 						}
-					</button>
+					}
 				</div>
 			</div>
 		</div>
 	</div>
-}
-
-// promptIntStr converts an int to a string for use inside templ templates.
-func promptIntStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	s := ""
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	if neg {
-		s = "-" + s
-	}
-	return s
 }

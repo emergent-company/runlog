@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"html"
+	"io"
 	"math"
 	"strings"
 	"time"
@@ -178,7 +182,21 @@ type runsTableOpts struct {
 	ShowCategory bool
 	ShowTags     bool
 	ShowCost     bool
+	ShowTestType bool
 	Categories   map[int64]string // run ID → category name
+}
+
+func testTypeBadge(t string) string {
+	switch t {
+	case "unit":
+		return "badge badge-xs badge-success"
+	case "integration":
+		return "badge badge-xs badge-info"
+	case "e2e":
+		return "badge badge-xs badge-warning"
+	default:
+		return "badge badge-xs badge-ghost"
+	}
 }
 
 // runsTable renders a standardized runs table with configurable columns.
@@ -195,6 +213,9 @@ templ runsTable(runs []runlog.RunRow, opts runsTableOpts) {
 				@table.TableHeadCell("Started")
 				if opts.ShowCategory {
 					@table.TableHeadCell("Category")
+				}
+				if opts.ShowTestType {
+					@table.TableHeadCell("Type")
 				}
 				if opts.ShowTags {
 					@table.TableHeadCell("Tags")
@@ -238,6 +259,11 @@ templ runsTable(runs []runlog.RunRow, opts runsTableOpts) {
 							if opts.Categories != nil {
 								<span class="badge badge-ghost badge-xs">{ opts.Categories[r.ID] }</span>
 							}
+						}
+					}
+					if opts.ShowTestType && r.TestType != "" {
+						@table.TableCell("", nil) {
+							<span class={ testTypeBadge(r.TestType) }>{ r.TestType }</span>
 						}
 					}
 					if opts.ShowTags {
@@ -363,6 +389,56 @@ func testNameFile(fullName string) string {
 		return fullName[:idx]
 	}
 	return ""
+}
+
+// renderCoverageInline renders a per-file coverage table from the coverage_data JSON.
+// The JSON is a string of [{file,coverage},...] or empty/malformed.
+func renderCoverageInline(coverageData *string) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		if coverageData == nil || *coverageData == "" {
+			return nil
+		}
+		var files []struct {
+			File     string  `json:"file"`
+			Coverage float64 `json:"coverage"`
+		}
+		if err := json.Unmarshal([]byte(*coverageData), &files); err != nil || len(files) == 0 {
+			return nil
+		}
+		_, err := fmt.Fprint(w, `<table class="table table-xs w-full mt-2"><thead><tr><th>File</th><th>Coverage</th><th class="w-1/2">Bar</th></tr></thead><tbody>`)
+		if err != nil { return err }
+		for _, f := range files {
+			barPct := f.Coverage
+			if barPct > 100 { barPct = 100 }
+			if barPct < 0 { barPct = 0 }
+			barColor := "bg-error"
+			if f.Coverage >= 80 {
+				barColor = "bg-success"
+			} else if f.Coverage >= 50 {
+				barColor = "bg-warning"
+			}
+			_, err = fmt.Fprintf(w, `<tr><td class="font-mono text-xs">%s</td><td class="text-xs">%.1f%%</td><td><div class="w-full bg-base-300 rounded-full h-2"><div class="%s h-2 rounded-full" style="width:%.0f%%"></div></div></td></tr>`,
+				html.EscapeString(f.File), f.Coverage, barColor, barPct)
+			if err != nil { return err }
+		}
+		_, err = fmt.Fprint(w, `</tbody></table>`)
+		return err
+	})
+}
+
+// runMetaStats returns the Runner/Env/Exit Code stat grid, adding Coverage if available.
+func runMetaStats(r runlog.RunRow) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		items := []statItem{
+			{Label: "Runner", Value: optStrOrDash(r.Runner)},
+			{Label: "Env", Value: optStrOrDash(r.EnvName)},
+			{Label: "Exit Code", Value: runExitCode(r)},
+		}
+		if r.CoveragePct != nil {
+			items = append(items, statItem{Label: "Coverage", Value: coverageStr(r.CoveragePct)})
+		}
+		return statsGrid(items, 4).Render(ctx, w)
+	})
 }
 
 func testNameOnly(fullName string) string {

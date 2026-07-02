@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 )
@@ -165,4 +166,52 @@ func authHeadersForHome(t *testing.T, home string) (authorizationHeader, xAPIKey
 
 	// standalone
 	return "", E2ETestToken()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Environment requirement checks (test-side fast-fail)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// RequireEnv checks a single environment requirement and skips the test if
+// it fails.  Use this at the top of any test that needs a specific env var:
+//
+//	framework.RequireEnv(t, rl, "MEMORY_TEST_SERVER", "reachable")
+//	framework.RequireEnv(t, rl, "GOOGLE_AI_API_KEY", "nonempty")
+func RequireEnv(t *testing.T, rl *RunLog, key, checkType string) { //nolint:deadcode
+	t.Helper()
+	check := EnvCheck{Check: checkType}
+	val := os.Getenv(key)
+	if err := CheckRequirement(key, val, check); err != nil {
+		hint := ""
+		switch checkType {
+		case "nonempty":
+			hint = "set " + key + " in your environment or .env file"
+		case "reachable":
+			hint = "start the server or check " + key
+		}
+		DoSkipf(t, rl, "env check: %s: %v", key, err)
+		_ = hint
+	}
+}
+
+// RequireEnvironment validates all requirements for a named environment and
+// skips the test if any fail.  Use at the top of tests that need a specific
+// environment:
+//
+//	framework.RequireEnvironment(t, rl, "mcj-emergent")
+//
+// The environment name is looked up in .runlog/config.yaml environments:.
+func RequireEnvironment(t *testing.T, rl *RunLog, name string) { //nolint:deadcode
+	t.Helper()
+	cfg, err := LoadConfig("")
+	if err != nil {
+		DoSkipf(t, rl, "env: cannot load config: %v", err)
+	}
+	env := cfg.LookupEnvironment(name)
+	if env == nil {
+		DoSkipf(t, rl, "env: environment %q not found in config", name)
+	}
+	if err := ValidateEnvSummary(env); err != nil {
+		DoSkipf(t, rl, "env %s: %v", name, err)
+	}
 }

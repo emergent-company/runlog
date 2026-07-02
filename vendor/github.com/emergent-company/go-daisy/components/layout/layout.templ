@@ -29,16 +29,16 @@ templ Page(title string, themeAttr string) {
 
 // AppShell renders the sidebar + topbar + main content layout.
 templ AppShell(appName string) {
-	<div id="app-shell" class="flex h-screen overflow-hidden" { devmode.Attrs(ctx, "layout/AppShell")... }>
+	<div id="_app-shell" class="flex h-screen overflow-hidden" { devmode.Attrs(ctx, "layout/AppShell")... }>
 		<input
 			type="checkbox"
-			id="layout-sidebar-toggle-trigger"
+			id="_layout-sidebar-toggle-trigger"
 			class="hidden"
 			aria-label="Toggle layout sidebar"
 		/>
 		<label
-			for="layout-sidebar-toggle-trigger"
-			id="layout-sidebar-backdrop"
+			for="_layout-sidebar-toggle-trigger"
+			id="_layout-sidebar-backdrop"
 		></label>
 		{ children... }
 	</div>
@@ -58,16 +58,16 @@ templ AppShellContent() {
 
 // AppShellWithNav is a convenience wrapper combining AppShell + Sidebar + Navbar + main content.
 templ AppShellWithNav(appName string, groups []SidebarGroup) {
-	<div id="app-shell" class="flex h-screen overflow-hidden" { devmode.Attrs(ctx, "layout/AppShellWithNav")... }>
+	<div id="_app-shell" class="flex h-screen overflow-hidden" { devmode.Attrs(ctx, "layout/AppShellWithNav")... }>
 		<input
 			type="checkbox"
-			id="layout-sidebar-toggle-trigger"
+			id="_layout-sidebar-toggle-trigger"
 			class="hidden"
 			aria-label="Toggle layout sidebar"
 		/>
 		<label
-			for="layout-sidebar-toggle-trigger"
-			id="layout-sidebar-backdrop"
+			for="_layout-sidebar-toggle-trigger"
+			id="_layout-sidebar-backdrop"
 		></label>
 		@Sidebar(appName, groups)
 		<div class="flex min-w-0 grow flex-col overflow-hidden">

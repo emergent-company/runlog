@@ -8,7 +8,7 @@ tmp_dir = "tmp"
 [build]
   cmd = "templ generate && templ generate -f vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ && go build -o /tmp/runlog-air-dogfood ./cmd/runlog"
   entrypoint = ["/tmp/runlog-air-dogfood"]
-  args_bin = ["--daemon", "--db", "/tmp/runlog-dogfood.db", "--port", "17433"]
+  args_bin = ["--daemon", "--dev", "--db", "/tmp/runlog-dogfood.db", "--port", "17433"]
   include_ext = ["go", "templ"]
   exclude_dir = ["tmp", "vendor", ".git", "node_modules", "test-results"]
   exclude_regex = [".*_test.go", ".*_templ.go", ".*tests-result.*"]

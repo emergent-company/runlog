@@ -1,36 +1,34 @@
 package form
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+)
 
 // InputSpinner renders a numeric increment/decrement input with +/− buttons.
 // It includes a small inline <script> to handle button clicks — no library needed.
 // id must be unique on the page.
 templ InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnClass string, inputClass string) {
 	<div class="flex items-center gap-3" { devmode.Attrs(ctx, "form/InputSpinner")... }>
-		<button
-			type="button"
-			class={ "btn btn-square", btnClass }
-			onclick={ templ.JSFuncCall("spinnerDecrement", id) }
-		>
-			<span class="iconify lucide--minus size-4" aria-hidden="true"></span>
-		</button>
+		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerDecrement", id)}) {
+			@ui.IconSpan("lucide--minus", "size-4")
+		}
 		<input
 			id={ id }
 			type="number"
-			value={ spinnerIntStr(value) }
+			value={ strconv.Itoa(value) }
 			if hasMinMax {
-				min={ spinnerIntStr(min) }
-				max={ spinnerIntStr(max) }
+				min={ strconv.Itoa(min) }
+				max={ strconv.Itoa(max) }
 			}
 			class={ "input input-bordered text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inputClass }
 		/>
-		<button
-			type="button"
-			class={ "btn btn-square", btnClass }
-			onclick={ templ.JSFuncCall("spinnerIncrement", id) }
-		>
-			<span class="iconify lucide--plus size-4" aria-hidden="true"></span>
-		</button>
+		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerIncrement", id)}) {
+			@ui.IconSpan("lucide--plus", "size-4")
+		}
 	</div>
 	@spinnerScript()
 }
@@ -55,23 +53,4 @@ templ spinnerScript() {
 	  };
 	}
 	</script>
-}
-
-func spinnerIntStr(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	s := ""
-	for n > 0 {
-		s = string(rune('0'+n%10)) + s
-		n /= 10
-	}
-	if neg {
-		return "-" + s
-	}
-	return s
 }

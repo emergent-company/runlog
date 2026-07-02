@@ -205,7 +205,7 @@ func linterTable(entries []linterListEntry) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = table.TableHeadCell("Runs", "text-right w-16").Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = table.TableHeadCell("Runs").Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -221,7 +221,7 @@ func linterTable(entries []linterListEntry) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = table.TableHeadCell("Action", "text-center w-16").Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = table.TableHeadCell("Action").Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -818,7 +818,7 @@ func linterRunsTable(runs []runlog.LinterRow) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = table.TableHeadCell("Exit Code", "text-right").Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = table.TableHeadCell("Exit Code").Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -826,7 +826,7 @@ func linterRunsTable(runs []runlog.LinterRow) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = table.TableHeadCell("Duration", "text-right").Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = table.TableHeadCell("Duration").Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

@@ -101,7 +101,7 @@ templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f
 // runsTableContent is the HTMX partial — only the table + pagination, no filters/title.
 templ runsTableContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters) {
 	if len(rows) > 0 {
-		@runsTable(rows, runsTableOpts{ShowID: true, ShowCategory: true, Categories: catMap})
+		@runsTable(rows, runsTableOpts{ShowID: true, ShowCategory: true, ShowTestType: true, Categories: catMap})
 		if f.Offset+runsPerPage < total {
 			@loadMoreButton(fmt.Sprintf("/ui/runs?offset=%d&category=%s&status=%s&since=%s&search=%s&tags=%s&has_cost=%s", f.Offset+runsPerPage, f.Category, f.Status, f.Since, f.Search, f.Tags, boolToOneZeroStr(f.HasCost)), "#runs-table")
 		}

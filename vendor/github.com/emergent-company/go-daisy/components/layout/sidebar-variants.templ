@@ -1,0 +1,302 @@
+package layout
+
+import "github.com/emergent-company/go-daisy/components/ui"
+
+
+type SidebarVariantOpts struct {
+	AppName       string
+	AvatarSrc     string
+	AvatarAlt     string
+
+	TrialDaysLeft int
+	TrialMessage  string
+
+	OrgName   string
+	OrgStatus string
+
+	SearchPlaceholder string
+	TokenUsed         int
+	TokenMax          int
+
+	Version    string
+	Versions   []string
+
+	ExtraClass string
+}
+
+templ SidebarVariant(variant string, opts SidebarVariantOpts) {
+	switch variant {
+	case "ecommerce":
+		@SidebarEcommerce(opts)
+	case "payment":
+		@SidebarPayment(opts)
+	case "project":
+		@SidebarProject(opts)
+	case "chat":
+		@SidebarChat(opts)
+	case "documentation":
+		@SidebarDocs(opts)
+	}
+}
+
+templ SidebarEcommerce(opts SidebarVariantOpts) {
+	<div id="_layout-sidebar" class="flex flex-col bg-base-100">
+		<div class="flex min-h-10 items-center justify-between gap-3 px-5 py-3 pb-5 shrink-0">
+			<span class="text-xl font-semibold truncate">{ opts.AppName }</span>
+			<div class="flex items-center gap-2">
+				@SidebarFoldToggle()
+				@SidebarAvatarDropdown(opts.AvatarSrc, opts.AvatarAlt)
+			</div>
+		</div>
+		<div class="sidebar-menu custom-scrollbar grow overflow-auto px-2.5">
+			<div class="space-y-0.5">
+				<p class="menu-label px-2.5 pb-1.5">Navigation</p>
+				<div class="mt-2">
+					@SidebarMenuItem("Dashboard", "#", "lucide--monitor-dot", true)
+				</div>
+				<p class="menu-label px-2.5 pb-1.5">Manage</p>
+				<div class="mt-2 space-y-0.5">
+				@SidebarCollapsible("lucide--package", "Products", []templ.Component{
+					SidebarMenuItem("All Products", "#", "", false),
+					SidebarMenuItem("Add New", "#", "", false),
+					SidebarMenuItem("Categories", "#", "", false),
+				}, false)
+				@SidebarCollapsible("lucide--receipt-text", "Orders", []templ.Component{
+					SidebarMenuItem("All Orders", "#", "", false),
+					SidebarMenuItem("Returns", "#", "", false),
+				}, false)
+					@SidebarMenuItem("Customers", "#", "lucide--users", false)
+					@SidebarMenuItem("Inventory", "#", "lucide--warehouse", false)
+					@SidebarMenuItem("Payouts", "#", "lucide--dollar-sign", false)
+				</div>
+				<p class="menu-label px-2.5 pb-1.5">Other</p>
+				<div class="mt-2 space-y-0.5">
+				@SidebarCollapsible("lucide--align-center", "Menu Levels", []templ.Component{
+					SidebarMenuItem("Level 1a", "#", "", false),
+					SidebarCollapsible("", "Level 1b", []templ.Component{
+						SidebarMenuItem("Level 2a", "#", "", false),
+						SidebarCollapsible("", "Level 2b", []templ.Component{
+							SidebarMenuItem("Level 3a", "#", "", false),
+							SidebarMenuItem("Level 3b", "#", "", false),
+						}, false),
+					}, false),
+				}, false)
+					@SidebarMenuItemWithExtra("External Links", "#", "lucide--external-link", false) {
+						@ui.IconSpan("lucide--external-link", "size-4 ml-auto")
+					}
+					@SidebarMenuItemWithExtra("Label", "#", "lucide--award", false) {
+						@SidebarBadge(8)
+					}
+				</div>
+			</div>
+		</div>
+		@SidebarPromoCard(opts.TrialDaysLeft, opts.TrialMessage)
+	</div>
+}
+
+templ SidebarPayment(opts SidebarVariantOpts) {
+	<div id="_layout-sidebar" class="flex flex-col bg-base-100">
+		<div class="flex min-h-10 items-center justify-between gap-3 px-5 py-3 pb-5 shrink-0">
+			<span class="text-xl font-semibold truncate">{ opts.AppName }</span>
+			@SidebarSimpleToggle()
+		</div>
+		<div class="sidebar-menu custom-scrollbar grow overflow-auto px-2.5">
+			<div class="space-y-0.5">
+				<div class="mt-2">
+					@SidebarMenuItem("Home", "#", "lucide--house", true)
+				</div>
+				@SidebarMenuItem("Overview", "#", "lucide--layout-dashboard", false)
+			@SidebarCollapsible("lucide--arrow-left-right", "Transactions", []templ.Component{
+				SidebarMenuItem("Payment History", "#", "", false),
+				SidebarMenuItem("Send Payment", "#", "", false),
+				SidebarMenuItem("Recurring", "#", "", false),
+			}, false)
+			@SidebarCollapsible("lucide--user-circle", "Account", []templ.Component{
+				SidebarMenuItem("Profile", "#", "", false),
+				SidebarMenuItem("Security", "#", "", false),
+				SidebarMenuItem("Wallet", "#", "", false),
+			}, false)
+				@SidebarMenuItem("Settings", "#", "lucide--settings", false)
+				@SidebarDivider()
+				@SidebarToggleRow("Test Mode", "toggle-primary")
+			@SidebarMenuItemWithExtra("Logout", "#", "lucide--log-out", false) {
+				<span class="grow"></span>
+			}
+			</div>
+		</div>
+	</div>
+}
+
+templ SidebarProject(opts SidebarVariantOpts) {
+	<div id="_layout-sidebar" class="flex flex-col bg-base-100">
+		<div class="flex min-h-10 items-center justify-between gap-3 px-5 py-3 pb-5 shrink-0">
+			<div class="flex items-center gap-3">
+				<div class="flex items-center gap-2">
+					<div class="bg-primary size-2 rounded-full"></div>
+					<span class="text-sm font-semibold truncate">{ opts.OrgName }</span>
+				</div>
+				@ui.Badge(ui.BadgeProps{Label: "Online", Variant: ui.BadgeSuccess, Style: ui.BadgeStyleSoft, Size: ui.BadgeSizeXS})
+			</div>
+			@SidebarSimpleToggle()
+		</div>
+		<div class="px-3 pb-2">
+			@SidebarProjectSwitcher([]SidebarProjectItem{
+				{Name: "Design System", Icon: "lucide--sparkles", Href: "#"},
+				{Name: "Project Astra", Icon: "lucide--rocket", Href: "#"},
+				{Name: "Web Analytics", Icon: "lucide--globe", Href: "#"},
+			})
+		</div>
+		<div class="sidebar-menu custom-scrollbar grow overflow-auto px-2.5">
+			<div class="space-y-0.5">
+				<p class="menu-label px-2.5 pb-1.5">Navigation</p>
+				@SidebarMenuItemWithExtra("Overview", "#", "lucide--compass", true) {
+					@ui.IconSpan("lucide--chevron-right", "size-3.5 text-base-content/20 ml-auto")
+				}
+				@SidebarMenuItemWithExtra("Design Tokens", "#", "lucide--frame", false) {
+					@ui.IconSpan("lucide--chevron-right", "size-3.5 text-base-content/20 ml-auto")
+				}
+				@SidebarMenuItemWithExtra("Components", "#", "lucide--component", false) {
+					@ui.IconSpan("lucide--chevron-right", "size-3.5 text-base-content/20 ml-auto")
+				}
+				@SidebarMenuItemWithExtra("Documentation", "#", "lucide--file-text", false) {
+					@ui.IconSpan("lucide--chevron-right", "size-3.5 text-base-content/20 ml-auto")
+				}
+				<p class="menu-label px-2.5 pb-1.5">Favorites</p>
+				@SidebarMenuItemWithExtra("Button System", "#", "lucide--star", false) {
+					<div class="border-base-300 bg-base-200 rounded-box px-1 text-[10px]">{ "\u2318B" }</div>
+				}
+				@SidebarMenuItemWithExtra("Color Palette", "#", "lucide--star", false) {
+					<div class="border-base-300 bg-base-200 rounded-box px-1 text-[10px]">{ "\u2318P" }</div>
+				}
+				@SidebarMenuItemWithExtra("Typography", "#", "lucide--star", false) {
+					<div class="border-base-300 bg-base-200 rounded-box px-1 text-[10px]">{ "\u2318T" }</div>
+				}
+				<p class="menu-label px-2.5 pb-1.5">Channels</p>
+				@SidebarMenuItemWithExtra("general", "#", "lucide--hashtag", false) {
+					<div class="dropdown dropdown-bottom dropdown-end" onclick="event.stopPropagation()">
+						<div tabindex="0" class="btn btn-xs btn-circle btn-ghost">@ui.IconSpan("lucide--ellipsis", "size-3")</div>
+						<div tabindex="0" class="dropdown-content bg-base-100 rounded-box w-32 shadow p-1 border border-base-200">
+							<ul class="menu menu-xs p-0"><li><a>Mute</a></li><li><a>Mark Read</a></li></ul>
+						</div>
+					</div>
+				}
+				@SidebarMenuItemWithExtra("design-review", "#", "lucide--hashtag", false) {
+					@ui.Badge(ui.BadgeProps{Label: "3", Variant: ui.BadgePrimary, Style: ui.BadgeStyleSoft, Size: ui.BadgeSizeXS})
+				}
+			</div>
+		</div>
+		@SidebarMeetingBar([]string{"JD", "AK", "ML"}, "Design Review \u00b7 15 min")
+	</div>
+}
+
+templ SidebarChat(opts SidebarVariantOpts) {
+	<div id="_layout-sidebar" class="flex flex-col bg-base-100">
+		<div class="flex items-center gap-2 px-3 pt-3 pb-1 shrink-0">
+			@SidebarSearchInput(opts.SearchPlaceholder, true)
+		</div>
+		@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Style: ui.ButtonStyleSoft, ExtraClass: "mx-3 mb-2 gap-2"}){
+			@ui.IconSpan("lucide--plus", "size-4") "New Chat"
+		}
+		<div class="sidebar-menu custom-scrollbar grow overflow-auto px-2.5">
+			<div class="space-y-0.5">
+				<p class="menu-label px-2.5 pb-1.5">Today</p>
+				@SidebarMenuItemWithExtra("AI Assistant", "#", "lucide--bot", true) {
+					@ui.Badge(ui.BadgeProps{Label: "2", Variant: ui.BadgePrimary, Style: ui.BadgeStyleSoft, Size: ui.BadgeSizeXS})
+				}
+				@SidebarMenuItem("Marketing Bot", "#", "lucide--megaphone", false)
+				@SidebarMenuItemWithExtra("Support Chat", "#", "lucide--message-circle", false) {
+					<span class="text-base-content/40 text-xs">12:30</span>
+				}
+				<p class="menu-label px-2.5 pb-1.5">Earlier</p>
+				@SidebarMenuItemWithExtra("Team Workspace", "#", "lucide--users", false) {
+					<span class="text-base-content/40 text-xs">Yesterday</span>
+				}
+				@SidebarMenuItemWithExtra("Notifications", "#", "lucide--bell", false) {
+					<span class="text-base-content/40 text-xs">3d ago</span>
+				}
+			</div>
+		</div>
+		<div class="border-base-200 border-t px-3 py-3">
+			@SidebarTokenMeter(opts.TokenUsed, opts.TokenMax)
+			@SidebarBottomNav([]SidebarBottomNavItem{
+				{Label: "Home", Icon: "lucide--home", Href: "#", Active: true},
+				{Label: "Favorites", Icon: "lucide--star", Href: "#"},
+				{Label: "Settings", Icon: "lucide--settings", Href: "#"},
+			})
+		</div>
+	</div>
+}
+
+templ SidebarDocs(opts SidebarVariantOpts) {
+	<div id="_layout-sidebar" class="flex flex-col bg-base-100">
+		<div class="flex min-h-10 items-center justify-between gap-3 px-5 py-3 pb-5 shrink-0">
+			<span class="text-xl font-semibold truncate">{ opts.AppName }</span>
+			@SidebarSimpleToggle()
+		</div>
+		<div class="px-3 pb-2">
+			@SidebarSearchInput("Search documentation...", false)
+		</div>
+		<div class="sidebar-menu custom-scrollbar grow overflow-auto px-2.5">
+			<div class="space-y-3">
+				<div class="rounded-box border border-base-200 p-3">
+					<div class="flex items-center gap-3">
+						@SidebarIconBox("bg-primary/10", "text-primary", "lucide--rocket")
+						@SidebarIconText("Getting Started", "Learn the basics")
+					</div>
+				</div>
+				<div class="rounded-box border border-base-200 p-3">
+					<div class="flex items-center gap-3">
+						@SidebarIconBox("bg-secondary/10", "text-secondary", "lucide--book-open")
+						@SidebarIconText("Guide", "Step-by-step tutorials")
+					</div>
+				</div>
+				<div class="rounded-box border border-base-200 p-3">
+					<div class="flex items-center gap-3">
+						@SidebarIconBox("bg-accent/10", "text-accent", "lucide--code")
+						@SidebarIconText("API", "Reference & endpoints")
+					</div>
+				</div>
+				<div class="rounded-box border border-base-200 p-3">
+					<div class="flex items-center gap-3">
+						@SidebarIconBox("bg-neutral/10", "text-neutral", "lucide--users")
+						@SidebarIconText("Community", "Discussions & support")
+					</div>
+				</div>
+				<div class="border-base-200 mt-4 border-t pt-3">
+					<p class="menu-label px-2.5 pb-1.5">Sections</p>
+					@SidebarCollapsible("lucide--book-marked", "Getting Started", []templ.Component{
+						SidebarMenuItem("Installation", "#", "", true),
+						SidebarMenuItem("Quickstart", "#", "", false),
+						SidebarMenuItem("Configuration", "#", "", false),
+						SidebarMenuItem("Intro", "#", "", false),
+					}, true)
+					@SidebarCollapsible("lucide--component", "Components", []templ.Component{
+						SidebarMenuItem("Buttons", "#", "", false),
+						SidebarMenuItem("Forms", "#", "", false),
+						SidebarMenuItem("Navigation", "#", "", false),
+					}, false)
+					@SidebarCollapsible("lucide--wrench", "Utilities", []templ.Component{
+						SidebarMenuItem("CLI", "#", "", false),
+						SidebarMenuItem("API Client", "#", "", false),
+					}, false)
+				</div>
+			</div>
+		</div>
+		<div class="border-base-200 border-t px-3 py-3">
+			@SidebarVersionSwitcher(opts.Versions, opts.Version)
+		</div>
+	</div>
+}
+
+templ SidebarIconBox(bgClass string, textClass string, icon string) {
+	<div class={ "rounded-box flex size-10 items-center justify-center " + bgClass }>
+		<span class={ "iconify size-5 " + textClass + " " + icon }></span>
+	</div>
+}
+
+templ SidebarIconText(title string, desc string) {
+	<div>
+		<p class="text-sm font-medium">{ title }</p>
+		<p class="text-base-content/60 text-xs">{ desc }</p>
+	</div>
+}

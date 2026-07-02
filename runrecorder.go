@@ -74,7 +74,7 @@ func (r *RunRecorder) RegisterRun(testName string) (string, error) { //nolint:de
 
 	if !r.active && r.db != nil {
 		// Fallback: insert directly into DB
-		id, err := r.db.InsertRun(testName, time.Now(), "runrecorder", "", nil)
+		id, err := r.db.InsertRun(testName, time.Now(), "runrecorder", "", nil, "")
 		if err == nil {
 			r.runID = fmt.Sprintf("%d", id)
 			r.active = true

@@ -33,7 +33,7 @@ func seedDummy(db *runlog.RunDB) error {
 // seedAnalyzer simulates an LLM-based analyzer/testing pipeline.
 // Events: state_change, section, cli, log, token_usage, metric, gantt, token_summary, tag
 func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
-	runID, err := db.InsertRun("TestAnalyzer", t0, "docker", "prod", nil)
+	runID, err := db.InsertRun("TestAnalyzer", t0, "docker", "prod", nil, "")
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 	envVars2 := map[string]string{"EXPERIMENT": "llm-compare", "ITERATIONS": "2"}
 
 	// Run 1: 3 iterations, partial failures
-	runID, err := db.InsertRun("TestExperiment", t0, "docker", "staging", envVars)
+	runID, err := db.InsertRun("TestExperiment", t0, "docker", "staging", envVars, "")
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 		"iteration 2 failed: expected 100, got 99")
 
 	// Run 2: 2 iterations, all pass — to show run history
-	runID2, err := db.InsertRun("TestExperiment", t0.Add(2*time.Minute), "docker", "staging", envVars2)
+	runID2, err := db.InsertRun("TestExperiment", t0.Add(2*time.Minute), "docker", "staging", envVars2, "")
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 // seedHybrid mixes many event kinds: skills, credentials, groups, nested sections, trace_span.
 // Events: state_change, section, group, cli, log, failure, skip, tag, trace_span, skill, credentials
 func seedHybrid(db *runlog.RunDB, t0 time.Time) error {
-	runID, err := db.InsertRun("TestHybrid", t0, "host", "localhost", nil)
+	runID, err := db.InsertRun("TestHybrid", t0, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func seedHybrid(db *runlog.RunDB, t0 time.Time) error {
 // seedPerf simulates a performance run with many metric events and gantt data.
 // Events: state_change, section, cli, log, metric, gantt, tag
 func seedPerf(db *runlog.RunDB, t0 time.Time) error {
-	runID, err := db.InsertRun("TestPerf", t0, "docker", "benchmark", map[string]string{"SCALE": "1000"})
+	runID, err := db.InsertRun("TestPerf", t0, "docker", "benchmark", map[string]string{"SCALE": "1000"}, "")
 	if err != nil {
 		return err
 	}
@@ -390,7 +390,7 @@ func seedPerf(db *runlog.RunDB, t0 time.Time) error {
 // seedMultiStep simulates a long-running test with many sequential steps.
 // Events: state_change, section, cli, log
 func seedMultiStep(db *runlog.RunDB, t0 time.Time) error {
-	runID, err := db.InsertRun("TestMultiStep", t0, "host", "localhost", nil)
+	runID, err := db.InsertRun("TestMultiStep", t0, "host", "localhost", nil, "")
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,333 @@
+package nav
+
+import (
+	"strconv"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// PageTitleStep is a single breadcrumb step used in page title components.
+// A step with an empty Href renders as plain text.
+type PageTitleStep struct {
+	Label string
+	// Href is the link target. If empty the step is rendered as plain text.
+	Href string
+	// Icon is an optional Iconify icon identifier shown before the label.
+	Icon string
+}
+
+// PageTitleMinimal renders a compact title bar with an inline breadcrumb trail
+// on the right and a primary title on the left.
+templ PageTitleMinimal(title string, steps []PageTitleStep) {
+	<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3" { devmode.Attrs(ctx, "nav/PageTitleMinimal")... }>
+		<div class="flex w-full items-center justify-between gap-3">
+			<p class="font-semibold text-base-content">{ title }</p>
+			<nav class="text-base-content/80 flex items-center gap-2 text-sm" aria-label="Breadcrumb">
+				for i, step := range steps {
+					if i > 0 {
+						<span aria-hidden="true">/</span>
+					}
+					if step.Href != "" {
+						<a class="inline-flex items-center gap-1 hover:text-primary" href={ templ.SafeURL(step.Href) }>
+							if step.Icon != "" {
+								@ui.IconSpan(step.Icon, "size-4")
+							}
+							{ step.Label }
+						</a>
+					} else {
+						<span class="text-base-content font-medium">{ step.Label }</span>
+					}
+				}
+			</nav>
+		</div>
+	</div>
+}
+
+// PageTitleEditorAction is a single action button rendered in PageTitleEditor.
+type PageTitleEditorAction struct {
+	// Label is the button text. Leave empty for icon-only buttons.
+	Label string
+	// Icon is an optional Iconify icon identifier.
+	Icon string
+	// Href is the link target (renders an <a> instead of <button>).
+	Href string
+	// Class is extra DaisyUI button classes (e.g. "btn-primary btn-sm").
+	Class string
+	// AriaLabel is used for icon-only buttons.
+	AriaLabel string
+}
+
+// pageTitleActionType picks the Link type when an action has an href, otherwise Button.
+func pageTitleActionType(href string) ui.ButtonType {
+	if href != "" {
+		return ui.ButtonTypeLink
+	}
+	return ui.ButtonTypeButton
+}
+
+// pageTitleActionAttrs builds an aria-label attribute map only when set, to
+// avoid rendering an empty aria-label (which is worse for a11y than omitting it).
+func pageTitleActionAttrs(ariaLabel string) templ.Attributes {
+	if ariaLabel == "" {
+		return nil
+	}
+	return templ.Attributes{"aria-label": ariaLabel}
+}
+
+// PageTitleEditor renders a full page title with DaisyUI breadcrumbs,
+// a subtitle meta line, and a row of action buttons.
+templ PageTitleEditor(steps []BreadcrumbStep, title, subtitle string, actions []PageTitleEditorAction) {
+	<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3" { devmode.Attrs(ctx, "nav/PageTitleEditor")... }>
+		<div class="breadcrumbs text-sm mb-1">
+			<ul>
+				for _, step := range steps {
+					<li>
+						if step.URL != "" {
+							<a href={ templ.SafeURL(step.URL) }>{ step.Label }</a>
+						} else {
+							{ step.Label }
+						}
+					</li>
+				}
+			</ul>
+		</div>
+		<div class="flex items-end justify-between gap-3">
+			<div>
+				<p class="font-semibold text-base-content sm:text-lg">{ title }</p>
+				if subtitle != "" {
+					<p class="text-base-content/60 mt-0.5 text-sm">{ subtitle }</p>
+				}
+			</div>
+			if len(actions) > 0 {
+				<div class="flex items-center gap-2">
+					for _, action := range actions {
+						@ui.Button(ui.ButtonProps{Type: pageTitleActionType(action.Href), Href: action.Href, ExtraClass: action.Class, Attrs: pageTitleActionAttrs(action.AriaLabel)}) {
+							if action.Icon != "" {
+								@ui.IconSpan(action.Icon, "size-4")
+							}
+							if action.Label != "" {
+								{ action.Label }
+							}
+						}
+					}
+				</div>
+			}
+		</div>
+	</div>
+}
+
+type PageTitleVariantOpts struct {
+	Title    string
+	Subtitle string
+	Steps    []BreadcrumbStep
+
+	OrderID  string
+	Date     string
+	Status   string
+
+	DueCount    int
+	ProgressCount int
+	DoneCount   int
+
+	StepCurrent int
+	StepTotal   int
+	StepLabels  []string
+
+	Actions []PageTitleEditorAction
+}
+
+templ PageTitleVariant(style string, opts PageTitleVariantOpts) {
+	switch style {
+	case "minimal":
+		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
+			<div class="flex w-full items-center justify-between gap-3">
+				<p class="font-medium">{ opts.Title }</p>
+				<nav class="text-base-content/80 flex items-center gap-3 text-sm" aria-label="Breadcrumb">
+					for i, step := range opts.Steps {
+						if i > 0 {
+							<span aria-hidden="true">/</span>
+						}
+						if step.URL != "" {
+							<a class="inline-flex items-center gap-1 hover:text-primary" href={ templ.SafeURL(step.URL) }>
+								@ui.IconSpan("lucide--package", "size-4")
+								<span class="max-sm:hidden">{ step.Label }</span>
+							</a>
+						} else {
+							<span class="text-base-content font-medium">{ step.Label }</span>
+						}
+					}
+				</nav>
+			</div>
+		</div>
+
+	case "ecommerce":
+		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
+			<div class="flex w-full items-center justify-between">
+				<div>
+					<p class="font-medium">{ opts.Title }</p>
+					<p class="text-base-content/70 text-xs">
+						ID: <span class="text-base-content font-medium">{ opts.OrderID }</span>
+					</p>
+				</div>
+				<div class="flex items-center gap-4">
+					<div class="flex items-center gap-2">
+						@ui.IconSpan("lucide--calendar-days", "size-4")
+						<span class="text-base-content/80 text-sm max-md:hidden">{ opts.Date }</span>
+					</div>
+					<hr class="border-base-300 h-7 w-px border-e border-dashed max-md:hidden" />
+					<div class="flex items-center gap-2 max-md:hidden">
+						<label class="text-sm font-medium" for="status">Status</label>
+						<select id="status" aria-label="Order status" class="select select-sm w-24">
+							<option>{ opts.Status }</option>
+							<option>Unpaid</option>
+						</select>
+					</div>
+					<hr class="border-base-300 h-7 w-px border-e border-dashed" />
+					<div class="flex items-center gap-2">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, ExtraClass: "max-md:btn-square gap-2"}){
+							@ui.IconSpan("lucide--download", "size-4")
+							<span class="max-md:hidden">Invoice</span>
+						}
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonOutline, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, ExtraClass: "border-base-300", Attrs: templ.Attributes{"aria-label": "More options"}}){
+							@ui.IconSpan("lucide--more-vertical", "size-4")
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+
+	case "editor":
+		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
+			<div class="w-full">
+				<div class="breadcrumbs text-sm">
+					<ul>
+						for _, step := range opts.Steps {
+							<li>
+								if step.URL != "" {
+									<a href={ templ.SafeURL(step.URL) }>
+										@ui.IconSpan("lucide--layout-dashboard", "mr-1 size-4")
+										{ step.Label }
+									</a>
+								} else {
+									{ step.Label }
+								}
+							</li>
+						}
+					</ul>
+				</div>
+				<div class="mt-1 flex items-end justify-between gap-3">
+					<div>
+						<p class="font-medium sm:text-lg">{ opts.Title }</p>
+						<div class="text-base-content/60 mt-0.5 flex items-center gap-3 text-sm">
+							<div class="flex items-center gap-1">
+								@ui.IconSpan("lucide--settings", "size-3.5")
+								<span>{ opts.Subtitle }</span>
+							</div>
+							if opts.Date != "" {
+								<div class="flex items-center gap-1 max-md:hidden">
+									@ui.IconSpan("lucide--calendar-clock", "size-3.5")
+									<span>Created on { opts.Date }</span>
+								</div>
+							}
+						</div>
+					</div>
+					<div class="flex items-center gap-3">
+						for _, action := range opts.Actions {
+							@ui.Button(ui.ButtonProps{Type: pageTitleActionType(action.Href), Href: action.Href, ExtraClass: action.Class, Attrs: pageTitleActionAttrs(action.AriaLabel)}) {
+								if action.Icon != "" {
+									@ui.IconSpan(action.Icon, "size-4")
+								}
+								if action.Label != "" {
+									{ action.Label }
+								}
+							}
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+
+	case "task":
+		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
+			<div class="flex w-full items-center justify-between gap-3">
+				<div>
+					<p class="text-lg font-medium">{ opts.Title }</p>
+					<p class="text-sm">
+						<span class="text-error">{ strconv.Itoa(opts.DueCount) } due</span>
+						, <span class="text-primary">{ strconv.Itoa(opts.ProgressCount) } in progress</span>
+						, <span class="text-success">{ strconv.Itoa(opts.DoneCount) } done</span>
+					</p>
+				</div>
+				<div class="flex items-center gap-3">
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonOutline, Size: ui.ButtonSM, ExtraClass: "border-base-300 max-md:btn-square gap-2"}){
+						@ui.IconSpan("lucide--calendar-clock", "size-4")
+						<span class="max-md:hidden">Sync with Calendar</span>
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, ExtraClass: "max-md:btn-square gap-2"}){
+						@ui.IconSpan("lucide--plus", "size-4")
+						<span class="max-md:hidden">New Event</span>
+					}
+				</div>
+			</div>
+		</div>
+
+	case "stepper":
+		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
+			<div class="flex w-full items-center justify-between gap-3">
+				<p class="font-medium sm:text-lg">{ opts.Title }</p>
+				@ui.Button(ui.ButtonProps{Variant: ui.ButtonOutline, Size: ui.ButtonSM, ExtraClass: "border-base-300 gap-2"}){
+					@ui.IconSpan("lucide--eye", "size-4")
+					{ "Preview" }
+				}
+			</div>
+			<ul class="steps steps-xs mt-3 w-full">
+				for i, label := range opts.StepLabels {
+					<li class={ "step", templ.KV("step-primary", i < opts.StepCurrent) }>{ label }</li>
+				}
+			</ul>
+		</div>
+
+	case "analytics":
+		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
+			<div class="flex w-full items-center justify-between gap-3">
+				<div>
+					<p class="font-medium sm:text-lg">{ opts.Title }</p>
+					<nav class="text-base-content/80 flex items-center gap-3 text-sm" aria-label="Breadcrumb">
+						for i, step := range opts.Steps {
+							if i > 0 {
+								<span aria-hidden="true">/</span>
+							}
+							if step.URL != "" {
+								<a class="hover:text-primary" href={ templ.SafeURL(step.URL) }>{ step.Label }</a>
+							} else {
+								<span class="text-base-content font-medium">{ step.Label }</span>
+							}
+						}
+					</nav>
+				</div>
+				<div class="flex items-center gap-3">
+					<div class="dropdown dropdown-end">
+						<label tabindex="0" class="btn btn-outline btn-sm border-base-300 gap-2">
+							@ui.IconSpan("lucide--filter", "size-4")
+							<span class="max-md:hidden">Filter</span>
+						</label>
+						<ul tabindex="0" class="dropdown-content menu menu-sm bg-base-100 rounded-box shadow-lg z-50 w-40 p-1 border border-base-200 mt-1">
+							<li><a>This Week</a></li>
+							<li><a>This Month</a></li>
+							<li><a>This Year</a></li>
+						</ul>
+					</div>
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonOutline, Size: ui.ButtonSM, ExtraClass: "border-base-300 max-md:btn-square gap-2"}){
+						@ui.IconSpan("lucide--download", "size-4")
+						<span class="max-md:hidden">Export</span>
+					}
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, ExtraClass: "max-md:btn-square gap-2"}){
+						@ui.IconSpan("lucide--plus", "size-4")
+						<span class="max-md:hidden">New Report</span>
+					}
+				</div>
+			</div>
+		</div>
+	}
+}

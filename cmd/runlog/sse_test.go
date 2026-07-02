@@ -14,6 +14,10 @@ import (
 
 // TestSSEBroker_SubscribePublishUnsubscribe verifies subscribing to a topic, publishing an event, receiving it, and unsubscribing closes the channel.
 func TestSSEBroker_SubscribePublishUnsubscribe(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("Subscribe, publish, receive, and unsubscribe")
+	df.Event("log", "Subscribe, publish, receive, and unsubscribe")
 	b := newSSEBroker(nil)
 	ch := b.Subscribe("test")
 	defer b.Unsubscribe("test", ch)
@@ -31,6 +35,10 @@ func TestSSEBroker_SubscribePublishUnsubscribe(t *testing.T) {
 
 // TestSSEBroker_MultipleSubscribers verifies two subscribers to the same topic both receive the published event.
 func TestSSEBroker_MultipleSubscribers(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("Two subscribers to same topic both receive events")
+	df.Event("log", "Two subscribers to same topic both receive events")
 	b := newSSEBroker(nil)
 
 	ch1 := b.Subscribe("topic")
@@ -54,6 +62,10 @@ func TestSSEBroker_MultipleSubscribers(t *testing.T) {
 
 // TestSSEBroker_TopicIsolation verifies events on one topic do not reach subscribers on a different topic.
 func TestSSEBroker_TopicIsolation(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("Events on one topic don't leak to another")
+	df.Event("log", "Events on one topic don't leak to another")
 	b := newSSEBroker(nil)
 
 	chA := b.Subscribe("A")
@@ -80,6 +92,10 @@ func TestSSEBroker_TopicIsolation(t *testing.T) {
 
 // TestSSEBroker_UnsubscribeRemovesSubscriber verifies the channel is closed after unsubscribe and publish does not reach it.
 func TestSSEBroker_UnsubscribeRemovesSubscriber(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("Channel is closed after unsubscribe")
+	df.Event("log", "Channel is closed after unsubscribe")
 	b := newSSEBroker(nil)
 	ch := b.Subscribe("test")
 	b.Unsubscribe("test", ch)
@@ -96,6 +112,10 @@ func TestSSEBroker_UnsubscribeRemovesSubscriber(t *testing.T) {
 
 // TestSSEBroker_NonBlockingPublish verifies the 16-buffer channel drops the 17th event without blocking the publisher.
 func TestSSEBroker_NonBlockingPublish(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("Buffer drops 17th event without blocking")
+	df.Event("log", "Buffer drops 17th event without blocking")
 	b := newSSEBroker(nil)
 	ch := b.Subscribe("test")
 	defer b.Unsubscribe("test", ch)
@@ -124,6 +144,10 @@ done:
 
 // TestSSEBroker_ZeroSubscribersNoPanic verifies publishing to a topic with zero subscribers does not panic or block.
 func TestSSEBroker_ZeroSubscribersNoPanic(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("Publishing to empty topic doesn't panic")
+	df.Event("log", "Publishing to empty topic doesn't panic")
 	b := newSSEBroker(nil)
 	b.Publish("empty", SSEEvent{Event: "x", Data: "y"})
 	// Should not panic or block
@@ -131,7 +155,8 @@ func TestSSEBroker_ZeroSubscribersNoPanic(t *testing.T) {
 
 // TestSSEStream_HeadersAndConnectedMessage verifies /stream returns text/event-stream, no-cache, and starts with : connected.
 func TestSSEStream_HeadersAndConnectedMessage(t *testing.T) {
-	app, _ := newTestApp(t)
+	_, app, _, df := newWebTest(t, "sse", "Stream returns text/event-stream with correct headers")
+	df.Event("log", "Testing SSE stream headers and connected message")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
@@ -148,28 +173,41 @@ func TestSSEStream_HeadersAndConnectedMessage(t *testing.T) {
 	<-done
 
 	if rec.Code != 200 {
+		df.Event("assertion", "FAIL: SSE stream returned non-200")
 		t.Errorf("want 200, got %d", rec.Code)
+	} else {
+		df.Event("assertion", "SSE stream returned 200")
 	}
 
 	ct := rec.Header().Get("Content-Type")
 	if ct != "text/event-stream" {
+		df.Event("assertion", "FAIL: Content-Type should be text/event-stream")
 		t.Errorf("want Content-Type text/event-stream, got %q", ct)
+	} else {
+		df.Event("assertion", "Content-Type is text/event-stream")
 	}
 
 	cc := rec.Header().Get("Cache-Control")
 	if cc != "no-cache" {
+		df.Event("assertion", "FAIL: Cache-Control should be no-cache")
 		t.Errorf("want Cache-Control no-cache, got %q", cc)
+	} else {
+		df.Event("assertion", "Cache-Control is no-cache")
 	}
 
 	body := rec.Body.String()
 	if !strings.Contains(body, ": connected") {
+		df.Event("assertion", "FAIL: expected ': connected' in body")
 		t.Errorf("expected ': connected' comment in body, got: %s", body)
+	} else {
+		df.Event("assertion", "SSE stream starts with ': connected'")
 	}
 }
 
 // TestSSEStream_DeliversPublishedEvent verifies subscribing via HTTP stream and publishing an event delivers it in the response body.
 func TestSSEStream_DeliversPublishedEvent(t *testing.T) {
-	app, _ := newTestApp(t)
+	_, app, _, df := newWebTest(t, "sse", "Stream delivers published events to subscriber")
+	df.Event("log", "Testing stream delivers published events")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
@@ -193,16 +231,23 @@ func TestSSEStream_DeliversPublishedEvent(t *testing.T) {
 
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: custom-event") {
+		df.Event("assertion", "FAIL: expected 'event: custom-event' in SSE body")
 		t.Errorf("expected 'event: custom-event' in body, got: %s", body)
+	} else {
+		df.Event("assertion", "custom-event received in SSE stream")
 	}
 	if !strings.Contains(body, `{"msg":"works"}`) {
+		df.Event("assertion", "FAIL: expected event data in SSE body")
 		t.Errorf("expected event data in body, got: %s", body)
+	} else {
+		df.Event("assertion", "event data correctly delivered via SSE")
 	}
 }
 
 // TestSSEStream_DefaultTopicIsFooter verifies /stream without topic param defaults to the footer topic.
 func TestSSEStream_DefaultTopicIsFooter(t *testing.T) {
-	app, _ := newTestApp(t)
+	_, app, _, df := newWebTest(t, "sse", "Default stream topic is footer")
+	df.Event("log", "Testing default stream topic is footer")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
@@ -224,13 +269,17 @@ func TestSSEStream_DefaultTopicIsFooter(t *testing.T) {
 
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: footer-status") {
+		df.Event("assertion", "FAIL: footer-status event not received on default topic")
 		t.Errorf("expected footer-status event for default topic, got: %s", body)
+	} else {
+		df.Event("assertion", "footer-status event received on default topic")
 	}
 }
 
 // TestSSEStream_ContextCancellationExitsCleanly verifies cancelling the request context causes the SSE handler to exit cleanly without hanging.
 func TestSSEStream_ContextCancellationExitsCleanly(t *testing.T) {
-	app, _ := newTestApp(t)
+	_, app, _, df := newWebTest(t, "sse", "Context cancellation exits SSE handler cleanly")
+	df.Event("log", "Testing SSE stream context cancellation")
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -249,41 +298,35 @@ func TestSSEStream_ContextCancellationExitsCleanly(t *testing.T) {
 
 	select {
 	case <-done:
-		// ok
+		df.Event("assertion", "SSE handler exited cleanly after context cancellation")
 	case <-time.After(time.Second):
+		df.Event("assertion", "FAIL: handler did not exit after context cancellation")
 		t.Fatal("handler did not exit after context cancellation")
 	}
 
 	body := rec.Body.String()
 	if !strings.Contains(body, ": connected") {
+		df.Event("assertion", "FAIL: expected connected message even on cancelled stream")
 		t.Errorf("expected connected message even on cancelled stream")
+	} else {
+		df.Event("assertion", "connected message present before cancellation")
 	}
 }
 
 // TestFooterPoller_PublishesStatusEvent verifies the footer poller publishes a footer-status event with correct run/test counts.
 func TestFooterPoller_PublishesStatusEvent(t *testing.T) {
-	dbDir := t.TempDir()
-	dbPath := dbDir + "/test.db"
-	db, err := runlog.OpenDB(dbPath)
-	if err != nil {
-		t.Fatalf("OpenDB: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	// Seed some runs
+	_, app, dc, df := newWebTest(t, "sse", "Footer poller publishes status event with correct counts")
+	df.Event("log", "Seeding 3 runs via daemon for footer poller")
 	for i := 0; i < 3; i++ {
-		name := fmt.Sprintf("TestPoller_%d", i)
-		_, err := db.RawDB().Exec(
-			`INSERT INTO test_runs (test_name, passed, skipped, started_at, finished_at)
-			 VALUES (?, 1, 0, datetime('now'), datetime('now'))`,
-			name,
-		)
-		if err != nil {
-			t.Fatalf("seed run: %v", err)
-		}
+		r := dc.CreateRun(t, runlog.CreateRunOpts{
+			EnvProfile:  fmt.Sprintf("TestPoller_%d", i),
+			Category:    "sse",
+			Description: "Footer poller run count verification",
+		})
+		dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
 	}
 
-	broker := newSSEBroker(db)
+	broker := newSSEBroker(app.db)
 	ch := broker.Subscribe("footer")
 	defer broker.Unsubscribe("footer", ch)
 

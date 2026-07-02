@@ -1,0 +1,166 @@
+package form
+
+import (
+	"encoding/json"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// ValidationRule defines a single field validation rule.
+type ValidationRule struct {
+	Field      string // field name
+	Label      string // human-readable field name for error messages
+	Required   bool
+	MinLength  int
+	MaxLength  int
+	Pattern    string // regex pattern
+	PatternMsg string // custom pattern mismatch message
+	Type       string // "email", "number", "text", "tel"
+	Match      string // ID of another field to match (e.g., password confirmation)
+}
+
+// FormValidationProps configures form validation via Alpine.js.
+type FormValidationProps struct {
+	ID         string
+	Rules      []ValidationRule
+	SubmitText string
+	Loading    bool
+	Class      string
+	Attrs      templ.Attributes
+}
+
+// FormValidation wraps form fields with Alpine.js client-side validation.
+templ FormValidation(props FormValidationProps) {
+	<form
+		id={ props.ID }
+		data-form-validation
+		class={ props.Class }
+		data-rules={ string(validationRulesJSON(props.Rules)) }
+		{ devmode.Attrs(ctx, "form/FormValidation")... }
+		{ props.Attrs... }
+	>
+		{ children... }
+		<div class="mt-4 flex items-center gap-3">
+			<button type="submit" class="btn btn-primary" data-submit>
+				if props.Loading {
+					<span class="loading loading-spinner"></span>
+				}
+				{ props.SubmitText }
+			</button>
+		</div>
+	</form>
+	@formValidationScript()
+}
+
+// validationRulesJSON serializes ValidationRule slice to JSON string.
+func validationRulesJSON(rules []ValidationRule) string {
+	b, err := json.Marshal(rules)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
+templ formValidationScript() {
+	<script>
+	if (!window._formValidationInit) {
+	  window._formValidationInit = true;
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('[data-form-validation]').forEach(attachValidation);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('[data-form-validation]:not(._fv-initialized)').forEach(function(el) {
+	      el.classList.add('_fv-initialized');
+	      attachValidation(el);
+	    });
+	  });
+
+	  function attachValidation(form) {
+	    var rules = [];
+	    try { rules = JSON.parse(form.dataset.rules || '[]'); } catch(e) { rules = []; }
+
+	    form.addEventListener('submit', function(e) {
+	      var errors = [];
+
+	      for (var i = 0; i < rules.length; i++) {
+	        var r = rules[i];
+	        var el = form.querySelector('[name="' + r.field + '"]');
+	        if (!el) continue;
+	        var val = el.value || '';
+	        var label = r.label || r.field;
+
+	        if (r.required && !val.trim()) {
+	          errors.push(label + ' is required');
+	          showFieldError(el, label + ' is required');
+	          continue;
+	        }
+	        if (r.minLength > 0 && val.length < r.minLength) {
+	          errors.push(label + ' must be at least ' + r.minLength + ' characters');
+	          showFieldError(el, label + ' must be at least ' + r.minLength + ' characters');
+	          continue;
+	        }
+	        if (r.maxLength > 0 && val.length > r.maxLength) {
+	          errors.push(label + ' must be at most ' + r.maxLength + ' characters');
+	          showFieldError(el, label + ' must be at most ' + r.maxLength + ' characters');
+	          continue;
+	        }
+	        if (r.pattern && val && !new RegExp(r.pattern).test(val)) {
+	          errors.push(r.patternMsg || label + ' format is invalid');
+	          showFieldError(el, r.patternMsg || label + ' format is invalid');
+	          continue;
+	        }
+	        if (r.type === 'email' && val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+	          errors.push(label + ' must be a valid email');
+	          showFieldError(el, label + ' must be a valid email');
+	          continue;
+	        }
+	        if (r.match) {
+	          var matchEl = form.querySelector('[name="' + r.match + '"]');
+	          if (matchEl && val !== matchEl.value) {
+	            errors.push(label + ' does not match');
+	            showFieldError(el, label + ' does not match');
+	            continue;
+	          }
+	        }
+	        clearFieldError(el);
+	      }
+
+	      if (errors.length > 0) {
+	        e.preventDefault();
+	        showFormError(form, errors[0]);
+	      }
+	    });
+	  }
+
+	  function showFieldError(el, msg) {
+	    el.classList.add('input-error', 'textarea-error', 'select-error');
+	    var err = el.parentNode.querySelector('.field-error');
+	    if (!err) {
+	      err = document.createElement('span');
+	      err.className = 'field-error text-error text-xs mt-1';
+	      el.parentNode.appendChild(err);
+	    }
+	    err.textContent = msg;
+	  }
+
+	  function clearFieldError(el) {
+	    el.classList.remove('input-error', 'textarea-error', 'select-error');
+	    var err = el.parentNode.querySelector('.field-error');
+	    if (err) err.remove();
+	  }
+
+	  function showFormError(form, msg) {
+	    var err = form.querySelector('.form-error-msg');
+	    if (!err) {
+	      err = document.createElement('div');
+	      err.className = 'form-error-msg alert alert-error text-sm mb-4';
+	      form.insertBefore(err, form.firstChild);
+	    }
+	    err.textContent = msg;
+	    err.style.display = 'flex';
+	    setTimeout(function() { err.style.display = 'none'; }, 5000);
+	  }
+	}
+	</script>
+}

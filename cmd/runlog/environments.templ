@@ -1,0 +1,238 @@
+package main
+
+import (
+	"fmt"
+	"net/url"
+
+	"github.com/emergent-company/go-daisy/components/table"
+)
+
+templ EnvironmentsPage(data envListData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - Environments", appName()), sidebarGroups) {
+		@environmentsContent(data)
+	}
+}
+
+templ EnvironmentsContent(data envListData) {
+	@environmentsContent(data)
+}
+
+templ environmentsContent(data envListData) {
+	<div data-testid="environments-content">
+		<div class="flex items-center justify-between mb-4">
+			<h1 class="text-2xl font-bold">Environments</h1>
+		</div>
+		<div id="env-list" data-testid="env-list" class="contents">
+			@envTable(data.Envs)
+		</div>
+	</div>
+}
+
+templ envTable(entries []envListEntry) {
+	if len(entries) > 0 {
+		@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+			@table.TableHead() {
+				@table.TableHeadRow() {
+					@table.TableHeadCell("Environment")
+					@table.TableHeadCell("Vars")
+					@table.TableHeadCell("Checks")
+					@table.TableHeadCell("Test Script")
+					@table.TableHeadCell("Setup Script")
+					@table.TableHeadCell("Status")
+				}
+			}
+			@table.TableBody() {
+				for _, e := range entries {
+					<!-- lint:allow-raw -->
+					<tr
+						id={ "env-" + e.Name }
+						data-testid={ "env-row-" + e.Name }
+						class="hover cursor-pointer"
+						hx-get={ "/ui/environments/" + url.PathEscape(e.Name) }
+						hx-target="#main-content"
+						hx-swap="innerHTML"
+						hx-push-url="true"
+						hx-sync="#main-content:replace"
+					>
+						@table.TableCell("font-semibold", nil) {
+							@text(e.Name)
+						}
+						@table.TableCell("text-right w-16", nil) {
+							@text(fmt.Sprintf("%d", e.VarCount))
+						}
+						@table.TableCell("text-right w-16", nil) {
+							@text(fmt.Sprintf("%d", e.CheckCount))
+						}
+						@table.TableCell("text-center", nil) {
+							if e.HasTestScript {
+								<span class="text-success">✓</span>
+							} else {
+								<span class="text-base-content/30">—</span>
+							}
+						}
+						@table.TableCell("text-center", nil) {
+							if e.HasSetupScript {
+								<span class="text-success">✓</span>
+							} else {
+								<span class="text-base-content/30">—</span>
+							}
+						}
+						@table.TableCell("", nil) {
+							@envStatusBadge(e.Status)
+						}
+					</tr>
+				}
+			}
+		}
+	} else {
+		@emptyState("No environments configured. Add an 'environments:' section to .runlog/config.yaml.")
+	}
+}
+
+templ envStatusBadge(status string) {
+	if status == "pass" {
+		<span class="badge gap-1 badge-success badge-outline badge-sm">Pass</span>
+	} else if status == "fail" {
+		<span class="badge gap-1 badge-error badge-outline badge-sm">Fail</span>
+	} else {
+		<span class="badge gap-1 badge-ghost badge-outline badge-sm">Unknown</span>
+	}
+}
+
+templ EnvDetailPage(data envDetailData) {
+	@AppPage(fmt.Sprintf("Runlog - %s - %s", appName(), data.Name), sidebarGroups) {
+		@envDetailContent(data)
+	}
+}
+
+templ EnvDetailContent(data envDetailData) {
+	@envDetailContent(data)
+}
+
+templ envDetailContent(data envDetailData) {
+	<div data-testid="env-detail">
+		@backButton("/ui/environments")
+		<div class="flex items-center justify-between mb-4 mt-2">
+			<div>
+				<h1 class="text-2xl font-bold">{ data.Name }</h1>
+				<div class="flex items-center gap-3 mt-1">
+					@envStatusBadge(data.Status)
+					<span class="text-xs text-base-content/50">{ fmt.Sprintf("%d vars, %d checks", data.VarCount, data.CheckCount) }</span>
+				</div>
+			</div>
+		</div>
+		if len(data.EnvVars) > 0 {
+			<div class="mb-6">
+				@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+					@table.TableHead() {
+						@table.TableHeadRow() {
+							@table.TableHeadCell("Env Var")
+							@table.TableHeadCell("Value")
+						}
+					}
+					@table.TableBody() {
+						for k, v := range data.EnvVars {
+							<!-- lint:allow-raw -->
+							<tr>
+								@table.TableCell("font-mono", nil) {
+									@text(k)
+								}
+								@table.TableCell("font-mono text-base-content/60", nil) {
+									@text(v)
+								}
+							</tr>
+						}
+					}
+				}
+			</div>
+		}
+		if len(data.CheckResults) > 0 {
+			<div class="mb-6">
+				@sectionHeading("Requirement Checks")
+				@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+					@table.TableHead() {
+						@table.TableHeadRow() {
+							@table.TableHeadCell("Variable")
+							@table.TableHeadCell("Check")
+							@table.TableHeadCell("Value")
+							@table.TableHeadCell("Result")
+						}
+					}
+					@table.TableBody() {
+						for _, r := range data.CheckResults {
+							<!-- lint:allow-raw -->
+							<tr>
+								@table.TableCell("font-mono", nil) {
+									@text(r.Key)
+								}
+								@table.TableCell("", nil) {
+									@text(r.CheckType)
+								}
+								@table.TableCell("font-mono text-xs", nil) {
+									if r.Value != "" {
+										@text(r.Value)
+									} else {
+										<span class="text-base-content/30">—</span>
+									}
+								}
+								@table.TableCell("", nil) {
+									if r.Pass {
+										<span class="text-success flex items-center gap-1"><span class="iconify lucide--check size-3"></span> Pass</span>
+									} else {
+										<div class="flex flex-col gap-0.5">
+											<span class="text-error flex items-center gap-1"><span class="iconify lucide--x size-3"></span> Fail</span>
+											<span class="text-xs text-base-content/40">{ r.Error }</span>
+											if r.Hint != "" {
+												<span class="text-xs text-warning">{ r.Hint }</span>
+											}
+										</div>
+									}
+								}
+							</tr>
+						}
+					}
+				}
+			</div>
+		}
+		if data.TestScript != "" || data.SetupScript != "" {
+			<div class="mb-6">
+				@sectionHeading("Scripts")
+				@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+					@table.TableHead() {
+						@table.TableHeadRow() {
+							@table.TableHeadCell("Type")
+							@table.TableHeadCell("Path")
+						}
+					}
+					@table.TableBody() {
+						if data.TestScript != "" {
+							<!-- lint:allow-raw -->
+							<tr>
+								@table.TableCell("", nil) {
+									<span class="font-medium">Test Script</span>
+								}
+								@table.TableCell("font-mono text-xs", nil) {
+									@text(data.TestScript)
+								}
+							</tr>
+						}
+						if data.SetupScript != "" {
+							<!-- lint:allow-raw -->
+							<tr>
+								@table.TableCell("", nil) {
+									<span class="font-medium">Setup Script</span>
+								}
+								@table.TableCell("font-mono text-xs", nil) {
+									@text(data.SetupScript)
+								}
+							</tr>
+						}
+					}
+				}
+			</div>
+		}
+		if len(data.EnvVars) == 0 && len(data.CheckResults) == 0 && data.TestScript == "" && data.SetupScript == "" {
+			@emptyState("No configuration for this environment.")
+		}
+	</div>
+}

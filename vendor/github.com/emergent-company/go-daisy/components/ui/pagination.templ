@@ -107,3 +107,55 @@ templ PaginationWithProps(props PaginationProps) {
 		</div>
 	}
 }
+
+// PaginationCircle renders a circle-style pagination button strip.
+templ PaginationCircle(currentPage int, totalPages int, baseURL string, targetID string) {
+	if totalPages > 1 {
+		<div class="inline-flex items-center gap-1" { devmode.Attrs(ctx, "ui/PaginationCircle")... }>
+			<a
+				class={ "btn btn-circle sm:btn-sm btn-xs btn-ghost",
+					templ.KV("btn-disabled", currentPage <= 1) }
+				if currentPage > 1 && baseURL != "" {
+					href={ templ.URL(pageURL(baseURL, currentPage-1)) }
+					hx-get={ pageURL(baseURL, currentPage-1) }
+					hx-target={ "#" + targetID }
+					hx-swap="outerHTML"
+					hx-push-url="true"
+				}
+				aria-label="Previous page"
+			>
+				<span class="iconify lucide--chevron-left" aria-hidden="true"></span>
+			</a>
+			for p := 1; p <= totalPages; p++ {
+				<a
+					class={ "btn btn-circle sm:btn-sm btn-xs",
+						templ.KV("btn-primary", p == currentPage),
+						templ.KV("btn-ghost", p != currentPage) }
+					if baseURL != "" {
+						href={ templ.URL(pageURL(baseURL, p)) }
+						hx-get={ pageURL(baseURL, p) }
+						hx-target={ "#" + targetID }
+						hx-swap="outerHTML"
+						hx-push-url="true"
+					}
+				>
+					{ strconv.Itoa(p) }
+				</a>
+			}
+			<a
+				class={ "btn btn-circle sm:btn-sm btn-xs btn-ghost",
+					templ.KV("btn-disabled", currentPage >= totalPages) }
+				if currentPage < totalPages && baseURL != "" {
+					href={ templ.URL(pageURL(baseURL, currentPage+1)) }
+					hx-get={ pageURL(baseURL, currentPage+1) }
+					hx-target={ "#" + targetID }
+					hx-swap="outerHTML"
+					hx-push-url="true"
+				}
+				aria-label="Next page"
+			>
+				<span class="iconify lucide--chevron-right" aria-hidden="true"></span>
+			</a>
+		</div>
+	}
+}

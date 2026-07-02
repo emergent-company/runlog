@@ -7,11 +7,22 @@ import (
 	"github.com/emergent-company/go-daisy/render"
 )
 
+var overriddenAppName string
+
 func appName() string {
 	if n := os.Getenv("RUNLOG_APP_TITLE"); n != "" {
 		return n
 	}
+	if overriddenAppName != "" {
+		return overriddenAppName
+	}
 	return "runlog"
+}
+
+// SetAppName overrides the app name shown in the UI page title.
+// Called by the web app at startup from config.
+func SetAppName(name string) {
+	overriddenAppName = name
 }
 
 // AppShellContent renders the app shell (sidebar, navbar, main content, footer,
@@ -24,6 +35,14 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 		@layout.Sidebar(appName(), groups)
 		<div class="flex min-w-0 grow flex-col overflow-hidden">
 			@layout.Navbar(appName()) {
+				<button
+					class="btn btn-sm btn-circle btn-ghost"
+					aria-label="Search (Ctrl+K)"
+					onclick="document.getElementById('search-modal').showModal();setTimeout(function(){document.getElementById('search-input').focus();document.getElementById('search-input').select()},100)"
+					data-testid="search-btn"
+				>
+					<span class="iconify lucide--search size-4.5"></span>
+				</button>
 				<div class="dropdown dropdown-end">
 					<label tabindex="0" class="btn btn-sm btn-circle btn-ghost" data-testid="theme-toggle">
 						<span id="theme-icon-light" class="iconify lucide--sun size-4.5"></span>
@@ -41,33 +60,6 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 			<main id="main-content" hx-ext="head" hx-history-elt class="grow overflow-auto bg-base-200 p-6" data-testid="main-content">
 				{ children... }
 			</main>
-			<template id="skeleton-dashboard">
-				@DashboardSkeleton()
-			</template>
-			<template id="skeleton-linters">
-				@LintersSkeleton()
-			</template>
-			<template id="skeleton-tests">
-				@TestsSkeleton()
-			</template>
-			<template id="skeleton-test-detail">
-				@TestDetailSkeleton()
-			</template>
-			<template id="skeleton-runs">
-				@AllRunsSkeleton()
-			</template>
-			<template id="skeleton-run-detail">
-				@RunDetailSkeleton()
-			</template>
-			<template id="skeleton-experiments">
-				@ExperimentsSkeleton()
-			</template>
-			<template id="skeleton-experiment-detail">
-				@ExperimentDetailSkeleton()
-			</template>
-			<template id="skeleton-events-reference">
-				@EventsReferenceSkeleton()
-			</template>
 			<footer class="hidden sm:flex border-t border-base-200 bg-base-100 shrink-0">
 				<div class="flex w-full items-center justify-between gap-3 px-4 py-1.5">
 					<div id="footer-status" class="flex items-center gap-2 text-xs">
@@ -91,6 +83,7 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 			})();
 		</script>
 		</div>
+		@SearchModal()
 	}
 	// Theme init: check localStorage (light|dark|system) → OS preference → default (system).
 	// Legacy migration: 'go-daisy-theme' stored a theme name; migrate to mode.
@@ -143,61 +136,45 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 			});
 		})();
 	</script>
-	// Global loading indicator + skeleton injection + error handling.
+	// Keyboard shortcut: Ctrl+K / Cmd+K and / open the search modal.
+	<script>
+		document.addEventListener('keydown', function(e) {
+			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+				e.preventDefault();
+				var modal = document.getElementById('search-modal');
+				if (modal && modal.open) { modal.close(); return; }
+				if (modal) { modal.showModal(); return; }
+			}
+			if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+				var tag = e.target.tagName;
+				if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+				e.preventDefault();
+				var modal = document.getElementById('search-modal');
+				if (modal) modal.showModal();
+			}
+		});
+		document.addEventListener('htmx:after:swap', function(e) {
+			if (e.detail?.target?.id === 'search-results') {
+				var input = document.getElementById('search-input');
+				if (input) input.focus();
+			}
+		});
+	</script>
+	// Global loading indicator + error recovery.
+	// No skeleton injection — HTMX swaps content inline; old page stays visible during requests.
 	<script>
 		(function() {
 			var bar = document.getElementById('global-loading-bar');
-			var showTimer, hideTimer;
+			var showTimer;
 
-			var skeletonMap = [
-				{ pattern: '/ui/events', skeleton: 'skeleton-events-reference' },
-				{ pattern: '/ui/linters/', skeleton: 'skeleton-linters' },
-				{ pattern: '/ui/linters', skeleton: 'skeleton-linters' },
-				{ pattern: '/ui/experiments/', skeleton: 'skeleton-experiment-detail' },
-				{ pattern: '/ui/experiments', skeleton: 'skeleton-experiments' },
-				{ pattern: '/ui/runs/', skeleton: 'skeleton-run-detail' },
-				{ pattern: '/ui/runs', skeleton: 'skeleton-runs' },
-				{ pattern: '/ui/tests/', skeleton: 'skeleton-test-detail' },
-				{ pattern: '/ui/tests', skeleton: 'skeleton-tests' },
-				{ pattern: '/ui/', skeleton: 'skeleton-dashboard' },
-			];
-			var fallbackHtml = '<div class="flex items-center justify-center py-24"><span class="loading loading-spinner loading-lg text-primary"></span></div>';
-
-			function injectSkeleton(href) {
-				var path = new URL(href, location.origin).pathname;
-				for (var i = 0; i < skeletonMap.length; i++) {
-					var entry = skeletonMap[i];
-					if (path === entry.pattern || path.indexOf(entry.pattern) === 0) {
-						var main = document.getElementById('main-content');
-						if (!main) return;
-						var tmpl = document.getElementById(entry.skeleton);
-						if (tmpl && tmpl.innerHTML.trim()) {
-							main.innerHTML = tmpl.innerHTML;
-						} else {
-							main.innerHTML = fallbackHtml;
-						}
-						return;
-					}
-				}
-				var main = document.getElementById('main-content');
-				if (main) main.innerHTML = fallbackHtml;
-			}
-
-		document.addEventListener('htmx:before:request', function(evt) {
-			try {
-				var elt = evt.detail?.ctx?.sourceElement || evt.detail?.elt || null;
-				if (elt && elt.getAttribute && elt.getAttribute('hx-push-url') === 'true') {
-					var href = elt.getAttribute('hx-get') || elt.getAttribute('data-hx-get');
-					if (href) injectSkeleton(href);
-				}
-			} catch(e) { /* skeleton is best-effort */ }
-				clearTimeout(hideTimer);
-				showTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);
-			});
-			document.addEventListener('htmx:after:request', function() {
-				clearTimeout(showTimer);
-				if (bar) bar.style.opacity = '0';
-			});
+		document.addEventListener('htmx:before:request', function() {
+			clearTimeout(window.__hideTimer);
+			showTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);
+		});
+		document.addEventListener('htmx:after:request', function() {
+			clearTimeout(showTimer);
+			if (bar) bar.style.opacity = '0';
+		});
 		document.addEventListener('htmx:error', function() {
 			clearTimeout(showTimer);
 			if (bar) {
@@ -206,6 +183,8 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 				setTimeout(function() { bar.style.opacity = '0'; }, 1500);
 				setTimeout(function() { bar.style.background = ''; }, 2000);
 			}
+			// Recover: reload page so user doesn't see stale state
+			setTimeout(function() { location.reload(); }, 2000);
 		});
 		})();
 	</script>
@@ -234,8 +213,6 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 			document.body.appendChild(s);
 		})();
 	</script>
-	<link rel="stylesheet" href="/static/css/frappe-gantt.css"/>
-	<script src="/static/js/hx-head.js"></script>
 }
 
 // AppPage renders the full HTML shell with sidebar and content area.
@@ -266,6 +243,9 @@ templ AppPage(title string, groups []layout.SidebarGroup) {
 					{ children... }
 				}
 			}
+			// hx-head.js must load AFTER htmx.js (which is at end of layout.Page body).
+			<link rel="stylesheet" href="/static/css/frappe-gantt.css"/>
+			<script src="/static/js/hx-head.js"></script>
 		}
 	</div>
 }

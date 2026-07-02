@@ -42,7 +42,7 @@ templ experimentDetailContent(exp runlog.ExperimentSummary) {
 		}
 		@sectionHeading("Runs")
 		if len(exp.Runs) > 0 {
-			@runsTable(exp.Runs, runsTableOpts{ShowID: true, ShowTags: true})
+			@runsTable(exp.Runs, runsTableOpts{ShowID: true, ShowTags: true, ShowTestType: true})
 		} else {
 			@emptyState("No runs for this experiment.")
 		}

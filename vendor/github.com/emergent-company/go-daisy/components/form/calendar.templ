@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/emergent-company/go-daisy/devmode"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
 // CalendarVariant controls the calendar display style.
@@ -39,9 +41,9 @@ templ CalendarWrapper(variant CalendarVariant) {
 templ CalendarDemo(month string, year string, startWeekday int, daysInMonth int, today int, selected int) {
 	<div class="calendar" { devmode.Attrs(ctx, "form/CalendarDemo")... }>
 		<div class="calendar-nav">
-			<button class="btn btn-ghost btn-sm" aria-label="Previous month">&#8249;</button>
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Attrs: templ.Attributes{"aria-label": "Previous month"}}){ &#8249; }
 			<span class="font-semibold">{ month } { year }</span>
-			<button class="btn btn-ghost btn-sm" aria-label="Next month">&#8250;</button>
+			@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Attrs: templ.Attributes{"aria-label": "Next month"}}){ &#8250; }
 		</div>
 		<table class="calendar-table">
 			<thead>
@@ -72,17 +74,26 @@ templ calendarRows(startWeekday int, daysInMonth int, today int, selected int) {
 					<td></td>
 				} else {
 					<td>
-						<button
-							class={
-								"btn btn-sm btn-ghost btn-square",
-								templ.KV("btn-primary", day == selected),
-								templ.KV("btn-outline", day == today && day != selected),
-							}
-						>{ strconv.Itoa(day) }</button>
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM, Shape: ui.ButtonShapeSquare, ExtraClass: calendarDayExtraClass(day, today, selected)}) {
+							{ strconv.Itoa(day) }
+						}
 					</td>
 					{{ day++ }}
 				}
 			}
 		</tr>
+	}
+}
+
+// calendarDayExtraClass returns the highlight class for a calendar day cell,
+// layered on top of the base ghost/square button styling.
+func calendarDayExtraClass(day, today, selected int) string {
+	switch {
+	case day == selected:
+		return "btn-primary"
+	case day == today:
+		return "btn-outline"
+	default:
+		return ""
 	}
 }

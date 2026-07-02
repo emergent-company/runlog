@@ -96,9 +96,21 @@ tasks:
           exit 0
         fi
         go build -o /tmp/runlog-bin ./cmd/runlog
-        nohup /tmp/runlog-bin daemon > /tmp/runlog-daemon.log 2>&1 &
+        RUNLOG_APP_TITLE="${RUNLOG_APP_TITLE:-runlog}" \
+        RUNLOG_LISTEN_ADDR="${RUNLOG_LISTEN_ADDR:-0.0.0.0}" \
+        nohup /tmp/runlog-bin daemon --port "${RUNLOG_PORT:-7430}" > /tmp/runlog-daemon.log 2>&1 &
         echo $! > {{.DAEMON_PID_FILE}}
-        echo "Daemon started (PID $!), http://localhost:7430"
+        echo "Daemon started (PID $!), http://${RUNLOG_LISTEN_ADDR:-0.0.0.0}:${RUNLOG_PORT:-7430}"
+
+  "daemon:go-daisy":
+    desc: Start the daemon named "go-daisy" on Tailscale IP port 2099
+    silent: true
+    cmds:
+      - |
+        RUNLOG_APP_TITLE="go-daisy" \
+        RUNLOG_LISTEN_ADDR="100.75.139.71" \
+        RUNLOG_PORT="2099" \
+        task daemon:start
 
   daemon:stop:
     desc: Stop the background daemon
@@ -212,10 +224,9 @@ tasks:
   # set RUNLOG_DAEMON_URL so that runlog itself records its own test runs.
 
   dogfood:start:
-    desc: Start dogfood runlog daemon (port {{.DOGFOOD_PORT}}) — empty DB, tests populate it
+    desc: Start dogfood runlog daemon (port {{.DOGFOOD_PORT}}) — preserves existing DB runs
     cmds:
       - task: dogfood:stop
-      - rm -f {{.DOGFOOD_DB}}
       - bash scripts/dogfood-start.sh {{.DOGFOOD_PORT}} {{.DOGFOOD_DB}} {{.DOGFOOD_BIN}} {{.DOGFOOD_LOG}}
 
   dogfood:stop:
@@ -242,12 +253,11 @@ tasks:
       - curl -s http://localhost:{{.DOGFOOD_PORT}}/status | python3 -m json.tool || echo "Not running"
 
   dogfood:server:
-    desc: "Run dogfood daemon in foreground with hot-reload (clean DB, Ctrl+C to stop)"
+    desc: "Run dogfood daemon in foreground with hot-reload (preserves existing DB, Ctrl+C to stop)"
     env:
       RUNLOG_APP_TITLE: "runlog (dogfood)"
     cmds:
       - task: dogfood:stop
-      - rm -f {{.DOGFOOD_DB}}
       - air -c .air.dogfood.toml
 
   dogfood:server:persist:
@@ -267,14 +277,31 @@ tasks:
   # ── Dogfood: test recording ─────────────────────────────────────────────
 
   dogfood:record:
-    desc: "Run integration tests that record to dogfood DB"
+    desc: "Run all tests with coverage and record to dogfood DB"
     deps: [dogfood:start]
     env:
       RUNLOG_DAEMON_URL: http://localhost:17433
-      TEST_RUNS_DB: /tmp/runlog-dogfood.db
       RUNLOG_APP_TITLE: "runlog (dogfood)"
     cmds:
-      - go test -v -count=1 -timeout 120s -run 'TestCostTracking_EndToEnd|TestEnvVarsIntegration' ./...
+      - go test -count=1 -timeout 600s -coverprofile=/tmp/runlog-cov.out ./...
+      - |
+        if [ -f /tmp/runlog-cov.out ]; then
+          TOTAL=$(go tool cover -func=/tmp/runlog-cov.out | grep "^total:" | awk '{print $3}' | sed 's/%//')
+          echo "=== Coverage: ${TOTAL}% ==="
+          # Parse per-file coverage as JSON array
+          FILES_JSON=$(go tool cover -func=/tmp/runlog-cov.out | python3 /tmp/cov_parse.py)
+          LAST_RUN=$(sqlite3 /tmp/runlog-dogfood.db "SELECT id FROM daemon_runs WHERE status='done' ORDER BY finished_at DESC LIMIT 1;" 2>/dev/null)
+          if [ -n "$LAST_RUN" ]; then
+            BODY=$(python3 -c "import json; d={'coverage_pct':$TOTAL,'coverage_data':json.dumps($FILES_JSON)}; print(json.dumps(d))")
+            curl -s -X PUT "http://localhost:17433/runs/$LAST_RUN/done" \
+              -H "Content-Type: application/json" \
+              -d "$BODY" > /dev/null
+            echo "Coverage $TOTAL% attached to run $LAST_RUN."
+          else
+            echo "No completed runs to attach coverage to."
+          fi
+          rm -f /tmp/runlog-cov.out
+        fi
       - echo "---"
       - echo "Dogfood DB now has runs. Open:"
       - echo "  http://mcj-one:17433/ui/tests"
@@ -346,7 +373,7 @@ tasks:
   # ── Lint ───────────────────────────────────────────────────────────────────
 
   lint:
-    desc: Run all linters (templ-fmt, gofmt, go vet, dead code, secrets, etc.) via lefthook
+    desc: Run all linters (SDK typecheck, SDK build, secrets scan) via lefthook
     cmds:
       - lefthook run lint
 
@@ -371,3 +398,32 @@ tasks:
     desc: Remove test coverage artifacts
     cmds:
       - rm -f coverage.out coverage.html
+
+  # ── TypeScript SDK ───────────────────────────────────────────────────────────
+
+  sdk:install:
+    desc: Install TypeScript SDK dependencies
+    dir: sdk/typescript
+    cmds:
+      - pnpm install
+
+  sdk:build:
+    desc: Build TypeScript SDK (ESM + CJS + dts)
+    dir: sdk/typescript
+    deps: [sdk:install]
+    cmds:
+      - pnpm build
+
+  sdk:typecheck:
+    desc: TypeScript type-check SDK without emitting
+    dir: sdk/typescript
+    deps: [sdk:install]
+    cmds:
+      - pnpm typecheck
+
+  sdk:publish:
+    desc: Publish @runlog/client to npm
+    dir: sdk/typescript
+    deps: [sdk:build]
+    cmds:
+      - npm publish

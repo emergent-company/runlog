@@ -19,8 +19,8 @@ type codeExample struct {
 
 func strPtr(s string) *string { return &s }
 
-// sdkPageJS is the inline JavaScript for expandable detail rows and copy-to-clipboard.
-var sdkPageJS = `window.toggleDetail=function(e){var t=document.getElementById(e);t&&t.classList.toggle('hidden')};document.addEventListener('click',function(e){var t=e.target.closest('[data-detail-id]');t&&toggleDetail(t.getAttribute('data-detail-id'))});window.copyCode=function(e){var t=e.parentElement;var n=t.querySelector('input[type="radio"]:checked');var r;if(n){r=n.nextElementSibling&&n.nextElementSibling.querySelector('code')}else{r=t.querySelector('code')}if(r){var i=r.innerText;navigator.clipboard.writeText(i).then(function(){var o=e.innerHTML;e.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"><\/polyline><\/svg>';setTimeout(function(){e.innerHTML=o},2000)})}}`
+// sdkPageJS is the inline JavaScript for expandable detail rows.
+var sdkPageJS = `window.toggleDetail=function(e){var t=document.getElementById(e);t&&t.classList.toggle('hidden')};document.addEventListener('click',function(e){var t=e.target.closest('[data-detail-id]');t&&toggleDetail(t.getAttribute('data-detail-id'))})`
 
 // scriptTag returns a templ component that writes a <script> tag with the given content.
 // Use instead of inline <script>{ var }</script> which templ treats as raw text.
@@ -142,8 +142,8 @@ rl.SetExperiment("prompt-optimization-v3")`,
 		Title:       "Screenshots",
 		Description: "Emits screenshot artifacts from Playwright e2e tests. The UI renders the image inline in the event detail.",
 		ID:          "playwright-screenshots", Lang: "javascript",
-		Code: `// In your Playwright test fixture:
-const artifactsDir = '/tmp/runlog-artifacts';
+		Code: `// In your Playwright test fixture (run from project root):
+const artifactsDir = process.env.RUNLOG_ARTIFACTS_DIR || '.runlog/artifacts';
 
 async function saveArtifact(runId, page, name) {
     const ssPath = path.join(artifactsDir, runId, name + '.png');

@@ -57,7 +57,9 @@ func DashboardPage(data dashboardData) templ.Component {
 				{Label: "Passed", Value: fmt.Sprintf("%d", data.PassCount)},
 				{Label: "Failed", Value: fmt.Sprintf("%d", data.FailCount)},
 				{Label: "Skipped", Value: fmt.Sprintf("%d", data.SkipCount)},
-			}, 5).Render(ctx, templ_7745c5c3_Buffer)
+				{Label: "Environments", Value: fmt.Sprintf("%d/%d", data.EnvPassCount, data.EnvCount)},
+				{Label: "Coverage", Value: coverageStr(data.CoveragePct)},
+			}, 7).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -70,7 +72,7 @@ func DashboardPage(data dashboardData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = runsTable(data.RecentRuns, runsTableOpts{}).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = runsTable(data.RecentRuns, runsTableOpts{ShowTestType: true}).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -118,7 +120,7 @@ func DashboardPage(data dashboardData) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue("/ui/tests?category=" + cat.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/dashboard.templ`, Line: 28, Col: 77}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/dashboard.templ`, Line: 30, Col: 77}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 					if templ_7745c5c3_Err != nil {
@@ -191,7 +193,9 @@ func DashboardContent(data dashboardData) templ.Component {
 			{Label: "Passed", Value: fmt.Sprintf("%d", data.PassCount)},
 			{Label: "Failed", Value: fmt.Sprintf("%d", data.FailCount)},
 			{Label: "Skipped", Value: fmt.Sprintf("%d", data.SkipCount)},
-		}, 5).Render(ctx, templ_7745c5c3_Buffer)
+			{Label: "Environments", Value: fmt.Sprintf("%d/%d", data.EnvPassCount, data.EnvCount)},
+			{Label: "Coverage", Value: coverageStr(data.CoveragePct)},
+		}, 7).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -204,7 +208,7 @@ func DashboardContent(data dashboardData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = runsTable(data.RecentRuns, runsTableOpts{}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = runsTable(data.RecentRuns, runsTableOpts{ShowTestType: true}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

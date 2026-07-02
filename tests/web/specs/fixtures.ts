@@ -5,13 +5,14 @@ import * as path from 'path';
 const DOGFOOD_URL = process.env.RUNLOG_DAEMON_URL || 'http://localhost:17433';
 const ARTIFACT_DIR = '/tmp/runlog-artifacts';
 
-async function registerRun(testName: string, category: string): Promise<string | null> {
+async function registerRun(testName: string, category: string, description?: string): Promise<string | null> {
   try {
-    const body = JSON.stringify({ pid: process.pid, env_profile: `${category} / ${testName}` });
+    const body: any = { pid: process.pid, env_profile: testName, category };
+    if (description) body.description = description;
     const resp = await fetch(`${DOGFOOD_URL}/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body,
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(2000),
     });
     if (!resp.ok) return null;
@@ -156,7 +157,9 @@ export const test = base.extend<{ captureErrors: void; dogfood: string | null }>
       }
     });
 
-    const runId = await registerRun(fullPath, category);
+    const descAnnot = testInfo.annotations.find(a => a.type === 'description');
+    const description = descAnnot?.description;
+    const runId = await registerRun(fullPath, category, description);
     rid = runId;
     if (runId) {
       await insertEvent(runId, 'state_change', 'test started', 0);

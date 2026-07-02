@@ -96,9 +96,17 @@ templ testsContentInner(data testListData) {
 	<script>
 		document.querySelector('[data-testid="tests-content"]')?.addEventListener('click', function(e) {
 			var btn = e.target.closest('[data-run-test]');
-			if (!btn || typeof htmx === 'undefined') return;
-			var name = btn.getAttribute('data-run-test');
-			window.location.href = '/ui/launch/' + name;
+			if (btn) {
+				if (typeof htmx === 'undefined') return;
+				var name = btn.getAttribute('data-run-test');
+				window.location.href = '/ui/launch/' + name;
+				return;
+			}
+			var row = e.target.closest('tr[data-href]');
+			if (!row || e.target.closest('.dropdown')) return;
+			var href = row.getAttribute('data-href');
+			if (!href) return;
+			htmx.ajax('GET', href, { target: '#main-content', swap: 'innerHTML', pushUrl: href });
 		});
 	</script>
 }
@@ -110,6 +118,7 @@ templ flatTestTable(data testListData) {
 				@table.TableHeadCell("Test Name")
 				@table.TableHeadCell("Status")
 				@table.TableHeadCell("Category")
+				@table.TableHeadCell("Type")
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Runs</th> <!-- lint:allow-raw -->
 				@table.TableHeadCell("Last Run")
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Action</th> <!-- lint:allow-raw -->
@@ -118,18 +127,13 @@ templ flatTestTable(data testListData) {
 		@table.TableBody() {
 			for _, cat := range data.Categories {
 				if data.ActiveFilter == "" || data.ActiveFilter == cat.Name {
-					for _, e := range cat.Tests {
-						<tr
-							id={ "test-" + e.Name }
-							data-testid={ "test-row-" + e.Name }
-							class="hover"
-							hx-get={ "/ui/tests/" + url.PathEscape(e.Name) }
-							hx-target="#main-content"
-							hx-swap="innerHTML"
-							hx-push-url="true"
-							hx-sync="#main-content:replace"
-							hx-trigger="click[!target.closest('.dropdown')]"
-						>
+				for _, e := range cat.Tests {
+					<tr
+						id={ "test-" + e.Name }
+						data-testid={ "test-row-" + e.Name }
+						class="hover"
+						data-href={ "/ui/tests/" + url.PathEscape(e.Name) }
+					>
 							@table.TableCell("", nil) {
 								@text(e.Name)
 							}
@@ -138,6 +142,11 @@ templ flatTestTable(data testListData) {
 							}
 							@table.TableCell("", nil) {
 								<span class="badge badge-ghost badge-xs">{ cat.Name }</span>
+							}
+							@table.TableCell("", nil) {
+								if e.TestType != "" {
+									<span class={ testTypeBadge(e.TestType) }>{ e.TestType }</span>
+								}
 							}
 							@table.TableCell("text-right w-16", nil) {
 								if e.NeverRun {

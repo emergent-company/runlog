@@ -1,0 +1,257 @@
+package table
+
+import (
+	"encoding/json"
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+	ui "github.com/emergent-company/go-daisy/components/ui"
+)
+
+// DataTableColumn defines a single column in a data table.
+type DataTableColumn struct {
+	ID         string // unique key for sorting/filtering
+	Label      string // display header
+	Sortable   bool
+	Searchable bool
+	Hidden     bool   // initial visibility
+	Width      string // Tailwind width class, e.g. "w-24"
+}
+
+// DataTableRow represents a row as a map of column ID -> cell content.
+type DataTableRow map[string]string
+
+// DataTableProps configures a full-featured data table.
+type DataTableProps struct {
+	ID              string
+	Columns         []DataTableColumn
+	Rows            []DataTableRow
+	PageSize        int
+	Searchable      bool
+	Sortable        bool
+	Striped         bool
+	Bordered        bool
+	Compact         bool
+	PageSizeOptions []int
+	Attrs           templ.Attributes
+}
+
+// DataTable renders a full-featured data table with pagination, sorting, search, and column toggle.
+templ DataTable(props DataTableProps) {
+	<div
+		id={ props.ID }
+		class="card bg-base-100 shadow-sm border border-base-200"
+		data-datatable
+		data-columns={ columnJSON(props.Columns) }
+		data-rows={ rowsJSON(props.Rows) }
+		data-page-size={ strconv.Itoa(dataTablePageSize(props.PageSize)) }
+		data-page-size-options={ pageSizeOptionsJSON(props.PageSizeOptions) }
+		data-searchable={ ternary(props.Searchable, "true", "false") }
+		data-sortable={ ternary(props.Sortable, "true", "false") }
+		data-striped={ ternary(props.Striped, "true", "false") }
+		data-bordered={ ternary(props.Bordered, "true", "false") }
+		x-data="dataTable()"
+		{ devmode.Attrs(ctx, "table/DataTable")... }
+		{ props.Attrs... }
+	>
+		<div class="flex items-center gap-3 px-5 pt-5" x-show="columns.length > 0">
+			if props.Searchable {
+				<div class="join flex-1 max-w-sm">
+					<input
+						type="search"
+						class="input input-bordered input-sm join-item w-full"
+						placeholder="Search..."
+						x-model="search"
+						@input.debounce="filterRows()"
+					/>
+				</div>
+			}
+			<div class="dropdown dropdown-end" x-data="{ open: false }">
+				<button class="btn btn-ghost btn-sm" @click="open = !open" @click.outside="open = false">
+					@ui.IconSpan("lucide--columns", "size-4")
+					Columns
+				</button>
+				<div class="dropdown-content bg-base-100 rounded-box shadow-sm border border-base-200 mt-1 p-3 min-w-40 z-10" x-show="open">
+					<template x-for="(col, i) in columns" :key="col.id">
+						<label class="flex items-center gap-2 py-1 text-sm">
+							<input type="checkbox" class="checkbox checkbox-xs" x-model="col.hidden" @change="filterRows()" />
+							<span x-text="col.label"></span>
+						</label>
+					</template>
+				</div>
+			</div>
+		</div>
+
+		<div class="overflow-x-auto">
+			<table class={ "table w-full",
+				templ.KV("table-zebra", props.Striped),
+				templ.KV("table-xs", props.Compact) }>
+				<thead>
+					<tr>
+						<template x-for="col in visibleColumns" :key="col.id">
+							<th
+								x-text="col.label"
+								:class="'text-xs uppercase tracking-wider text-base-content/50' + (sortable ? ' cursor-pointer hover:text-base-content' : '') + ' ' + (col.width || '')"
+								x-on:click="if (sortable) sortBy(col.id)"
+							>
+							</th>
+						</template>
+					</tr>
+				</thead>
+				<tbody>
+					<template x-if="paginatedRows.length === 0">
+						<tr>
+							<td :colspan="visibleColumns.length" class="text-center py-8 text-base-content/50">
+								No results found.
+							</td>
+						</tr>
+					</template>
+					<template x-for="(row, ri) in paginatedRows" :key="ri">
+						<tr>
+							<template x-for="col in visibleColumns" :key="col.id">
+								<td x-text="row[col.id] || ''" class="text-sm"></td>
+							</template>
+						</tr>
+					</template>
+				</tbody>
+			</table>
+		</div>
+
+		<div class="flex items-center justify-between p-4 border-t border-base-200">
+			<div class="flex items-center gap-2 text-sm text-base-content/60">
+				<span>Rows per page:</span>
+				<select class="select select-xs w-20" x-model="pageSize" @change="currentPage = 1; filterRows()">
+					<template x-for="opt in pageSizeOptions" :key="opt">
+						<option :value="opt" x-text="opt"></option>
+					</template>
+				</select>
+				<span x-text="'Showing ' + ((currentPage - 1) * pageSize + 1) + '–' + Math.min(currentPage * pageSize, filteredRows.length) + ' of ' + filteredRows.length"></span>
+			</div>
+			<div class="join">
+				<button class="join-item btn btn-sm" :disabled="currentPage === 1" @click="currentPage--; filterRows()">&laquo;</button>
+				<button class="join-item btn btn-sm" x-text="currentPage"></button>
+				<button class="join-item btn btn-sm" :disabled="currentPage >= totalPages" @click="currentPage++; filterRows()">&raquo;</button>
+			</div>
+		</div>
+	</div>
+	@dataTableAlpineScript(props.ID)
+}
+
+func columnJSON(cols []DataTableColumn) string {
+	type colJSON struct {
+		ID     string `json:"id"`
+		Label  string `json:"label"`
+		Hidden bool   `json:"hidden"`
+		Width  string `json:"width,omitempty"`
+	}
+	out := make([]colJSON, len(cols))
+	for i, c := range cols {
+		out[i] = colJSON{ID: c.ID, Label: c.Label, Hidden: c.Hidden, Width: c.Width}
+	}
+	b, _ := json.Marshal(out)
+	return string(b)
+}
+
+func rowsJSON(rows []DataTableRow) string {
+	b, _ := json.Marshal(rows)
+	return string(b)
+}
+
+func pageSizeOptionsJSON(opts []int) string {
+	if len(opts) == 0 {
+		opts = []int{10, 20, 50, 100}
+	}
+	b, _ := json.Marshal(opts)
+	return string(b)
+}
+
+templ dataTableAlpineScript(id string) {
+	<script>
+	if (!window._dataTableInit) {
+	  window._dataTableInit = true;
+
+	  window.dataTable = function() {
+	    return {
+	      search: '',
+	      currentPage: 1,
+	      pageSize: 10,
+	      pageSizeOptions: [],
+	      sortKey: null,
+	      sortDir: 'asc',
+	      columns: [],
+	      allRows: [],
+	      filteredRows: [],
+	      paginatedRows: [],
+	      sortable: false,
+
+	      get visibleColumns() {
+	        return this.columns.filter(function(c) { return !c.hidden; });
+	      },
+
+	      get totalPages() {
+	        return Math.max(1, Math.ceil(this.filteredRows.length / this.pageSize));
+	      },
+
+	      init: function() {
+	        var el = this.$el;
+	        this.columns = JSON.parse(el.dataset.columns || '[]');
+	        this.allRows = JSON.parse(el.dataset.rows || '[]');
+	        this.pageSize = parseInt(el.dataset.pageSize) || 10;
+	        try { this.pageSizeOptions = JSON.parse(el.dataset.pageSizeOptions || '[10,20,50,100]'); } catch(e) { this.pageSizeOptions = [10,20,50,100]; }
+	        this.sortable = el.dataset.sortable === 'true';
+	        this.currentPage = 1;
+	        this.filterRows();
+	      },
+
+	      sortBy: function(key) {
+	        if (this.sortKey === key) {
+	          this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+	        } else {
+	          this.sortKey = key;
+	          this.sortDir = 'asc';
+	        }
+	        this.filterRows();
+	      },
+
+	      filterRows: function() {
+	        var self = this;
+	        var rows = this.allRows.slice();
+
+	        var q = this.search.toLowerCase().trim();
+	        if (q) {
+	          rows = rows.filter(function(row) {
+	            return Object.keys(row).some(function(k) { return (row[k] || '').toLowerCase().includes(q); });
+	          });
+	        }
+
+	        if (this.sortKey) {
+	          rows.sort(function(a, b) {
+	            var va = (a[self.sortKey] || '').toLowerCase();
+	            var vb = (b[self.sortKey] || '').toLowerCase();
+	            if (va < vb) return self.sortDir === 'asc' ? -1 : 1;
+	            if (va > vb) return self.sortDir === 'asc' ? 1 : -1;
+	            return 0;
+	          });
+	        }
+
+	        this.filteredRows = rows;
+	        this.currentPage = Math.min(this.currentPage, this.totalPages);
+	        this.updatePaginated();
+	      },
+
+	      updatePaginated: function() {
+	        var start = (this.currentPage - 1) * this.pageSize;
+	        this.paginatedRows = this.filteredRows.slice(start, start + this.pageSize);
+	      },
+	    };
+	  };
+
+	  if (typeof Alpine === 'undefined') {
+	    var s = document.createElement('script');
+	    s.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js';
+	    s.defer = true;
+	    document.head.appendChild(s);
+	  }
+	}
+	</script>
+}

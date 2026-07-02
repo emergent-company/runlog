@@ -1,0 +1,24 @@
+package nav
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// FooterLink is a single link rendered in the footer.
+type FooterLink struct {
+	Label string
+	Href  string
+}
+
+// FooterMinimal renders a simple one-line footer with copyright text and
+// optional navigation links.
+templ FooterMinimal(copyright string, links []FooterLink) {
+	<footer class="flex w-full flex-wrap items-center justify-between gap-2 border-t border-base-200 px-4 py-3 text-sm text-base-content/80" { devmode.Attrs(ctx, "nav/FooterMinimal")... }>
+		<span>{ copyright }</span>
+		if len(links) > 0 {
+			<nav class="flex items-center gap-4" aria-label="Footer">
+				for _, link := range links {
+					<a href={ templ.SafeURL(link.Href) } class="hover:text-primary transition-colors">{ link.Label }</a>
+				}
+			</nav>
+		}
+	</footer>
+}

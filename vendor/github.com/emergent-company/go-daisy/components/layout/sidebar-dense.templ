@@ -1,0 +1,109 @@
+package layout
+
+import (
+	"github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// SidebarDenseProps configures a dense/hover-mode sidebar.
+type SidebarDenseProps struct {
+	AppName      string
+	Groups       []SidebarGroup
+	Logo         templ.Component
+}
+
+// SidebarDense renders a sidebar with hover-to-expand dense mode.
+templ SidebarDense(props SidebarDenseProps) {
+	<div
+		id="_layout-sidebar-dense"
+		class="flex flex-col bg-base-100 border-e border-base-200 transition-all duration-300"
+		data-sidebar-dense
+		{ devmode.Attrs(ctx, "layout/SidebarDense")... }
+	>
+		<div class="flex min-h-10 items-center justify-between gap-3 px-3 py-3 shrink-0">
+			<div class="flex-1 min-w-0 sidebar-dense-label">
+				if props.Logo != nil {
+					@props.Logo
+				} else {
+					<span class="text-lg font-semibold truncate">{ props.AppName }</span>
+				}
+			</div>
+			<button
+				type="button"
+				class="btn btn-circle btn-ghost btn-sm text-base-content/50 sidebar-dense-toggle shrink-0"
+				onclick="toggleSidebarDense()"
+				aria-label="Toggle sidebar"
+			>
+				@ui.IconSpan("lucide--panel-left-close", "size-4")
+			</button>
+		</div>
+
+		<div class="sidebar-menu grow overflow-y-auto overflow-x-hidden">
+			<div class="space-y-0.5 px-2.5 pt-4">
+				for _, group := range props.Groups {
+					if group.Label != "" {
+						<p class="menu-label px-2.5 pb-1.5 sidebar-dense-label">{ group.Label }</p>
+					}
+					for _, item := range group.Items {
+						<a
+							class={ "menu-item", templ.KV("active", item.Active) }
+							href={ templ.SafeURL(item.Href) }
+							{ item.Attrs... }
+						>
+							if item.Icon != "" {
+								<span class={ "iconify size-4 shrink-0 " + item.Icon }></span>
+							}
+							<span class="grow sidebar-dense-label">{ item.Label }</span>
+						</a>
+					}
+				}
+			</div>
+		</div>
+	</div>
+	@sidebarDenseScript()
+}
+
+templ sidebarDenseScript() {
+	<script>
+	(function() {
+	  if (window._sidebarDenseInit) return;
+	  window._sidebarDenseInit = true;
+
+	  // Inject CSS
+	  var css = document.createElement('style');
+	  css.textContent = [
+	    '[data-sidebar-dense] { width: 64px; min-width: 64px; }',
+	    '[data-sidebar-dense]:hover, [data-sidebar-dense].expanded { width: 256px; min-width: 256px; }',
+	    '[data-sidebar-dense] .sidebar-dense-label { opacity: 0; transition: opacity 0.2s; white-space: nowrap; }',
+	    '[data-sidebar-dense]:hover .sidebar-dense-label, [data-sidebar-dense].expanded .sidebar-dense-label { opacity: 1; }',
+	    '[data-sidebar-dense] .sidebar-dense-toggle { opacity: 0; transition: opacity 0.2s; }',
+	    '[data-sidebar-dense]:hover .sidebar-dense-toggle { opacity: 1; }',
+	    '[data-sidebar-dense] .menu-item { justify-content: center; padding: 0.5rem; }',
+	    '[data-sidebar-dense]:hover .menu-item, [data-sidebar-dense].expanded .menu-item { justify-content: flex-start; padding: 0.5rem 0.75rem; }',
+	    '[data-sidebar-dense] .menu-label { text-align: center; }',
+	    '[data-sidebar-dense]:hover .menu-label, [data-sidebar-dense].expanded .menu-label { text-align: left; }',
+	  ].join(' ');
+	  document.head.appendChild(css);
+
+	  window.toggleSidebarDense = function() {
+	    var el = document.getElementById('_layout-sidebar-dense');
+	    if (!el) return;
+	    el.classList.toggle('expanded');
+	    try {
+	      var cfg = JSON.parse(localStorage.getItem('__GO_DAISY_SIDEBAR__') || '{}');
+	      cfg.denseExpanded = el.classList.contains('expanded');
+	      localStorage.setItem('__GO_DAISY_SIDEBAR__', JSON.stringify(cfg));
+	    } catch(e) {}
+	  };
+
+	  (function() {
+	    var el = document.getElementById('_layout-sidebar-dense');
+	    if (!el) return;
+	    try {
+	      var cfg = JSON.parse(localStorage.getItem('__GO_DAISY_SIDEBAR__') || '{}');
+	      if (cfg.denseExpanded) el.classList.add('expanded');
+	    } catch(e) {}
+	  })();
+	})();
+	</script>
+}

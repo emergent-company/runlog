@@ -13,11 +13,13 @@ templ DashboardPage(data dashboardData) {
 					{Label: "Passed", Value: fmt.Sprintf("%d", data.PassCount)},
 					{Label: "Failed", Value: fmt.Sprintf("%d", data.FailCount)},
 					{Label: "Skipped", Value: fmt.Sprintf("%d", data.SkipCount)},
-				}, 5)
+					{Label: "Environments", Value: fmt.Sprintf("%d/%d", data.EnvPassCount, data.EnvCount)},
+					{Label: "Coverage", Value: coverageStr(data.CoveragePct)},
+				}, 7)
 				if len(data.RecentRuns) > 0 {
 					<div class="mb-8">
 						@sectionHeading("Recent Runs")
-						@runsTable(data.RecentRuns, runsTableOpts{})
+						@runsTable(data.RecentRuns, runsTableOpts{ShowTestType: true})
 					</div>
 				}
 				if len(data.Categories) > 0 {
@@ -46,11 +48,13 @@ templ DashboardContent(data dashboardData) {
 			{Label: "Passed", Value: fmt.Sprintf("%d", data.PassCount)},
 			{Label: "Failed", Value: fmt.Sprintf("%d", data.FailCount)},
 			{Label: "Skipped", Value: fmt.Sprintf("%d", data.SkipCount)},
-		}, 5)
+			{Label: "Environments", Value: fmt.Sprintf("%d/%d", data.EnvPassCount, data.EnvCount)},
+			{Label: "Coverage", Value: coverageStr(data.CoveragePct)},
+		}, 7)
 		if len(data.RecentRuns) > 0 {
 			<div class="mb-8">
 				@sectionHeading("Recent Runs")
-				@runsTable(data.RecentRuns, runsTableOpts{})
+				@runsTable(data.RecentRuns, runsTableOpts{ShowTestType: true})
 			</div>
 		}
 		if len(data.Categories) > 0 {

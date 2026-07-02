@@ -4,13 +4,24 @@ import "github.com/emergent-company/go-daisy/devmode"
 
 // CardRaw renders a bare DaisyUI card shell with configurable card and body CSS classes.
 // Use this when Card or CardCompact don't fit the layout (e.g. custom padding, flex body).
+// as controls the HTML element: "" (default) for <div>, "a" for <a>.
 // attrs is optional; pass nil when not needed.
-templ CardRaw(cardClass string, bodyClass string, attrs templ.Attributes) {
-	<div class={ "card bg-base-100", cardClass } { devmode.Attrs(ctx, "ui/CardRaw")... } { attrs... }>
-		<div class={ "card-body", bodyClass }>
-			{ children... }
+templ CardRaw(cardClass string, bodyClass string, attrs templ.Attributes, as ...string) {
+	{{ renderAs := ""
+		if len(as) > 0 { renderAs = as[0] } }}
+	if renderAs == "a" {
+		<a class={ "card bg-base-100", cardClass } { devmode.Attrs(ctx, "ui/CardRaw")... } { attrs... }>
+			<div class={ "card-body", bodyClass }>
+				{ children... }
+			</div>
+		</a>
+	} else {
+		<div class={ "card bg-base-100", cardClass } { devmode.Attrs(ctx, "ui/CardRaw")... } { attrs... }>
+			<div class={ "card-body", bodyClass }>
+				{ children... }
+			</div>
 		</div>
-	</div>
+	}
 }
 
 // Card renders a DaisyUI card with optional title.
@@ -119,17 +130,15 @@ templ StatCardMinimal(item StatCardMinimalItem) {
 		</div>
 		</div>
 	} else {
-		<div class="card bg-base-100 card-border" { devmode.Attrs(ctx, "ui/StatCardMinimal")... } { item.Attrs... }>
-			<div class="card-body">
-				<p class="text-base-content/60 text-xs font-medium tracking-wide uppercase">{ item.Label }</p>
-				<div class="mt-4 flex items-end justify-between gap-2 text-sm">
-					<p class="text-2xl/none font-semibold">{ item.Value }</p>
-				if item.TrendLabel != "" {
-					@BadgeWithBoundary(statTrendIntent(item.Trend), BadgeStyleSoft, BadgeSizeSM, false, statTrendIcon(item.Trend), item.TrendLabel)
-				}
-				</div>
+		@CardRaw("card-border", "", item.Attrs) {
+			<p class="text-base-content/60 text-xs font-medium tracking-wide uppercase">{ item.Label }</p>
+			<div class="mt-4 flex items-end justify-between gap-2 text-sm">
+				<p class="text-2xl/none font-semibold">{ item.Value }</p>
+			if item.TrendLabel != "" {
+				@BadgeWithBoundary(statTrendIntent(item.Trend), BadgeStyleSoft, BadgeSizeSM, false, statTrendIcon(item.Trend), item.TrendLabel)
+			}
 			</div>
-		</div>
+		}
 	}
 }
 

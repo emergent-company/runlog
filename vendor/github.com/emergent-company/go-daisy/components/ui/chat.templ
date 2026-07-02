@@ -34,14 +34,14 @@ templ ChatBubble(sent bool, author string, timestamp string, avatarSrc string, b
 			{ children... }
 			if showActions {
 				<div class="border-base-300 bg-base-100 absolute end-2 -bottom-8 z-10 flex scale-90 items-center gap-1.5 rounded-full border px-3 py-2 opacity-0 transition-all group-hover:scale-100 group-hover:opacity-100">
-					<button class="btn btn-xs" type="button">Regenerate</button>
-					<button class="btn btn-xs" type="button">Copy</button>
-					<button class="btn btn-xs btn-ghost btn-error btn-circle" type="button" aria-label="Dislike">
+					@Button(ButtonProps{Type: ButtonTypeButton, Size: ButtonXS}) { Regenerate }
+					@Button(ButtonProps{Type: ButtonTypeButton, Size: ButtonXS}) { Copy }
+					@Button(ButtonProps{Type: ButtonTypeButton, Variant: ButtonError, Size: ButtonXS, Shape: ButtonShapeCircle, ExtraClass: "btn-ghost", Attrs: templ.Attributes{"aria-label": "Dislike"}}) {
 						<span class="iconify lucide--thumbs-down size-3.5" aria-hidden="true"></span>
-					</button>
-					<button class="btn btn-xs btn-ghost btn-success btn-circle" type="button" aria-label="Like">
+					}
+					@Button(ButtonProps{Type: ButtonTypeButton, Variant: ButtonSuccess, Size: ButtonXS, Shape: ButtonShapeCircle, ExtraClass: "btn-ghost", Attrs: templ.Attributes{"aria-label": "Like"}}) {
 						<span class="iconify lucide--thumbs-up size-3.5" aria-hidden="true"></span>
-					</button>
+					}
 				</div>
 			}
 		</div>
@@ -89,9 +89,9 @@ templ ChatInput(showAttach bool, placeholder string, attrs templ.Attributes) {
 		{ attrs... }
 	>
 		if showAttach {
-			<button class="btn btn-ghost btn-sm btn-circle" aria-label="Attach file" type="button">
+			@Button(ButtonProps{Type: ButtonTypeButton, Variant: ButtonGhost, Size: ButtonSM, Shape: ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Attach file"}}) {
 				<span class="iconify lucide--paperclip size-4.5" aria-hidden="true"></span>
-			</button>
+			}
 		}
 		<input
 			class="input validator grow"
@@ -101,8 +101,8 @@ templ ChatInput(showAttach bool, placeholder string, attrs templ.Attributes) {
 			aria-label="Message"
 			name="message"
 		/>
-		<button class="btn btn-primary btn-circle btn-sm" type="submit" aria-label="Send message">
+		@Button(ButtonProps{Type: ButtonTypeSubmit, Variant: ButtonPrimary, Size: ButtonSM, Shape: ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Send message"}}) {
 			<span class="iconify lucide--send-horizontal size-4.5" aria-hidden="true"></span>
-		</button>
+		}
 	</form>
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	runlog "github.com/emergent-company/runlog"
 )
 
 // setupSkillsTestDir creates a temporary project root with an opencode marker
@@ -26,12 +28,21 @@ func setupSkillsTestDir(t *testing.T) string {
 // TestDiscoverEmbeddedSkills verifies that the embedded skills are discoverable.
 // TestDiscoverEmbeddedSkills verifies all embedded skill directories are discoverable and have the runlog- prefix.
 func TestDiscoverEmbeddedSkills(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("discoverembeddedskills")
+	df.Event("log", "discoverembeddedskills")
+
 	skills, err := discoverEmbeddedSkills()
 	if err != nil {
 		t.Fatalf("discoverEmbeddedSkills: %v", err)
 	}
 	if len(skills) != 5 {
+		df.Event("assertion", "FAIL: expected 5 embedded skills")
 		t.Errorf("expected 5 embedded skills, got %d", len(skills))
+	} else {
+		df.Event("assertion", "found 5 embedded skills")
 	}
 
 	// All skills must have runlog- prefix.
@@ -65,6 +76,12 @@ func TestDiscoverEmbeddedSkills(t *testing.T) {
 // contains a SKILL.md file.
 // TestEmbeddedSkillsHaveSKILLMD verifies each embedded skill directory contains a SKILL.md file with valid frontmatter.
 func TestEmbeddedSkillsHaveSKILLMD(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("embeddedskillshaveskillmd")
+	df.Event("log", "embeddedskillshaveskillmd")
+
 	skills, err := discoverEmbeddedSkills()
 	if err != nil {
 		t.Fatalf("discoverEmbeddedSkills: %v", err)
@@ -82,6 +99,7 @@ func TestEmbeddedSkillsHaveSKILLMD(t *testing.T) {
 			continue
 		}
 		// Verify frontmatter contains the skill name.
+
 		content := string(data)
 		if !strings.Contains(content, "name: "+s.Name) {
 			t.Errorf("skill %s: SKILL.md frontmatter missing 'name: %s'", s.Name, s.Name)
@@ -92,6 +110,12 @@ func TestEmbeddedSkillsHaveSKILLMD(t *testing.T) {
 // TestSkillsInstall_HappyPath verifies a clean install copies embedded skills.
 // TestSkillsInstall_HappyPath verifies a clean install copies all embedded skills to the target directory.
 func TestSkillsInstall_HappyPath(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillsinstall happypath")
+	df.Event("log", "skillsinstall happypath")
+
 	root := setupSkillsTestDir(t)
 
 	origDir, _ := os.Getwd()
@@ -118,6 +142,12 @@ func TestSkillsInstall_HappyPath(t *testing.T) {
 // without --force.
 // TestSkillsInstall_SkipExisting verifies existing skill installations are not overwritten without the --force flag.
 func TestSkillsInstall_SkipExisting(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillsinstall skipexisting")
+	df.Event("log", "skillsinstall skipexisting")
+
 	root := setupSkillsTestDir(t)
 
 	origDir, _ := os.Getwd()
@@ -134,6 +164,7 @@ func TestSkillsInstall_SkipExisting(t *testing.T) {
 	sentinel := filepath.Join(dst, "sentinel.txt")
 	if err := os.WriteFile(sentinel, []byte("original"), 0644); err != nil {
 		t.Fatal(err)
+
 	}
 
 	if err := cmdSkillsInstall([]string{"--tools", "opencode"}); err != nil {
@@ -154,6 +185,12 @@ func TestSkillsInstall_SkipExisting(t *testing.T) {
 // existing install.
 // TestSkillsInstall_ForceOverwrite verifies the --force flag removes and replaces existing skill installations.
 func TestSkillsInstall_ForceOverwrite(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillsinstall forceoverwrite")
+	df.Event("log", "skillsinstall forceoverwrite")
+
 	root := setupSkillsTestDir(t)
 
 	origDir, _ := os.Getwd()
@@ -166,6 +203,7 @@ func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 	dst := filepath.Join(root, ".opencode", "skills", "runlog-clear")
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		t.Fatal(err)
+
 	}
 	stale := filepath.Join(dst, "stale.txt")
 	if err := os.WriteFile(stale, []byte("old"), 0644); err != nil {
@@ -191,6 +229,12 @@ func TestSkillsInstall_ForceOverwrite(t *testing.T) {
 // writing any files.
 // TestSkillsInstall_DryRun verifies --dry-run prints the installation plan without writing any files.
 func TestSkillsInstall_DryRun(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillsinstall dryrun")
+	df.Event("log", "skillsinstall dryrun")
+
 	root := setupSkillsTestDir(t)
 
 	origDir, _ := os.Getwd()
@@ -207,6 +251,7 @@ func TestSkillsInstall_DryRun(t *testing.T) {
 	skills, _ := discoverEmbeddedSkills()
 	for _, s := range skills {
 		dst := filepath.Join(root, ".opencode", "skills", s.Name)
+
 		if _, err := os.Stat(dst); !os.IsNotExist(err) {
 			t.Errorf("--dry-run should not have created %s", dst)
 		}
@@ -217,6 +262,12 @@ func TestSkillsInstall_DryRun(t *testing.T) {
 // an error.
 // TestSkillsInstall_UnknownTool verifies an invalid --tools value returns an error.
 func TestSkillsInstall_UnknownTool(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillsinstall unknowntool")
+	df.Event("log", "skillsinstall unknowntool")
+
 	root := setupSkillsTestDir(t)
 
 	origDir, _ := os.Getwd()
@@ -237,6 +288,12 @@ func TestSkillsInstall_UnknownTool(t *testing.T) {
 // TestSkillsList verifies the list subcommand runs without error.
 // TestSkillsList verifies the skills list subcommand runs without error and prints skill names.
 func TestSkillsList(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillslist")
+	df.Event("log", "skillslist")
+
 	root := setupSkillsTestDir(t)
 	err := cmdSkillsList(root)
 	if err != nil {
@@ -247,6 +304,12 @@ func TestSkillsList(t *testing.T) {
 // TestSkillsInstall_MultipleTools verifies installing to multiple tools at once.
 // TestSkillsInstall_MultipleTools verifies installing skills to multiple tool directories at once.
 func TestSkillsInstall_MultipleTools(t *testing.T) {
+
+	df := runlog.NewDogfoodRun(t, "skills")
+	defer df.Done()
+	df.Describe("skillsinstall multipletools")
+	df.Event("log", "skillsinstall multipletools")
+
 	root := setupSkillsTestDir(t)
 
 	// Also create agents marker.

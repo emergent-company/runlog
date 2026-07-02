@@ -1,6 +1,10 @@
 package form
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+)
 
 // ClipboardCopyItem holds one copy-able field for the ClipboardCopy component.
 type ClipboardCopyItem struct {
@@ -39,17 +43,14 @@ templ ClipboardCopy(items []ClipboardCopyItem) {
 							class="input input-bordered input-sm flex-1 font-mono text-sm"
 						/>
 					}
-					<button
-						class={ "btn btn-sm btn-outline", item.ButtonClass }
-						onclick={ clipboardOnClick(item.ID, item.Value, item.Mono) }
-					>
-						<span class="iconify lucide--copy size-4" aria-hidden="true"></span>
+					@ui.Button(ui.ButtonProps{Style: ui.ButtonStyleOutline, Size: ui.ButtonSM, ExtraClass: item.ButtonClass, OnClick: clipboardOnClick(item.ID, item.Value, item.Mono)}) {
+						@ui.IconSpan("lucide--copy", "size-4")
 						if item.ButtonLabel != "" {
 							{ item.ButtonLabel }
 						} else {
 							Copy
 						}
-					</button>
+					}
 				</div>
 			</div>
 		}

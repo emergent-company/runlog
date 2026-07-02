@@ -1,4 +1,3 @@
-// Package ui provides reusable primitive Templ components (button, badge, avatar, etc.).
 package ui
 
 import (
@@ -16,10 +15,15 @@ func StaticHandlerFS(prefix string, fsys fs.FS) http.Handler {
 type LoaderVariant string
 
 const (
-	// LoaderCentered renders a large spinner centred in its container (default).
 	LoaderCentered LoaderVariant = "centered"
-	// LoaderInline renders a small inline spinner (no wrapper div).
-	LoaderInline LoaderVariant = "inline"
-	// LoaderOverlay renders a full-area semi-transparent overlay with a spinner.
-	LoaderOverlay LoaderVariant = "overlay"
+	LoaderInline   LoaderVariant = "inline"
+	LoaderOverlay  LoaderVariant = "overlay"
 )
+
+// ternary returns a if cond is true, else b.
+func ternary(cond bool, a, b string) string {
+	if cond {
+		return a
+	}
+	return b
+}

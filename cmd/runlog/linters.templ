@@ -61,9 +61,9 @@ templ linterTable(entries []linterListEntry) {
 				@table.TableHeadRow() {
 					@table.TableHeadCell("Linter")
 					@table.TableHeadCell("Status")
-					@table.TableHeadCell("Runs", "text-right w-16")
+					@table.TableHeadCell("Runs")
 					@table.TableHeadCell("Last Run")
-					@table.TableHeadCell("Action", "text-center w-16")
+					@table.TableHeadCell("Action")
 				}
 			}
 			@table.TableBody() {
@@ -197,8 +197,8 @@ templ linterRunsTable(runs []runlog.LinterRow) {
 		@table.TableHead() {
 			@table.TableHeadRow() {
 				@table.TableHeadCell("Status")
-				@table.TableHeadCell("Exit Code", "text-right")
-				@table.TableHeadCell("Duration", "text-right")
+				@table.TableHeadCell("Exit Code")
+				@table.TableHeadCell("Duration")
 				@table.TableHeadCell("Started")
 			}
 		}

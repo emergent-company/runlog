@@ -1,0 +1,24 @@
+package nav
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// LinkVariant controls the visual style of a link.
+type LinkVariant string
+
+const (
+	LinkDefault   LinkVariant = "link"
+	LinkPrimary   LinkVariant = "link link-primary"
+	LinkSecondary LinkVariant = "link link-secondary"
+	LinkAccent    LinkVariant = "link link-accent"
+	LinkNeutral   LinkVariant = "link link-neutral"
+	LinkHover     LinkVariant = "link link-hover"
+)
+
+// Link renders a styled anchor link.
+// extraClass appends additional Tailwind utility classes to the variant base (e.g. "text-xs break-all").
+// Pass attrs for extra HTML attributes such as data-testid, target, or hx-*.
+templ Link(href string, variant LinkVariant, extraClass string, attrs templ.Attributes) {
+	<a href={ templ.URL(href) } class={ templ.Classes(string(variant), extraClass) } { devmode.Attrs(ctx, "nav/Link")... } { attrs... }>
+		{ children... }
+	</a>
+}

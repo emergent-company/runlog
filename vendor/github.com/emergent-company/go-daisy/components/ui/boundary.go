@@ -9,18 +9,21 @@ import (
 )
 
 // ButtonWithBoundary wraps Button with a dev-mode component boundary annotation.
-// gallery:token variant,size,typ,shape,icon,loading
+// gallery:token variant,size,style,typ,shape,icon,loading,block
 // gallery:hint href:default(#)
-func ButtonWithBoundary(href string, variant ButtonVariant, size ButtonSize, typ ButtonType, shape ButtonShape, icon string, loading bool) templ.Component {
-	return devmode.ComponentBoundary("Button", Button(href, variant, size, typ, shape, icon, loading, nil), map[string]any{
-		"href":    href,
-		"variant": string(variant),
-		"size":    string(size),
-		"type":    string(typ),
-		"shape":   string(shape),
-		"icon":    icon,
-		"loading": loading,
-	})
+func ButtonWithBoundary(href string, variant ButtonVariant, size ButtonSize, style ButtonStyle, typ ButtonType, shape ButtonShape, icon string, loading bool, block bool) templ.Component {
+	props := ButtonProps{
+		Href:    href,
+		Variant: variant,
+		Size:    size,
+		Style:   style,
+		Type:    typ,
+		Shape:   shape,
+		Icon:    icon,
+		Loading: loading,
+		Block:   block,
+	}
+	return devmode.ComponentBoundary("Button", Button(props), props)
 }
 
 // BadgeWithBoundary wraps Badge with a dev-mode component boundary annotation.
@@ -83,6 +86,19 @@ func ToastWithBoundary(typ ToastType, message string) templ.Component {
 	return devmode.ComponentBoundary("Toast", Toast(typ, message), map[string]any{
 		"type":    string(typ),
 		"message": message,
+	})
+}
+
+// PaginationCircleWithBoundary wraps PaginationCircle with a dev-mode component boundary annotation.
+// gallery:token currentPage,totalPages
+// gallery:hint currentPage:range(1,20,1)
+// gallery:hint totalPages:range(1,20,1)
+func PaginationCircleWithBoundary(currentPage int, totalPages int, baseURL string, targetID string) templ.Component {
+	return devmode.ComponentBoundary("PaginationCircle", PaginationCircle(currentPage, totalPages, baseURL, targetID), map[string]any{
+		"currentPage": currentPage,
+		"totalPages":  totalPages,
+		"baseURL":     baseURL,
+		"targetID":    targetID,
 	})
 }
 
@@ -746,6 +762,87 @@ func FABWithBoundary(icon string, actions []FABAction) templ.Component {
 	})
 }
 
+// ButtonGlowWithBoundary wraps ButtonGlow with a dev-mode component boundary annotation.
+// gallery:token variant,size,style,typ,shape,icon,loading,block
+// gallery:hint href:default(#)
+func ButtonGlowWithBoundary(href string, variant ButtonVariant, size ButtonSize, style ButtonStyle, typ ButtonType, shape ButtonShape, icon string, loading bool, block bool) templ.Component {
+	props := ButtonProps{
+		Href:    href,
+		Variant: variant,
+		Size:    size,
+		Style:   style,
+		Type:    typ,
+		Shape:   shape,
+		Icon:    icon,
+		Loading: loading,
+		Block:   block,
+	}
+	return devmode.ComponentBoundary("ButtonGlow", ButtonGlow(props), props)
+}
+
+// AnimatedGradientTextWithBoundary wraps AnimatedGradientText with a dev-mode component boundary annotation.
+// gallery:token text,fromColor,toColor,size,weight
+// gallery:hint text:default(go-daisy)
+// gallery:hint fromColor:default(from-primary)
+// gallery:hint toColor:default(to-secondary)
+func AnimatedGradientTextWithBoundary(text string, fromColor string, toColor string, size string, weight string) templ.Component {
+	return devmode.ComponentBoundary("AnimatedGradientText", AnimatedGradientText(text, fromColor, toColor, size, weight), map[string]any{
+		"text":      text,
+		"fromColor": fromColor,
+		"toColor":   toColor,
+		"size":      size,
+		"weight":    weight,
+	})
+}
+
+// GradientTextWithBoundary wraps GradientText with a dev-mode component boundary annotation.
+// gallery:token text,fromColor,toColor,size,weight
+// gallery:hint text:default(go-daisy)
+// gallery:hint fromColor:default(from-primary)
+// gallery:hint toColor:default(to-secondary)
+func GradientTextWithBoundary(text string, fromColor string, toColor string, size string, weight string) templ.Component {
+	return devmode.ComponentBoundary("GradientText", GradientText(text, fromColor, toColor, size, weight), map[string]any{
+		"text":      text,
+		"fromColor": fromColor,
+		"toColor":   toColor,
+		"size":      size,
+		"weight":    weight,
+	})
+}
+
+// TestimonialCardWithBoundary wraps TestimonialCard with a dev-mode component boundary annotation.
+// gallery:token quote,name,role,rating
+// gallery:hint quote:default(Amazing product that transformed our workflow!)
+// gallery:hint name:default(John Doe)
+// gallery:hint role:default(CEO, Acme Corp)
+// gallery:hint rating:range(0,5,1)
+func TestimonialCardWithBoundary(props TestimonialCardProps) templ.Component {
+	return devmode.ComponentBoundary("TestimonialCard", TestimonialCard(props), map[string]any{
+		"quote":  props.Quote,
+		"name":   props.Name,
+		"role":   props.Role,
+		"rating": props.Rating,
+	})
+}
+
+// StatCardSparklineWithBoundary wraps StatCardSparkline with a dev-mode component boundary annotation.
+// gallery:token label,value,trend
+// gallery:hint label:default(Revenue)
+// gallery:hint value:default($48,290)
+func StatCardSparklineWithBoundary(props StatCardSparklineProps) templ.Component {
+	return devmode.ComponentBoundary("StatCardSparkline", StatCardSparkline(props), map[string]any{
+		"label":      props.Label,
+		"value":      props.Value,
+		"trend":      string(props.Trend),
+		"trendLabel": props.TrendLabel,
+	})
+}
+
+// ThemeToggleWithBoundary wraps ThemeToggle with a dev-mode component boundary annotation.
+func ThemeToggleWithBoundary() templ.Component {
+	return devmode.ComponentBoundary("ThemeToggle", ThemeToggle(), nil)
+}
+
 // IconSpanColoredWithBoundary wraps IconSpanColored with a dev-mode component boundary annotation.
 func IconSpanColoredWithBoundary(name string, size string, color string) templ.Component {
 	return devmode.ComponentBoundary("IconSpanColored", IconSpanColored(name, size, color), map[string]any{
@@ -801,6 +898,11 @@ func ThemeControllerBtnWithBoundary(theme string, checked bool) templ.Component 
 	})
 }
 
+// ThemeSwitcherWithBoundary wraps ThemeSwitcher with a dev-mode boundary annotation.
+func ThemeSwitcherWithBoundary() templ.Component {
+	return devmode.ComponentBoundary("ThemeSwitcher", ThemeSwitcher(), nil)
+}
+
 // TextRotateWithBoundary wraps TextRotate with a dev-mode component boundary annotation.
 func TextRotateWithBoundary(items []string, duration string) templ.Component {
 	return devmode.ComponentBoundary("TextRotate", TextRotate(items, duration), map[string]any{
@@ -817,9 +919,67 @@ func Hover3DCardWithBoundary(extraClass string, children templ.Component) templ.
 	return devmode.ComponentBoundary("Hover3DCard", inner, map[string]any{"extraClass": extraClass})
 }
 
+// SortableListWithBoundary wraps SortableList with a dev-mode component boundary annotation.
+// gallery:token animation,direction
+// gallery:hint animation:range(0,500,10)
+func SortableListWithBoundary(id string, opts SortableOptions, children templ.Component) templ.Component {
+	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		return SortableList(id, opts).Render(templ.WithChildren(ctx, children), w)
+	})
+	return devmode.ComponentBoundary("SortableList", inner, map[string]any{
+		"animation": opts.Animation,
+		"direction": opts.Direction,
+	})
+}
+
+// SwiperCarouselWithBoundary wraps SwiperCarousel with a dev-mode component boundary annotation.
+// gallery:token effect,navigation,pagination,autoplay,loop,slidesPerView
+// gallery:hint slidesPerView:range(1,6,1)
+func SwiperCarouselWithBoundary(props SwiperCarouselProps) templ.Component {
+	return devmode.ComponentBoundary("SwiperCarousel", SwiperCarousel(props), map[string]any{
+		"effect":        string(props.Effect),
+		"navigation":    props.Navigation,
+		"pagination":    props.Pagination,
+		"autoplay":      props.Autoplay,
+		"loop":          props.Loop,
+		"slidesPerView": props.SlidesPerView,
+	})
+}
+
+// ChartWithBoundary wraps Chart with a dev-mode component boundary annotation.
+// gallery:token type,title,sparkline
+// gallery:hint title:default(Sales Overview)
+func ChartWithBoundary(props ChartProps) templ.Component {
+	return devmode.ComponentBoundary("Chart", Chart(props), map[string]any{
+		"type":      string(props.Type),
+		"title":     props.Title,
+		"sparkline": props.Sparkline,
+	})
+}
+
+// CommandPaletteWithBoundary wraps CommandPalette with a dev-mode component boundary annotation.
+// gallery:token placeholder
+// gallery:hint placeholder:default(Type a command...)
+func CommandPaletteWithBoundary(props CommandPaletteProps) templ.Component {
+	return devmode.ComponentBoundary("CommandPalette", CommandPalette(props), map[string]any{
+		"placeholder": props.Placeholder,
+		"itemCount":   len(props.Items),
+	})
+}
+
+// NotificationDropdownWithBoundary wraps NotificationDropdown with a dev-mode component boundary annotation.
+// gallery:token unreadCount
+func NotificationDropdownWithBoundary(props NotificationDropdownProps) templ.Component {
+	return devmode.ComponentBoundary("NotificationDropdown", NotificationDropdown(props), map[string]any{
+		"unreadCount": props.UnreadCount,
+		"itemCount":   len(props.Items),
+	})
+}
+
 // HoverGalleryWithBoundary wraps HoverGallery with a dev-mode component boundary annotation.
 func HoverGalleryWithBoundary(images []HoverGalleryImage) templ.Component {
 	return devmode.ComponentBoundary("HoverGallery", HoverGallery(images), map[string]any{
 		"imageCount": len(images),
 	})
 }
+

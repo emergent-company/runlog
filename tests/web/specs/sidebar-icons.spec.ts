@@ -1,7 +1,8 @@
 import { test, expect } from './fixtures';
 
 test.describe('Sidebar icons', () => {
-  test('all sidebar nav items have icon spans', async ({ page }) => {
+  test('every nav item', async ({ page }) => {
+    test.info().annotations.push({ type: 'description', description: 'each sidebar nav link has an iconify span' });
     await test.step('load dashboard page', async () => {
       await page.goto('');
     });
@@ -17,7 +18,8 @@ test.describe('Sidebar icons', () => {
     });
   });
 
-  test('all-runs nav item has lucide--list icon', async ({ page }) => {
+  test('all-runs → list', async ({ page }) => {
+    test.info().annotations.push({ type: 'description', description: 'all-runs nav item icon is lucide--list' });
     await test.step('load dashboard page', async () => {
       await page.goto('');
     });
@@ -29,7 +31,8 @@ test.describe('Sidebar icons', () => {
     });
   });
 
-  test('dashboard nav item has lucide--layout-dashboard icon', async ({ page }) => {
+  test('dashboard → layout-dashboard', async ({ page }) => {
+    test.info().annotations.push({ type: 'description', description: 'dashboard nav item icon is lucide--layout-dashboard' });
     await test.step('load dashboard page', async () => {
       await page.goto('');
     });
@@ -39,7 +42,8 @@ test.describe('Sidebar icons', () => {
     });
   });
 
-  test('tests nav item has lucide--flask-conical icon', async ({ page }) => {
+  test('tests → flask-conical', async ({ page }) => {
+    test.info().annotations.push({ type: 'description', description: 'tests nav item icon is lucide--flask-conical' });
     await test.step('load dashboard page', async () => {
       await page.goto('');
     });
@@ -49,7 +53,8 @@ test.describe('Sidebar icons', () => {
     });
   });
 
-  test('events nav item has lucide--file-text icon in sidebar', async ({ page }) => {
+  test('events → file-text', async ({ page }) => {
+    test.info().annotations.push({ type: 'description', description: 'events nav item icon is lucide--file-text' });
     await test.step('load dashboard page', async () => {
       await page.goto('');
     });

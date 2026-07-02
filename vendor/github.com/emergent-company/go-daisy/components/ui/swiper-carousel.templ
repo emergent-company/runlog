@@ -1,0 +1,123 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// SwiperEffect represents a Swiper transition effect.
+type SwiperEffect string
+
+const (
+	SwiperEffectSlide     SwiperEffect = "slide"
+	SwiperEffectFade      SwiperEffect = "fade"
+	SwiperEffectCoverflow SwiperEffect = "coverflow"
+	SwiperEffectFlip      SwiperEffect = "flip"
+)
+
+// SwiperSlide represents a single slide.
+type SwiperSlide struct {
+	Content templ.Component
+	Class   string // optional additional class
+}
+
+// SwiperCarouselProps configures a SwiperJS carousel.
+type SwiperCarouselProps struct {
+	ID              string
+	Slides          []SwiperSlide
+	Effect          SwiperEffect
+	Navigation      bool
+	Pagination      bool
+	Autoplay        bool
+	AutoplayDelay   int // ms
+	Loop            bool
+	SlidesPerView   int // 1 = single, 2+ = multi
+	SpaceBetween    int // px
+	Height          string // CSS height, e.g. "300px"
+	Attrs           templ.Attributes
+}
+
+// SwiperCarousel renders a SwiperJS-powered carousel.
+templ SwiperCarousel(props SwiperCarouselProps) {
+	<div
+		id={ props.ID }
+		class="swiper rounded-box overflow-hidden"
+		style={ "height:" + props.Height }
+		data-swiper
+		data-effect={ string(props.Effect) }
+		data-navigation={ ternary(props.Navigation, "true", "false") }
+		data-pagination={ ternary(props.Pagination, "true", "false") }
+		data-autoplay={ ternary(props.Autoplay, "true", "false") }
+		data-autoplay-delay={ strconv.Itoa(props.AutoplayDelay) }
+		data-loop={ ternary(props.Loop, "true", "false") }
+		data-slides-per-view={ strconv.Itoa(max(props.SlidesPerView, 1)) }
+		data-space-between={ strconv.Itoa(props.SpaceBetween) }
+		{ devmode.Attrs(ctx, "ui/SwiperCarousel")... }
+		{ props.Attrs... }
+	>
+		<div class="swiper-wrapper">
+			for _, slide := range props.Slides {
+				<div class={ "swiper-slide flex items-center justify-center", slide.Class }>
+					@slide.Content
+				</div>
+			}
+		</div>
+		if props.Navigation {
+			<div class="swiper-button-prev"></div>
+			<div class="swiper-button-next"></div>
+		}
+		if props.Pagination {
+			<div class="swiper-pagination"></div>
+		}
+	</div>
+	@swiperScript()
+}
+
+templ swiperScript() {
+	<script>
+	if (!window._swiperInit) {
+	  window._swiperInit = true;
+
+	  window.initSwiper = function(el) {
+	    if (typeof Swiper === 'undefined') {
+	      var s = document.createElement('script');
+	      s.src = 'https://cdn.jsdelivr.net/npm/swiper@11.2.6/swiper-bundle.min.js';
+	      s.onload = function() { initSwiperElement(el); };
+	      document.head.appendChild(s);
+	      var l = document.createElement('link');
+	      l.rel = 'stylesheet';
+	      l.href = 'https://cdn.jsdelivr.net/npm/swiper@11.2.6/swiper-bundle.min.css';
+	      document.head.appendChild(l);
+	    } else {
+	      initSwiperElement(el);
+	    }
+	  };
+
+	  function initSwiperElement(el) {
+	    if (el._swiperInstance) return;
+	    try {
+	      el._swiperInstance = new Swiper(el, {
+	        effect: el.dataset.effect || 'slide',
+	        navigation: el.dataset.navigation === 'true' ? { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' } : false,
+	        pagination: el.dataset.pagination === 'true' ? { el: '.swiper-pagination', clickable: true } : false,
+	        autoplay: el.dataset.autoplay === 'true' ? { delay: parseInt(el.dataset.autoplayDelay) || 3000 } : false,
+	        loop: el.dataset.loop === 'true',
+	        slidesPerView: parseInt(el.dataset.slidesPerView) || 1,
+	        spaceBetween: parseInt(el.dataset.spaceBetween) || 0,
+	      });
+	    } catch(e) { console.warn('Swiper init failed:', e); }
+	  }
+
+	  document.addEventListener('DOMContentLoaded', function() {
+	    document.querySelectorAll('[data-swiper]').forEach(initSwiperElement);
+	  });
+	  document.addEventListener('htmx:after:settle', function() {
+	    document.querySelectorAll('[data-swiper]:not(._swiper-initialized)').forEach(function(el) {
+	      el.classList.add('_swiper-initialized');
+	      initSwiperElement(el);
+	    });
+	  });
+	}
+	</script>
+}

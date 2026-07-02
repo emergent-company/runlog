@@ -1,0 +1,136 @@
+package nav
+
+import (
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+type SearchAction struct {
+	Label string
+	Icon  string
+	Href  string
+}
+
+type SearchQuickLink struct {
+	Label string
+	Icon  string
+	Href  string
+}
+
+type SearchFilterChip struct {
+	Label  string
+	Active bool
+}
+
+type SearchAgentCard struct {
+	Name        string
+	Description string
+	Icon        string
+}
+
+type SearchModalOpts struct {
+	Actions    []SearchAction
+	QuickLinks []SearchQuickLink
+	FilterChips []SearchFilterChip
+	AgentCards  []SearchAgentCard
+}
+
+templ SearchModal(style string, opts SearchModalOpts) {
+	switch style {
+	case "minimal":
+		<dialog id="search-modal" class="modal p-0" { devmode.Attrs(ctx, "nav/SearchModal")... }>
+			<div class="modal-box p-0">
+				<div class="input border-base-300 w-full rounded-none border-0 border-b">
+					@ui.IconSpan("lucide--search", "text-base-content/60 size-4.5")
+					<input class="grow" placeholder="Search" aria-label="Search" type="search" />
+					<form method="dialog">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonXS, Shape: ui.ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Close"}}){
+							@ui.IconSpan("lucide--x", "text-base-content/80 size-4")
+						}
+					</form>
+				</div>
+				<ul class="menu w-full pt-0">
+					<li class="menu-title">Actions</li>
+					for _, a := range opts.Actions {
+						<li><div>@ui.IconSpan(a.Icon, "size-4.5")<p class="grow text-sm">{ a.Label }</p></div></li>
+					}
+				</ul>
+				<hr class="border-base-300 h-px border-dashed" />
+				<ul class="menu w-full pt-0">
+					<li class="menu-title">Quick Links</li>
+					for _, q := range opts.QuickLinks {
+						<li><div>@ui.IconSpan(q.Icon, "size-4.5")<p class="grow text-sm">{ q.Label }</p></div></li>
+					}
+				</ul>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+
+	case "split":
+		<dialog id="search-modal" class="modal p-0" { devmode.Attrs(ctx, "nav/SearchModal")... }>
+			<div class="modal-box bg-transparent p-0 shadow-none">
+				<div class="bg-base-100 rounded-box">
+					<div class="input w-full border-0 !outline-none">
+@ui.IconSpan("lucide--search", "text-base-content/60 size-4.5")
+						<input class="grow" placeholder="Search" aria-label="Search" type="search" />
+						<form method="dialog">
+							@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonXS, Shape: ui.ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Close"}}){
+							@ui.IconSpan("lucide--x", "text-base-content/80 size-4")
+							}
+						</form>
+					</div>
+					<div class="border-base-300 flex items-center gap-3 border-t px-2 py-2">
+						<div class="flex items-center gap-0.5">
+							<div class="border-base-300 bg-base-200 flex size-5 items-center justify-center rounded-sm border shadow-xs">
+								@ui.IconSpan("lucide--arrow-up", "size-3.5")
+							</div>
+							<div class="border-base-300 bg-base-200 flex size-5 items-center justify-center rounded-sm border shadow-xs">
+								@ui.IconSpan("lucide--arrow-down", "size-3.5")
+							</div>
+							<p class="text-base-content/80 ms-1 text-sm">Navigate</p>
+						</div>
+						<div class="flex items-center gap-0.5 max-sm:hidden">
+							<div class="border-base-300 bg-base-200 flex size-5 items-center justify-center rounded-sm border shadow-xs">
+								@ui.IconSpan("lucide--undo-2", "size-3.5")
+							</div>
+							<p class="text-base-content/80 ms-1 text-sm">Return</p>
+						</div>
+						<div class="flex items-center gap-0.5">
+							<div class="border-base-300 bg-base-200 flex size-5 items-center justify-center rounded-sm border shadow-xs">
+								@ui.IconSpan("lucide--corner-down-left", "size-3.5")
+							</div>
+							<p class="text-base-content/80 ms-1 text-sm">Open</p>
+						</div>
+						<div class="ms-auto flex items-center gap-0.5">
+							<div class="border-base-300 bg-base-200 flex h-5 items-center justify-center rounded-sm border px-1 text-sm/none shadow-xs">esc</div>
+							<p class="text-base-content/80 ms-1 text-sm">Close</p>
+						</div>
+					</div>
+				</div>
+				<div class="mt-2 flex items-center gap-2 px-1">
+					for _, chip := range opts.FilterChips {
+						<div class={ "badge cursor-pointer", templ.KV("badge-soft badge-primary", chip.Active), templ.KV("badge-outline", !chip.Active) }>{ chip.Label }</div>
+					}
+				</div>
+				<div class="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+					for _, card := range opts.AgentCards {
+						<div class="bg-base-100 rounded-box flex items-center gap-3 border p-3">
+							<div class="bg-primary/10 rounded-box flex size-10 items-center justify-center">
+								@ui.IconSpan(card.Icon, "size-5 text-primary")
+							</div>
+							<div>
+								<p class="text-sm font-medium">{ card.Name }</p>
+								<p class="text-base-content/60 text-xs">{ card.Description }</p>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+			<form method="dialog" class="modal-backdrop">
+				<button>close</button>
+			</form>
+		</dialog>
+	}
+}

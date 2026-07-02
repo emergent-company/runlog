@@ -1,0 +1,155 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// CommandPaletteItem represents a single action in the command palette.
+type CommandPaletteItem struct {
+	ID          string
+	Label       string
+	Description string
+	Icon        string
+	Shortcut    string
+	Href        string
+	Group       string
+}
+
+// CommandPaletteProps configures a ⌘K command palette modal.
+type CommandPaletteProps struct {
+	ID          string
+	Placeholder string
+	Items       []CommandPaletteItem
+	Groups      []string
+	Open        bool
+	Attrs       templ.Attributes
+}
+
+// CommandPalette renders a ⌘K-style command palette modal.
+templ CommandPalette(props CommandPaletteProps) {
+	<input type="checkbox" id={ props.ID + "-toggle" } class="modal-toggle" checked?={ props.Open } />
+	<div class="modal" role="dialog" { devmode.Attrs(ctx, "ui/CommandPalette")... } { props.Attrs... }>
+		<div class="modal-box p-0 max-w-lg">
+			<div class="flex items-center gap-3 px-4 py-3 border-b border-base-200">
+				@IconSpan("lucide--search", "size-5 text-base-content/40")
+				<input
+					type="text"
+					id={ props.ID + "-input" }
+					class="input input-ghost w-full p-0 text-base focus:outline-none"
+					if props.Placeholder != "" {
+					placeholder={ props.Placeholder }
+				} else {
+					placeholder="Type a command or search..."
+				}
+					autofocus
+					oninput="filterPaletteItems(this)"
+				/>
+				<label for={ props.ID + "-toggle" } class="btn btn-ghost btn-xs">Esc</label>
+			</div>
+			<div class="max-h-80 overflow-y-auto p-2" id={ props.ID + "-results" }>
+				for _, group := range props.Groups {
+					@paletteGroup(props.ID, group, props.Items)
+				}
+				if len(props.Groups) == 0 {
+					@paletteGroup(props.ID, "", props.Items)
+				}
+			</div>
+		</div>
+		<label class="modal-backdrop" for={ props.ID + "-toggle" }></label>
+	</div>
+	@commandPaletteTrigger(props.ID)
+	@commandPaletteScript()
+}
+
+// paletteGroupAttrs returns data attributes for filtering.
+func paletteGroupAttrs(group string) templ.Attributes {
+	return templ.Attributes{"data-palette-group": group}
+}
+
+// paletteItemDataAttrs returns data attributes for palette items.
+func paletteItemDataAttrs(item CommandPaletteItem) templ.Attributes {
+	return templ.Attributes{
+		"data-label": item.Label,
+		"data-group": item.Group,
+	}
+}
+
+templ paletteGroup(paletteID, group string, items []CommandPaletteItem) {
+	<div data-palette-group={ group }>
+		if group != "" {
+			<p class="text-xs font-semibold uppercase tracking-wider text-base-content/40 px-3 pt-3 pb-1.5">{ group }</p>
+		}
+		for _, item := range items {
+			if item.Group == group || (group == "" && item.Group == "") {
+				<a
+					href={ templ.SafeURL(item.Href) }
+					class="flex items-center gap-3 px-3 py-2.5 rounded-box hover:bg-base-200 cursor-pointer transition-colors"
+					data-label={ item.Label }
+					data-group={ item.Group }
+				>
+					if item.Icon != "" {
+						<span class={ "iconify size-4 shrink-0 text-base-content/50 " + item.Icon }></span>
+					}
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-medium text-base-content truncate">{ item.Label }</p>
+						if item.Description != "" {
+							<p class="text-xs text-base-content/40 truncate">{ item.Description }</p>
+						}
+					</div>
+					if item.Shortcut != "" {
+						<kbd class="kbd kbd-xs">{ item.Shortcut }</kbd>
+					}
+				</a>
+			}
+		}
+	</div>
+}
+
+templ commandPaletteTrigger(paletteID string) {
+	<script>
+	if (!window._paletteTriggerInit) {
+	  window._paletteTriggerInit = true;
+
+	  document.addEventListener('keydown', function(e) {
+	    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+	      e.preventDefault();
+	      var cb = document.getElementById('{ paletteID }-toggle');
+	      if (cb) cb.checked = !cb.checked;
+	    }
+	  });
+
+	  document.addEventListener('htmx:after:settle', function() {
+	    // Re-bind keyboard shortcut after HTMX swaps
+	    if (!window._paletteKeydownBound) {
+	      window._paletteKeydownBound = true;
+	    }
+	  });
+	}
+	</script>
+}
+
+templ commandPaletteScript() {
+	<script>
+	if (!window._paletteFilterInit) {
+	  window._paletteFilterInit = true;
+
+	  window.filterPaletteItems = function(input) {
+	    var q = input.value.toLowerCase().trim();
+	    var results = document.getElementById(input.id.replace('-input', '-results'));
+	    if (!results) return;
+	    results.querySelectorAll('[data-palette-group]').forEach(function(group) {
+	      var items = group.querySelectorAll('[data-label]');
+	      var hasVisible = false;
+	      items.forEach(function(item) {
+	        var text = (item.dataset.label || '').toLowerCase();
+	        var match = !q || text.includes(q);
+	        item.style.display = match ? '' : 'none';
+	        if (match) hasVisible = true;
+	      });
+	      var header = group.querySelector('p');
+	      if (header) header.style.display = hasVisible ? '' : 'none';
+	    });
+	  };
+	}
+	</script>
+}

@@ -253,7 +253,7 @@ func runsTableContent(rows []runlog.RunRow, catMap map[int64]string, total int, 
 		}
 		ctx = templ.ClearChildren(ctx)
 		if len(rows) > 0 {
-			templ_7745c5c3_Err = runsTable(rows, runsTableOpts{ShowID: true, ShowCategory: true, Categories: catMap}).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = runsTable(rows, runsTableOpts{ShowID: true, ShowCategory: true, ShowTestType: true, Categories: catMap}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

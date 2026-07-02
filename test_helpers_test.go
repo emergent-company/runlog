@@ -1,43 +1,42 @@
 package runlog
 
 import (
-	"os"
-	"path/filepath"
+	"sync"
 	"testing"
 )
 
-// newTestDB creates a temp directory with TEST_RUNS_DB and TEST_LOG_DIR
-// pointing into it, resets the global DB singleton, and registers cleanup
-// on t.Cleanup.  Tests that need an isolated RunLog call this first.
-// Returns the temp dir path so callers can open the DB directly for
-// post-run assertions.
+// newTestDB creates a temp directory with an isolated runs.db and sets it as
+// the shared global DB so NewRunLog / SharedDB find it.
+//
+// Deprecated: use StartTestDaemon instead for daemon-backed tests.
 func newTestDB(t *testing.T) string {
 	t.Helper()
+	tmpDir := t.TempDir()
+	dbPath := tmpDir + "/runs.db"
 
-	// If TEST_RUNS_DB is already set (dogfood mode), don't override.
-	// Tests write directly to the dogfood DB — no isolation, but that's
-	// expected when running in dogfood mode.
-	if existing := os.Getenv("TEST_RUNS_DB"); existing != "" {
-		// Dogfood mode: create a temp dir with runs.db → dogfood DB symlink
-		// so callers can still do filepath.Join(tmpDir, "runs.db") and get the right path.
-		tmpDir := t.TempDir()
-		os.Symlink(existing, filepath.Join(tmpDir, "runs.db"))
-		resetSharedDB()
-		t.Cleanup(resetSharedDB)
-		return tmpDir
+	db, err := OpenDB(dbPath)
+	if err != nil {
+		t.Fatalf("OpenDB: %v", err)
 	}
 
-	tmpDir := t.TempDir()
+	globalDBMu.Lock()
+	if globalDB != nil {
+		globalDB.Close()
+	}
+	globalDB = db
+	globalDBErr = nil
+	globalDBOnce = sync.Once{}
+	globalDBMu.Unlock()
 
-	dbPath := filepath.Join(tmpDir, "runs.db")
-	os.Setenv("TEST_RUNS_DB", dbPath)
-	t.Cleanup(func() { os.Unsetenv("TEST_RUNS_DB") })
-
-	os.Setenv("TEST_LOG_DIR", tmpDir)
-	t.Cleanup(func() { os.Unsetenv("TEST_LOG_DIR") })
-
-	resetSharedDB()
-	t.Cleanup(resetSharedDB)
+	t.Cleanup(func() {
+		globalDBMu.Lock()
+		if globalDB == db {
+			globalDB.Close()
+			globalDB = nil
+			globalDBOnce = sync.Once{}
+		}
+		globalDBMu.Unlock()
+	})
 
 	return tmpDir
 }

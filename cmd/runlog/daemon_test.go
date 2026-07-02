@@ -28,7 +28,7 @@ func newDaemonTest(t *testing.T) (*DaemonServer, *runlog.RunDB) {
 	}
 	t.Cleanup(func() { db.Close() })
 
-	srv := newDaemonServer(db, 0, 30*time.Minute)
+	srv := newDaemonServer(db, 0, 30*time.Minute, "")
 	return srv, db
 }
 
@@ -57,8 +57,12 @@ func registerTestRun(t *testing.T, baseURL string, pid int, profile string) stri
 
 // TestDaemon_Health verifies GET /health returns 200 OK when the daemon is running.
 func TestDaemon_Health(t *testing.T) {
-	df := NewDogfoodRun(t, "daemon")
+	df := runlog.NewDogfoodRun(t, "daemon")
 	defer df.Done()
+	df.Describe("Verify daemon health endpoint",
+		"Sends GET /health to a running daemon",
+		"Asserts 200 OK response",
+	)
 	df.Event("log", "Verify GET /health returns 200 OK")
 
 	srv, _ := newDaemonTest(t)
@@ -83,6 +87,10 @@ func TestDaemon_Health(t *testing.T) {
 
 // TestDaemon_RegisterRun verifies POST /runs creates daemon_runs + test_runs rows with runner=dogfood.
 func TestDaemon_RegisterRun(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("registerrun")
+	df.Event("log", "registerrun")
 	t.Log("=== TestDaemon_RegisterRun ===")
 	t.Log("Purpose: Verify POST /runs creates daemon_runs + test_runs rows")
 
@@ -118,6 +126,7 @@ func TestDaemon_RegisterRun(t *testing.T) {
 	t.Logf("Step 3: Got run ID = %s", runID)
 
 	t.Log("Step 4: Verifying daemon_runs table has 1 row")
+	df.Event("log", "Query: SELECT COUNT(*) FROM daemon_runs")
 	var daemonCount int
 	db.RawDB().QueryRow("SELECT COUNT(*) FROM daemon_runs").Scan(&daemonCount)
 	if daemonCount != 1 {
@@ -125,12 +134,14 @@ func TestDaemon_RegisterRun(t *testing.T) {
 	}
 
 	t.Log("Step 5: Verifying test_runs table has 1 row linked via daemon_run_id")
+	df.Event("log", "Query: SELECT COUNT(*) FROM test_runs WHERE daemon_run_id="+runID)
 	var testCount int
 	db.RawDB().QueryRow("SELECT COUNT(*) FROM test_runs WHERE daemon_run_id = ?", runID).Scan(&testCount)
 	if testCount != 1 {
 		t.Errorf("want 1 test run, got %d", testCount)
 	}
 
+	df.Event("log", "Query: SELECT test_name, runner FROM test_runs")
 	var testName, runner string
 	db.RawDB().QueryRow("SELECT test_name, runner FROM test_runs WHERE daemon_run_id = ?", runID).Scan(&testName, &runner)
 	t.Logf("  test_name=%q, runner=%q", testName, runner)
@@ -142,8 +153,13 @@ func TestDaemon_RegisterRun(t *testing.T) {
 
 // TestDaemon_RegisterRun_MissingPID verifies POST /runs without pid returns 400.
 func TestDaemon_RegisterRun_MissingPID(t *testing.T) {
-	t.Log("=== TestDaemon_RegisterRun_MissingPID ===")
-	t.Log("Purpose: Verify POST /runs with empty pid returns 400")
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("POST /runs without pid returns 400",
+		"Sends POST /runs with no pid field",
+		"Verifies 400 status code",
+	)
+	df.Event("log", "Sending POST /runs with empty pid")
 
 	srv, _ := newDaemonTest(t)
 	server := httptest.NewServer(srv.mux)
@@ -156,15 +172,22 @@ func TestDaemon_RegisterRun_MissingPID(t *testing.T) {
 		t.Fatalf("POST /runs: %v", err)
 	}
 	defer resp.Body.Close()
+	df.HTTPCall("POST", "/runs", resp.StatusCode, "")
 
 	if resp.StatusCode != 400 {
+		df.Event("assertion", "FAIL: expected 400 for missing pid")
 		t.Errorf("want 400 for missing pid, got %d", resp.StatusCode)
+	} else {
+		df.Event("assertion", "missing pid correctly returns 400")
 	}
-	t.Logf("✓ POST /runs with empty pid returns 400 (got %d)", resp.StatusCode)
 }
 
 // TestDaemon_InsertEvent verifies POST /runs/:id/events inserts a row in run_events with correct kind, message, and details JSON.
 func TestDaemon_InsertEvent(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("insertevent")
+	df.Event("log", "insertevent")
 	t.Log("=== TestDaemon_InsertEvent ===")
 	t.Log("Purpose: Verify POST /runs/:id/events inserts into run_events with correct kind/details")
 
@@ -202,6 +225,7 @@ func TestDaemon_InsertEvent(t *testing.T) {
 
 	t.Log("Step 4: Querying run_events table directly")
 	// Find the test_runs ID linked by daemon_run_id
+	df.Event("log", "Query: SELECT kind, message, details FROM run_events")
 	var testRunID int64
 	db.RawDB().QueryRow("SELECT id FROM test_runs WHERE daemon_run_id = ?", runID).Scan(&testRunID)
 
@@ -230,6 +254,10 @@ func TestDaemon_InsertEvent(t *testing.T) {
 
 // TestDaemon_MarkRunDone verifies PUT /runs/:id/done sets daemon_runs.status=done and test_runs.finished_at.
 func TestDaemon_MarkRunDone(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("markrundone")
+	df.Event("log", "markrundone")
 	t.Log("=== TestDaemon_MarkRunDone ===")
 	t.Log("Purpose: Verify PUT /runs/:id/done sets finished_at and status='done'")
 
@@ -261,6 +289,7 @@ func TestDaemon_MarkRunDone(t *testing.T) {
 	}
 
 	t.Log("Step 4: Verifying daemon_runs.status = 'done'")
+	df.Event("log", "Query: SELECT status FROM daemon_runs")
 	var status string
 	db.RawDB().QueryRow("SELECT status FROM daemon_runs WHERE id = ?", runID).Scan(&status)
 	if status != "done" {
@@ -268,6 +297,7 @@ func TestDaemon_MarkRunDone(t *testing.T) {
 	}
 
 	t.Log("Step 5: Verifying test_runs has finished_at and passed=1")
+	df.Event("log", "Query: SELECT finished_at, passed FROM test_runs")
 	var finishedStr *string
 	var passedInt *int
 	db.RawDB().QueryRow(
@@ -286,6 +316,10 @@ func TestDaemon_MarkRunDone(t *testing.T) {
 
 // TestDaemon_Reap verifies POST /reap catches unfinished runs older than the daemon timeout and marks them with passed=3 (timeout).
 func TestDaemon_Reap(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("reap")
+	df.Event("log", "reap")
 	t.Log("=== TestDaemon_Reap ===")
 	t.Log("Purpose: Verify POST /reap catches unfinished runs older than timeout")
 
@@ -294,16 +328,22 @@ func TestDaemon_Reap(t *testing.T) {
 	server := httptest.NewServer(srv.mux)
 	defer server.Close()
 
-	t.Log("Step 1: Inserting a stale test_runs row (finished_at = NULL, started_at = 1 hour ago)")
-	_, err := db.RawDB().Exec(
-		`INSERT INTO test_runs (test_name, started_at) VALUES ('stale-reap-test', datetime('now', '-1 hour'))`,
-	)
-	if err != nil {
-		t.Fatalf("insert stale run: %v", err)
+	t.Log("Step 1: Creating a stale run via daemon API with started_at = 1 hour ago")
+	oneHourAgo := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
+	body := map[string]any{
+		"pid":         99991,
+		"env_profile": "stale-reap-test",
+		"started_at":  oneHourAgo,
 	}
+	b, _ := json.Marshal(body)
+	resp, err := http.Post(server.URL+"/runs", "application/json", bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("POST /runs (stale): %v", err)
+	}
+	resp.Body.Close()
 
 	t.Log("Step 2: Sending POST /reap")
-	resp, err := http.Post(server.URL+"/reap", "application/json", nil)
+	resp, err = http.Post(server.URL+"/reap", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST /reap: %v", err)
 	}
@@ -314,6 +354,7 @@ func TestDaemon_Reap(t *testing.T) {
 	t.Log("  /reap returned 200 OK")
 
 	t.Log("Step 3: Verifying the stale run now has finished_at, passed=3 (timeout), reason='timed out'")
+	df.Event("log", "Query: SELECT finished_at, passed, reason FROM test_runs WHERE test_name='stale-reap-test'")
 	var finishedStr *string
 	var passed *int
 	var reason *string
@@ -337,6 +378,10 @@ func TestDaemon_Reap(t *testing.T) {
 
 // TestDaemon_Reap_SkipsRecentRuns verifies POST /reap does NOT touch runs started within the timeout window.
 func TestDaemon_Reap_SkipsRecentRuns(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("reap skipsrecentruns")
+	df.Event("log", "reap skipsrecentruns")
 	t.Log("=== TestDaemon_Reap_SkipsRecentRuns ===")
 	t.Log("Purpose: Verify POST /reap does NOT touch runs started within the timeout window")
 
@@ -345,23 +390,29 @@ func TestDaemon_Reap_SkipsRecentRuns(t *testing.T) {
 	server := httptest.NewServer(srv.mux)
 	defer server.Close()
 
-	t.Log("Step 1: Inserting a recent run using RFC3339 format (started 1 minute ago)")
-	now := time.Now().UTC().Add(-1 * time.Minute).Format(time.RFC3339Nano)
-	_, err := srv.db.RawDB().Exec(
-		`INSERT INTO test_runs (test_name, started_at) VALUES ('recent-run', ?)`, now,
-	)
-	if err != nil {
-		t.Fatalf("insert recent run: %v", err)
+	t.Log("Step 1: Creating a recent run via daemon API (started 1 minute ago)")
+	oneMinAgo := time.Now().UTC().Add(-1 * time.Minute).Format(time.RFC3339)
+	body := map[string]any{
+		"pid":         99992,
+		"env_profile": "recent-run",
+		"started_at":  oneMinAgo,
 	}
+	b, _ := json.Marshal(body)
+	resp, err := http.Post(server.URL+"/runs", "application/json", bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("POST /runs (recent): %v", err)
+	}
+	resp.Body.Close()
 
 	t.Log("Step 2: Sending POST /reap")
-	resp, err := http.Post(server.URL+"/reap", "application/json", nil)
+	resp, err = http.Post(server.URL+"/reap", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST /reap: %v", err)
 	}
 	defer resp.Body.Close()
 
 	t.Log("Step 3: Verifying the recent run was NOT touched (finished_at is still NULL)")
+	df.Event("log", "Query: SELECT finished_at FROM test_runs WHERE test_name='recent-run'")
 	var finishedStr *string
 	db.RawDB().QueryRow(
 		"SELECT finished_at FROM test_runs WHERE test_name = 'recent-run'",
@@ -376,6 +427,10 @@ func TestDaemon_Reap_SkipsRecentRuns(t *testing.T) {
 
 // TestDaemon_Status verifies GET /status returns JSON with active_runs and tracked_resources counts.
 func TestDaemon_Status(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("status")
+	df.Event("log", "status")
 	t.Log("=== TestDaemon_Status ===")
 	t.Log("Purpose: Verify GET /status returns JSON with run counts")
 
@@ -419,6 +474,10 @@ func TestDaemon_Status(t *testing.T) {
 
 // TestDaemon_InsertEvent_RequiresKind verifies POST /runs/:id/events without kind field returns 400.
 func TestDaemon_InsertEvent_RequiresKind(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "daemon")
+	defer df.Done()
+	df.Describe("insertevent requireskind")
+	df.Event("log", "insertevent requireskind")
 	t.Log("=== TestDaemon_InsertEvent_RequiresKind ===")
 	t.Log("Purpose: Verify POST /runs/:id/events without 'kind' returns 400")
 

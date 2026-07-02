@@ -142,10 +142,10 @@ templ PersonChip(name string, avatarColor string, textColor string, gradientFrom
 							<span class={ "badge badge-sm", contact.BadgeClass }>{ contact.BadgeLabel }</span>
 						}
 						if contact.ProfileHref != "" {
-							<a href={ templ.URL(contact.ProfileHref) } class="btn btn-xs btn-ghost text-primary gap-1 px-2">
+							@Button(ButtonProps{Type: ButtonTypeLink, Href: contact.ProfileHref, Variant: ButtonGhost, Size: ButtonXS, ExtraClass: "text-primary gap-1 px-2"}) {
 								View profile
 								<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-							</a>
+							}
 						}
 					</div>
 				}

@@ -45,8 +45,10 @@ import (
 func cmdTest(args []string) error {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	var experiment string
+	var envName string
 	fs.StringVar(&experiment, "experiment", "", "tag all runs in this batch with an experiment name for later comparison")
 	fs.StringVar(&experiment, "e", "", "shorthand for --experiment")
+	fs.StringVar(&envName, "env", "", "validate named environment before running")
 	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, `runlog test — load .env and run go test
 
@@ -200,6 +202,30 @@ EXAMPLES
 	}
 	fmt.Println()
 
+	// ── Load env vars from --env config ──────────────────────────────────
+	if envName != "" {
+		cfg, _ := runlog.LoadConfig(filepath.Dir(resolveDBPath("")))
+		env := cfg.LookupEnvironment(envName)
+		if env == nil {
+			return fmt.Errorf("environment %q not found (available: %s)", envName, envNames(cfg))
+		}
+		// Set env vars from the environment config into the process env
+		// so both validation and the exec'd go test process can use them.
+		for k, v := range env.Env {
+			if os.Getenv(k) == "" {
+				os.Setenv(k, v)
+			}
+		}
+		// Use env name as profile if none set yet
+		if profile == "" {
+			profile = envName
+			os.Setenv("MEMORY_TEST_ENV", envName)
+		}
+		if err := runlog.ValidateEnvSummary(env); err != nil {
+			return err
+		}
+	}
+
 	// ── Exec go test (replaces the current process) ───────────────────────
 	goPath, err := exec.LookPath("go")
 	if err != nil {
@@ -256,6 +282,17 @@ func findTestPackages(wd, filter string) []string {
 	}
 	// Not found — run all test packages.
 	return []string{"./tests/..."}
+}
+
+func envNames(cfg *runlog.Config) string {
+	names := make([]string, len(cfg.Environments))
+	for i, e := range cfg.Environments {
+		names[i] = e.Name
+	}
+	if len(names) == 0 {
+		return "(none)"
+	}
+	return strings.Join(names, ", ")
 }
 
 // registerRunWithDaemon attempts to register the current run with the local

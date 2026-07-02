@@ -15,11 +15,22 @@ import (
 	"github.com/emergent-company/go-daisy/render"
 )
 
+var overriddenAppName string
+
 func appName() string {
 	if n := os.Getenv("RUNLOG_APP_TITLE"); n != "" {
 		return n
 	}
+	if overriddenAppName != "" {
+		return overriddenAppName
+	}
 	return "runlog"
+}
+
+// SetAppName overrides the app name shown in the UI page title.
+// Called by the web app at startup from config.
+func SetAppName(name string) {
+	overriddenAppName = name
 }
 
 // AppShellContent renders the app shell (sidebar, navbar, main content, footer,
@@ -80,7 +91,7 @@ func AppShellContent(groups []layout.SidebarGroup) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"dropdown dropdown-end\"><label tabindex=\"0\" class=\"btn btn-sm btn-circle btn-ghost\" data-testid=\"theme-toggle\"><span id=\"theme-icon-light\" class=\"iconify lucide--sun size-4.5\"></span> <span id=\"theme-icon-dark\" class=\"iconify lucide--moon size-4.5\" style=\"display:none\"></span> <span id=\"theme-icon-system\" class=\"iconify lucide--monitor-dot size-4.5\" style=\"display:none\"></span></label><ul tabindex=\"0\" class=\"dropdown-content menu bg-base-100 rounded-box z-50 w-36 p-2 shadow-sm\" data-testid=\"theme-dropdown\"><li><button data-theme-option=\"light\" class=\"flex items-center gap-2 w-full text-left\"><span class=\"iconify lucide--sun size-4\"></span>Light<span id=\"check-light\" class=\"iconify lucide--check size-4 ms-auto\" style=\"display:none\"></span></button></li><li><button data-theme-option=\"dark\" class=\"flex items-center gap-2 w-full text-left\"><span class=\"iconify lucide--moon size-4\"></span>Dark<span id=\"check-dark\" class=\"iconify lucide--check size-4 ms-auto\" style=\"display:none\"></span></button></li><li><button data-theme-option=\"system\" class=\"flex items-center gap-2 w-full text-left\"><span class=\"iconify lucide--monitor-dot size-4\"></span>System<span id=\"check-system\" class=\"iconify lucide--check size-4 ms-auto\" style=\"display:none\"></span></button></li></ul></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<button class=\"btn btn-sm btn-circle btn-ghost\" aria-label=\"Search (Ctrl+K)\" onclick=\"document.getElementById('search-modal').showModal();setTimeout(function(){document.getElementById('search-input').focus();document.getElementById('search-input').select()},100)\" data-testid=\"search-btn\"><span class=\"iconify lucide--search size-4.5\"></span></button><div class=\"dropdown dropdown-end\"><label tabindex=\"0\" class=\"btn btn-sm btn-circle btn-ghost\" data-testid=\"theme-toggle\"><span id=\"theme-icon-light\" class=\"iconify lucide--sun size-4.5\"></span> <span id=\"theme-icon-dark\" class=\"iconify lucide--moon size-4.5\" style=\"display:none\"></span> <span id=\"theme-icon-system\" class=\"iconify lucide--monitor-dot size-4.5\" style=\"display:none\"></span></label><ul tabindex=\"0\" class=\"dropdown-content menu bg-base-100 rounded-box z-50 w-36 p-2 shadow-sm\" data-testid=\"theme-dropdown\"><li><button data-theme-option=\"light\" class=\"flex items-center gap-2 w-full text-left\"><span class=\"iconify lucide--sun size-4\"></span>Light<span id=\"check-light\" class=\"iconify lucide--check size-4 ms-auto\" style=\"display:none\"></span></button></li><li><button data-theme-option=\"dark\" class=\"flex items-center gap-2 w-full text-left\"><span class=\"iconify lucide--moon size-4\"></span>Dark<span id=\"check-dark\" class=\"iconify lucide--check size-4 ms-auto\" style=\"display:none\"></span></button></li><li><button data-theme-option=\"system\" class=\"flex items-center gap-2 w-full text-left\"><span class=\"iconify lucide--monitor-dot size-4\"></span>System<span id=\"check-system\" class=\"iconify lucide--check size-4 ms-auto\" style=\"display:none\"></span></button></li></ul></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -98,79 +109,11 @@ func AppShellContent(groups []layout.SidebarGroup) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main><template id=\"skeleton-dashboard\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main><footer class=\"hidden sm:flex border-t border-base-200 bg-base-100 shrink-0\"><div class=\"flex w-full items-center justify-between gap-3 px-4 py-1.5\"><div id=\"footer-status\" class=\"flex items-center gap-2 text-xs\"><div class=\"status status-neutral status-sm\"></div><span class=\"text-base-content/50\">Loading...</span></div><span class=\"text-base-content/40 text-xs\">runlog</span></div></footer><script type=\"text/javascript\">\n\t\t\t(function() {\n\t\t\t\tvar es = new EventSource('/ui/stream?topic=footer');\n\t\t\t\tes.addEventListener('footer-status', function(e) {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = JSON.parse(e.data).html;\n\t\t\t\t});\n\t\t\t\tes.onerror = function() {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = '<div class=\"status status-error status-sm\"></div><span class=\"text-base-content/50\">Disconnected</span>';\n\t\t\t\t};\n\t\t\t})();\n\t\t</script></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = DashboardSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</template><template id=\"skeleton-linters\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = LintersSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</template><template id=\"skeleton-tests\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = TestsSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</template><template id=\"skeleton-test-detail\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = TestDetailSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</template><template id=\"skeleton-runs\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = AllRunsSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</template><template id=\"skeleton-run-detail\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = RunDetailSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</template><template id=\"skeleton-experiments\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = ExperimentsSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</template><template id=\"skeleton-experiment-detail\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = ExperimentDetailSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</template><template id=\"skeleton-events-reference\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = EventsReferenceSkeleton().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</template><footer class=\"hidden sm:flex border-t border-base-200 bg-base-100 shrink-0\"><div class=\"flex w-full items-center justify-between gap-3 px-4 py-1.5\"><div id=\"footer-status\" class=\"flex items-center gap-2 text-xs\"><div class=\"status status-neutral status-sm\"></div><span class=\"text-base-content/50\">Loading...</span></div><span class=\"text-base-content/40 text-xs\">runlog</span></div></footer><script type=\"text/javascript\">\n\t\t\t(function() {\n\t\t\t\tvar es = new EventSource('/ui/stream?topic=footer');\n\t\t\t\tes.addEventListener('footer-status', function(e) {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = JSON.parse(e.data).html;\n\t\t\t\t});\n\t\t\t\tes.onerror = function() {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = '<div class=\"status status-error status-sm\"></div><span class=\"text-base-content/50\">Disconnected</span>';\n\t\t\t\t};\n\t\t\t})();\n\t\t</script></div>")
+			templ_7745c5c3_Err = SearchModal().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -180,7 +123,7 @@ func AppShellContent(groups []layout.SidebarGroup) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script>\n\t\t(function() {\n\t\t\tfunction applyTheme(mode) {\n\t\t\t\tvar themes = { light: 'nord', dark: 'dracula' };\n\t\t\t\tvar html = document.documentElement;\n\t\t\t\tif (mode === 'system') {\n\t\t\t\t\tvar prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\t\thtml.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);\n\t\t\t\t} else {\n\t\t\t\t\thtml.setAttribute('data-theme', themes[mode] || themes.light);\n\t\t\t\t}\n\t\t\t\t['light','dark','system'].forEach(function(m) {\n\t\t\t\t\tvar el = document.getElementById('theme-icon-' + m);\n\t\t\t\t\tif (el) el.style.display = m === mode ? '' : 'none';\n\t\t\t\t\tvar ck = document.getElementById('check-' + m);\n\t\t\t\t\tif (ck) ck.style.display = m === mode ? '' : 'none';\n\t\t\t\t});\n\t\t\t\ttry { localStorage.setItem('runlog-theme', mode); } catch(e) {}\n\t\t\t}\n\t\t\tvar saved = null;\n\t\t\ttry { saved = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\tif (!saved) {\n\t\t\t\ttry {\n\t\t\t\t\tvar legacy = localStorage.getItem('go-daisy-theme');\n\t\t\t\t\tif (legacy) {\n\t\t\t\t\t\tsaved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';\n\t\t\t\t\t\tlocalStorage.removeItem('go-daisy-theme');\n\t\t\t\t\t}\n\t\t\t\t} catch(e) {}\n\t\t\t}\n\t\t\tif (!saved) saved = 'system';\n\t\t\tapplyTheme(saved);\n\t\t\tvar mq = window.matchMedia('(prefers-color-scheme: dark)');\n\t\t\tmq.addEventListener('change', function() {\n\t\t\t\tvar cur = null;\n\t\t\t\ttry { cur = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\t\tif (cur === 'system') applyTheme('system');\n\t\t\t});\n\t\t\tdocument.addEventListener('htmx:before:history:restore', function() {\n\t\t\t\tvar restored = null;\n\t\t\t\ttry { restored = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\t\tif (restored) applyTheme(restored);\n\t\t\t});\n\t\t\tdocument.addEventListener('mousedown', function(e) {\n\t\t\t\tvar option = e.target.closest('[data-theme-option]');\n\t\t\t\tif (option) { applyTheme(option.getAttribute('data-theme-option')); return; }\n\t\t\t});\n\t\t})();\n\t</script><script>\n\t\t(function() {\n\t\t\tvar bar = document.getElementById('global-loading-bar');\n\t\t\tvar showTimer, hideTimer;\n\n\t\t\tvar skeletonMap = [\n\t\t\t\t{ pattern: '/ui/events', skeleton: 'skeleton-events-reference' },\n\t\t\t\t{ pattern: '/ui/linters/', skeleton: 'skeleton-linters' },\n\t\t\t\t{ pattern: '/ui/linters', skeleton: 'skeleton-linters' },\n\t\t\t\t{ pattern: '/ui/experiments/', skeleton: 'skeleton-experiment-detail' },\n\t\t\t\t{ pattern: '/ui/experiments', skeleton: 'skeleton-experiments' },\n\t\t\t\t{ pattern: '/ui/runs/', skeleton: 'skeleton-run-detail' },\n\t\t\t\t{ pattern: '/ui/runs', skeleton: 'skeleton-runs' },\n\t\t\t\t{ pattern: '/ui/tests/', skeleton: 'skeleton-test-detail' },\n\t\t\t\t{ pattern: '/ui/tests', skeleton: 'skeleton-tests' },\n\t\t\t\t{ pattern: '/ui/', skeleton: 'skeleton-dashboard' },\n\t\t\t];\n\t\t\tvar fallbackHtml = '<div class=\"flex items-center justify-center py-24\"><span class=\"loading loading-spinner loading-lg text-primary\"></span></div>';\n\n\t\t\tfunction injectSkeleton(href) {\n\t\t\t\tvar path = new URL(href, location.origin).pathname;\n\t\t\t\tfor (var i = 0; i < skeletonMap.length; i++) {\n\t\t\t\t\tvar entry = skeletonMap[i];\n\t\t\t\t\tif (path === entry.pattern || path.indexOf(entry.pattern) === 0) {\n\t\t\t\t\t\tvar main = document.getElementById('main-content');\n\t\t\t\t\t\tif (!main) return;\n\t\t\t\t\t\tvar tmpl = document.getElementById(entry.skeleton);\n\t\t\t\t\t\tif (tmpl && tmpl.innerHTML.trim()) {\n\t\t\t\t\t\t\tmain.innerHTML = tmpl.innerHTML;\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tmain.innerHTML = fallbackHtml;\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tvar main = document.getElementById('main-content');\n\t\t\t\tif (main) main.innerHTML = fallbackHtml;\n\t\t\t}\n\n\t\tdocument.addEventListener('htmx:before:request', function(evt) {\n\t\t\ttry {\n\t\t\t\tvar elt = evt.detail?.ctx?.sourceElement || evt.detail?.elt || null;\n\t\t\t\tif (elt && elt.getAttribute && elt.getAttribute('hx-push-url') === 'true') {\n\t\t\t\t\tvar href = elt.getAttribute('hx-get') || elt.getAttribute('data-hx-get');\n\t\t\t\t\tif (href) injectSkeleton(href);\n\t\t\t\t}\n\t\t\t} catch(e) { /* skeleton is best-effort */ }\n\t\t\t\tclearTimeout(hideTimer);\n\t\t\t\tshowTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);\n\t\t\t});\n\t\t\tdocument.addEventListener('htmx:after:request', function() {\n\t\t\t\tclearTimeout(showTimer);\n\t\t\t\tif (bar) bar.style.opacity = '0';\n\t\t\t});\n\t\tdocument.addEventListener('htmx:error', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) {\n\t\t\t\tbar.style.background = 'var(--color-error, #ef4444)';\n\t\t\t\tbar.style.opacity = '1';\n\t\t\t\tsetTimeout(function() { bar.style.opacity = '0'; }, 1500);\n\t\t\t\tsetTimeout(function() { bar.style.background = ''; }, 2000);\n\t\t\t}\n\t\t});\n\t\t})();\n\t</script><script>\n\t\tdocument.addEventListener('htmx:before:request', function(evt) {\n\t\t\tvar elt = evt.detail?.ctx?.sourceElement || evt.target;\n\t\t\tif (!elt || !elt.getAttribute) return;\n\t\t\tvar targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');\n\t\t\tif (!targetId || !targetId.startsWith('#event-detail-')) return;\n\t\t\tvar det = document.querySelector(targetId);\n\t\t\tif (det && det.children.length > 0) {\n\t\t\t\tdet.innerHTML = '';\n\t\t\t\tevt.preventDefault();\n\t\t\t}\n\t\t});\n\t\t// Feedback overlay — loaded after HTMX so the script tag is inside <body>.\n\t\t(function() {\n\t\t\tvar s = document.createElement('script');\n\t\t\ts.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';\n\t\t\ts.setAttribute('data-api', 'https://feedback.emergent-company.ai');\n\t\t\ts.setAttribute('data-repo', 'emergent-company/runlog');\n\t\t\ts.setAttribute('data-label', 'feedback');\n\t\t\ts.async = true;\n\t\t\tdocument.body.appendChild(s);\n\t\t})();\n\t</script><link rel=\"stylesheet\" href=\"/static/css/frappe-gantt.css\"><script src=\"/static/js/hx-head.js\"></script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<script>\n\t\t(function() {\n\t\t\tfunction applyTheme(mode) {\n\t\t\t\tvar themes = { light: 'nord', dark: 'dracula' };\n\t\t\t\tvar html = document.documentElement;\n\t\t\t\tif (mode === 'system') {\n\t\t\t\t\tvar prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\t\thtml.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);\n\t\t\t\t} else {\n\t\t\t\t\thtml.setAttribute('data-theme', themes[mode] || themes.light);\n\t\t\t\t}\n\t\t\t\t['light','dark','system'].forEach(function(m) {\n\t\t\t\t\tvar el = document.getElementById('theme-icon-' + m);\n\t\t\t\t\tif (el) el.style.display = m === mode ? '' : 'none';\n\t\t\t\t\tvar ck = document.getElementById('check-' + m);\n\t\t\t\t\tif (ck) ck.style.display = m === mode ? '' : 'none';\n\t\t\t\t});\n\t\t\t\ttry { localStorage.setItem('runlog-theme', mode); } catch(e) {}\n\t\t\t}\n\t\t\tvar saved = null;\n\t\t\ttry { saved = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\tif (!saved) {\n\t\t\t\ttry {\n\t\t\t\t\tvar legacy = localStorage.getItem('go-daisy-theme');\n\t\t\t\t\tif (legacy) {\n\t\t\t\t\t\tsaved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';\n\t\t\t\t\t\tlocalStorage.removeItem('go-daisy-theme');\n\t\t\t\t\t}\n\t\t\t\t} catch(e) {}\n\t\t\t}\n\t\t\tif (!saved) saved = 'system';\n\t\t\tapplyTheme(saved);\n\t\t\tvar mq = window.matchMedia('(prefers-color-scheme: dark)');\n\t\t\tmq.addEventListener('change', function() {\n\t\t\t\tvar cur = null;\n\t\t\t\ttry { cur = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\t\tif (cur === 'system') applyTheme('system');\n\t\t\t});\n\t\t\tdocument.addEventListener('htmx:before:history:restore', function() {\n\t\t\t\tvar restored = null;\n\t\t\t\ttry { restored = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\t\tif (restored) applyTheme(restored);\n\t\t\t});\n\t\t\tdocument.addEventListener('mousedown', function(e) {\n\t\t\t\tvar option = e.target.closest('[data-theme-option]');\n\t\t\t\tif (option) { applyTheme(option.getAttribute('data-theme-option')); return; }\n\t\t\t});\n\t\t})();\n\t</script><script>\n\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\tif ((e.ctrlKey || e.metaKey) && e.key === 'k') {\n\t\t\t\te.preventDefault();\n\t\t\t\tvar modal = document.getElementById('search-modal');\n\t\t\t\tif (modal && modal.open) { modal.close(); return; }\n\t\t\t\tif (modal) { modal.showModal(); return; }\n\t\t\t}\n\t\t\tif (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {\n\t\t\t\tvar tag = e.target.tagName;\n\t\t\t\tif (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;\n\t\t\t\te.preventDefault();\n\t\t\t\tvar modal = document.getElementById('search-modal');\n\t\t\t\tif (modal) modal.showModal();\n\t\t\t}\n\t\t});\n\t\tdocument.addEventListener('htmx:after:swap', function(e) {\n\t\t\tif (e.detail?.target?.id === 'search-results') {\n\t\t\t\tvar input = document.getElementById('search-input');\n\t\t\t\tif (input) input.focus();\n\t\t\t}\n\t\t});\n\t</script><script>\n\t\t(function() {\n\t\t\tvar bar = document.getElementById('global-loading-bar');\n\t\t\tvar showTimer;\n\n\t\tdocument.addEventListener('htmx:before:request', function() {\n\t\t\tclearTimeout(window.__hideTimer);\n\t\t\tshowTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);\n\t\t});\n\t\tdocument.addEventListener('htmx:after:request', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) bar.style.opacity = '0';\n\t\t});\n\t\tdocument.addEventListener('htmx:error', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) {\n\t\t\t\tbar.style.background = 'var(--color-error, #ef4444)';\n\t\t\t\tbar.style.opacity = '1';\n\t\t\t\tsetTimeout(function() { bar.style.opacity = '0'; }, 1500);\n\t\t\t\tsetTimeout(function() { bar.style.background = ''; }, 2000);\n\t\t\t}\n\t\t\t// Recover: reload page so user doesn't see stale state\n\t\t\tsetTimeout(function() { location.reload(); }, 2000);\n\t\t});\n\t\t})();\n\t</script><script>\n\t\tdocument.addEventListener('htmx:before:request', function(evt) {\n\t\t\tvar elt = evt.detail?.ctx?.sourceElement || evt.target;\n\t\t\tif (!elt || !elt.getAttribute) return;\n\t\t\tvar targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');\n\t\t\tif (!targetId || !targetId.startsWith('#event-detail-')) return;\n\t\t\tvar det = document.querySelector(targetId);\n\t\t\tif (det && det.children.length > 0) {\n\t\t\t\tdet.innerHTML = '';\n\t\t\t\tevt.preventDefault();\n\t\t\t}\n\t\t});\n\t\t// Feedback overlay — loaded after HTMX so the script tag is inside <body>.\n\t\t(function() {\n\t\t\tvar s = document.createElement('script');\n\t\t\ts.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';\n\t\t\ts.setAttribute('data-api', 'https://feedback.emergent-company.ai');\n\t\t\ts.setAttribute('data-repo', 'emergent-company/runlog');\n\t\t\ts.setAttribute('data-label', 'feedback');\n\t\t\ts.async = true;\n\t\t\tdocument.body.appendChild(s);\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -213,12 +156,12 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<style>\n\t\ttr.hover { cursor: pointer; }\n\t\ttr.hover:hover { background-color: color-mix(in oklab, var(--color-base-200) 80%, transparent); }\n\t\t[data-component=\"ui/Badge\"] { min-width: 5rem; text-align: center; }\n\t\t.htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }\n\t\t.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }\n\t\t#events-section .is-debug-event { display: none; }\n\t\t#events-section.debug-visible .is-debug-event { display: table-row; }\n\t</style><div data-testid=\"app-page\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<style>\n\t\ttr.hover { cursor: pointer; }\n\t\ttr.hover:hover { background-color: color-mix(in oklab, var(--color-base-200) 80%, transparent); }\n\t\t[data-component=\"ui/Badge\"] { min-width: 5rem; text-align: center; }\n\t\t.htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }\n\t\t.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }\n\t\t#events-section .is-debug-event { display: none; }\n\t\t#events-section.debug-visible .is-debug-event { display: table-row; }\n\t</style><div data-testid=\"app-page\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if render.IsHistoryRestoreFromContext(ctx) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<link rel=\"stylesheet\" href=\"/static/css/app.css\"><div id=\"modal-container\"></div><div id=\"toast-container\" class=\"toast toast-top toast-end z-70\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<link rel=\"stylesheet\" href=\"/static/css/app.css\"><div id=\"modal-container\"></div><div id=\"toast-container\" class=\"toast toast-top toast-end z-70\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -285,8 +228,12 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "  <link rel=\"stylesheet\" href=\"/static/css/frappe-gantt.css\"><script src=\"/static/js/hx-head.js\"></script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

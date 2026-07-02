@@ -1,0 +1,110 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ButtonGlow renders a DaisyUI button with a colored glow shadow effect.
+// Wraps Button and adds shadow-lg shadow-{color}/30 classes.
+templ ButtonGlow(props ButtonProps) {
+	if props.Type == ButtonTypeLink {
+		<a
+			href={ templ.URL(props.Href) }
+			class={ "btn",
+				templ.KV(string(props.Variant), props.Variant != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV(string(props.Shape), props.Shape != ""),
+				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
+				templ.KV("btn-block", props.Block),
+				"shadow-lg",
+				templ.KV("shadow-primary/30", props.Variant == ButtonPrimary || props.Variant == ""),
+				templ.KV("shadow-secondary/30", props.Variant == ButtonSecondary),
+				templ.KV("shadow-accent/30", props.Variant == ButtonAccent),
+				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
+				templ.KV("shadow-error/30", props.Variant == ButtonError),
+				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
+				props.ExtraClass }
+			if props.OnClick.Name != "" {
+				onclick={ props.OnClick }
+			}
+			{ devmode.Attrs(ctx, "ui/ButtonGlow")... }
+			{ props.Attrs... }
+		>
+			if props.Icon != "" {
+				@IconSpan(props.Icon, "size-4")
+			}
+			{ children... }
+		</a>
+	} else if props.Type == ButtonTypeLabel {
+		<label
+			class={ "btn",
+				templ.KV(string(props.Variant), props.Variant != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV(string(props.Shape), props.Shape != ""),
+				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
+				templ.KV("btn-block", props.Block),
+				"shadow-lg",
+				templ.KV("shadow-primary/30", props.Variant == ButtonPrimary || props.Variant == ""),
+				templ.KV("shadow-secondary/30", props.Variant == ButtonSecondary),
+				templ.KV("shadow-accent/30", props.Variant == ButtonAccent),
+				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
+				templ.KV("shadow-error/30", props.Variant == ButtonError),
+				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
+				props.ExtraClass }
+			{ devmode.Attrs(ctx, "ui/ButtonGlow")... }
+			{ props.Attrs... }
+		>
+			if props.Icon != "" {
+				@IconSpan(props.Icon, "size-4")
+			}
+			{ children... }
+		</label>
+	} else {
+		<button
+			type={ string(props.Type) }
+			class={ "btn",
+				templ.KV(string(props.Variant), props.Variant != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV(string(props.Shape), props.Shape != ""),
+				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
+				templ.KV("btn-block", props.Block),
+				templ.KV("loading loading-spinner", props.Loading),
+				"shadow-lg",
+				templ.KV("shadow-primary/30", props.Variant == ButtonPrimary || props.Variant == ""),
+				templ.KV("shadow-secondary/30", props.Variant == ButtonSecondary),
+				templ.KV("shadow-accent/30", props.Variant == ButtonAccent),
+				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
+				templ.KV("shadow-error/30", props.Variant == ButtonError),
+				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
+				props.ExtraClass }
+			disabled?={ props.Loading }
+			if props.OnClick.Name != "" {
+				onclick={ props.OnClick }
+			}
+			{ devmode.Attrs(ctx, "ui/ButtonGlow")... }
+			{ props.Attrs... }
+		>
+			if props.Icon != "" {
+				@IconSpan(props.Icon, "size-4")
+			}
+			{ children... }
+		</button>
+	}
+}
+
+// SimpleButtonGlow renders a simple DaisyUI button with glow shadow.
+templ SimpleButtonGlow(label string, variant ButtonVariant, size ButtonSize, attrs templ.Attributes) {
+	<button
+		type="button"
+		class={ "btn",
+			templ.KV(string(variant), variant != ""),
+			templ.KV(string(size), size != ""),
+			"shadow-lg",
+			templ.KV("shadow-primary/30", variant == ButtonPrimary || variant == ""),
+			templ.KV("shadow-secondary/30", variant == ButtonSecondary),
+			templ.KV("shadow-accent/30", variant == ButtonAccent),
+			templ.KV("shadow-success/30", variant == ButtonSuccess),
+			templ.KV("shadow-error/30", variant == ButtonError),
+			templ.KV("shadow-neutral/30", variant == ButtonNeutral) }
+		{ devmode.Attrs(ctx, "ui/SimpleButtonGlow")... }
+		{ attrs... }
+	>{ label }</button>
+}

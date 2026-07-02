@@ -11,7 +11,16 @@ templ Join(vertical bool) {
 
 // JoinButton renders a button with the join-item class.
 templ JoinButton(label string, variant ButtonVariant, active bool) {
-	<button class={ "join-item", "btn", "btn-sm", string(variant), templ.KV("btn-active", active) } { devmode.Attrs(ctx, "ui/JoinButton")... }>{ label }</button>
+	@Button(ButtonProps{Variant: variant, Size: ButtonSM, ExtraClass: joinButtonExtraClass(active)}) {
+		{ label }
+	}
+}
+
+func joinButtonExtraClass(active bool) string {
+	if active {
+		return "join-item btn-active"
+	}
+	return "join-item"
 }
 
 // JoinInputPlaceholder renders a text input with the join-item class.

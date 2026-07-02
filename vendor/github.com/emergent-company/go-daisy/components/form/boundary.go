@@ -56,11 +56,18 @@ func SelectInputWithBoundary(name string, label string, selected string, options
 }
 
 // SearchInputWithBoundary wraps SearchInput with a dev-mode component boundary annotation.
-func SearchInputWithBoundary(name string, value string, placeholder string, hxTarget string, hxGet string) templ.Component {
-	return devmode.ComponentBoundary("SearchInput", SearchInput(name, value, placeholder, hxTarget, hxGet), map[string]any{
+func SearchInputWithBoundary(name string, value string, placeholder string, hxTarget string, hxGet string, class string) templ.Component {
+	return devmode.ComponentBoundary("SearchInput", SearchInput(name, value, placeholder, hxTarget, hxGet, class), map[string]any{
 		"name":        name,
 		"placeholder": placeholder,
 		"hxTarget":    hxTarget,
+	})
+}
+
+// FilterSelectWithBoundary wraps FilterSelect with a dev-mode component boundary annotation.
+func FilterSelectWithBoundary(name string, hxTarget string, hxGet string, class string) templ.Component {
+	return devmode.ComponentBoundary("FilterSelect", FilterSelect(name, hxTarget, hxGet, class), map[string]any{
+		"name": name,
 	})
 }
 
@@ -291,6 +298,30 @@ func ValidatedFieldWithBoundary(labelText string, hintText string, inputName str
 	})
 }
 
+// PasswordFieldWithBoundary wraps PasswordField with a dev-mode component boundary annotation.
+// gallery:token label,required,showToggle
+// gallery:hint label:default(Password)
+func PasswordFieldWithBoundary(props PasswordFieldProps) templ.Component {
+	return devmode.ComponentBoundary("PasswordField", PasswordField(props), map[string]any{
+		"label":      props.Label,
+		"required":   props.Required,
+		"showToggle": props.ShowToggle,
+	})
+}
+
+// PasswordMeterWithBoundary wraps PasswordMeter with a dev-mode component boundary annotation.
+// gallery:token label,required,showToggle,minLength
+// gallery:hint label:default(Password)
+// gallery:hint minLength:range(0,32,1)
+func PasswordMeterWithBoundary(props PasswordMeterProps) templ.Component {
+	return devmode.ComponentBoundary("PasswordMeter", PasswordMeter(props), map[string]any{
+		"label":      props.Label,
+		"required":   props.Required,
+		"showToggle": props.ShowToggle,
+		"minLength":  props.MinLength,
+	})
+}
+
 // CalendarWrapperWithBoundary wraps CalendarWrapper with a dev-mode component boundary annotation.
 func CalendarWrapperWithBoundary(variant CalendarVariant, children templ.Component) templ.Component {
 	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
@@ -298,6 +329,65 @@ func CalendarWrapperWithBoundary(variant CalendarVariant, children templ.Compone
 	})
 	return devmode.ComponentBoundary("CalendarWrapper", inner, map[string]any{
 		"variant": string(variant),
+	})
+}
+
+// EnhancedSelectWithBoundary wraps EnhancedSelect with a dev-mode component boundary annotation.
+// gallery:token label,multiple,searchable,removeItems,required
+// gallery:hint label:default(Select an option)
+func EnhancedSelectWithBoundary(props EnhancedSelectProps) templ.Component {
+	return devmode.ComponentBoundary("EnhancedSelect", EnhancedSelect(props), map[string]any{
+		"label":       props.Label,
+		"multiple":    props.Multiple,
+		"searchable":  props.Searchable,
+		"removeItems": props.RemoveItems,
+		"required":    props.Required,
+	})
+}
+
+// DatePickerWithBoundary wraps DatePicker with a dev-mode component boundary annotation.
+// gallery:token label,mode,inline,time24h
+// gallery:hint label:default(Select date)
+func DatePickerWithBoundary(props DatePickerProps) templ.Component {
+	return devmode.ComponentBoundary("DatePicker", DatePicker(props), map[string]any{
+		"label":   props.Label,
+		"mode":    string(props.Mode),
+		"inline":  props.Inline,
+		"time24h": props.Time24h,
+	})
+}
+
+// RichTextEditorWithBoundary wraps RichTextEditor with a dev-mode component boundary annotation.
+// gallery:token label,theme,readOnly
+// gallery:hint label:default(Content)
+func RichTextEditorWithBoundary(props RichTextEditorProps) templ.Component {
+	return devmode.ComponentBoundary("RichTextEditor", RichTextEditor(props), map[string]any{
+		"label":    props.Label,
+		"theme":    string(props.Theme),
+		"readOnly": props.ReadOnly,
+	})
+}
+
+// FileUploadWithBoundary wraps FileUpload with a dev-mode component boundary annotation.
+// gallery:token label,multiple,style
+// gallery:hint label:default(Upload files)
+func FileUploadWithBoundary(props FileUploadProps) templ.Component {
+	return devmode.ComponentBoundary("FileUpload", FileUpload(props), map[string]any{
+		"label":    props.Label,
+		"multiple": props.Multiple,
+		"style":    string(props.Style),
+	})
+}
+
+// FormValidationWithBoundary wraps FormValidation with a dev-mode component boundary annotation.
+// gallery:token submitText
+// gallery:hint submitText:default(Submit)
+func FormValidationWithBoundary(props FormValidationProps, children templ.Component) templ.Component {
+	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		return FormValidation(props).Render(templ.WithChildren(ctx, children), w)
+	})
+	return devmode.ComponentBoundary("FormValidation", inner, map[string]any{
+		"submitText": props.SubmitText,
 	})
 }
 

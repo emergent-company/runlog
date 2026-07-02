@@ -1,0 +1,26 @@
+package ui
+
+// StatsGroupItem holds data for a single stat cell in a StatsGroup.
+type StatsGroupItem struct {
+	Title string
+	Value string
+	Desc  string
+	// Color is a Tailwind text-* class for the value, e.g. "text-primary".
+	// Optional.
+	Color string
+}
+
+// StatsGroup renders a DaisyUI stats bar with multiple stat cells side by side.
+templ StatsGroup(items []StatsGroupItem) {
+	<div class="stats shadow border border-base-200">
+		for _, item := range items {
+			<div class="stat place-items-center">
+				<div class="stat-title">{ item.Title }</div>
+				<div class={ "stat-value", templ.KV(item.Color, item.Color != "") }>{ item.Value }</div>
+				if item.Desc != "" {
+					<div class="stat-desc">{ item.Desc }</div>
+				}
+			</div>
+		}
+	</div>
+}

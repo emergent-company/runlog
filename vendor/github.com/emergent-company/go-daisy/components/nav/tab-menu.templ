@@ -1,0 +1,79 @@
+package nav
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// Tab represents a single tab in a tab strip.
+type Tab struct {
+	Label  string
+	Href   string
+	Active bool
+	Count  int              // optional count badge shown next to the label; hidden when 0
+	Attrs  templ.Attributes // optional extra HTML attributes on the <a> element, e.g. {"data-testid": "tab-overview"}
+}
+
+// TabMenu renders a tab strip. When HTMX is true (default) each tab uses
+// hx-get to swap content into target and pushes the URL; when false it renders
+// a lightweight DaisyUI tabs-lifted strip suitable for in-panel use (no HTMX).
+// attrs is optional extra HTML attributes on the outer wrapper; pass nil when not needed.
+templ TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) {
+	{{
+		swapTarget := "#tab-content"
+		if len(target) > 0 && target[0] != "" {
+			swapTarget = target[0]
+		}
+		htmx := swapTarget != "-"
+	}}
+	if htmx {
+		<div class="border-b border-base-200 bg-base-100" { devmode.Attrs(ctx, "nav/TabMenu")... } { attrs... }>
+			<nav class="flex px-6 -mb-px" aria-label="Tabs">
+				for _, tab := range tabs {
+					<a
+						href={ templ.URL(tab.Href) }
+						hx-get={ tab.Href }
+						hx-target={ swapTarget }
+						hx-push-url="true"
+						class={ "inline-flex items-center px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+							templ.KV("border-primary text-primary", tab.Active),
+							templ.KV("border-transparent text-base-content/50 hover:text-base-content hover:border-base-300", !tab.Active) }
+						aria-current={ func() string {
+							if tab.Active {
+								return "page"
+							}
+							return ""
+						}() }
+						{ tab.Attrs... }
+					>
+						{ tab.Label }
+					if tab.Count > 0 {
+						<span class="ml-1.5 text-xs opacity-60">{ strconv.Itoa(tab.Count) }</span>
+					}
+					</a>
+				}
+			</nav>
+		</div>
+	} else {
+		<div role="tablist" class="tabs tabs-lifted" { devmode.Attrs(ctx, "nav/TabMenu")... } { attrs... }>
+			for _, tab := range tabs {
+				<a
+					role="tab"
+					href={ templ.URL(tab.Href) }
+					class={ "tab",
+						templ.KV("tab-active", tab.Active) }
+					{ tab.Attrs... }
+				>
+					{ tab.Label }
+				</a>
+			}
+		</div>
+	}
+}
+
+// SimpleTabs is an alias for TabMenu with HTMX disabled (target="-").
+// Deprecated: use TabMenu(tabs, nil, "-") instead.
+templ SimpleTabs(tabs []Tab) {
+	@TabMenu(tabs, nil, "-")
+}

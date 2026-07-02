@@ -1,0 +1,135 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// NotificationDropdownProps configures a dropdown notification panel.
+type NotificationDropdownProps struct {
+	ID          string
+	Items       []NotificationItem
+	UnreadCount int
+	ViewAllHref string
+	Attrs       templ.Attributes
+}
+
+// NotificationDropdown renders a bell icon with dropdown notification panel.
+templ NotificationDropdown(props NotificationDropdownProps) {
+	<div
+		class="dropdown dropdown-end"
+		data-notification-dropdown
+		{ devmode.Attrs(ctx, "ui/NotificationDropdown")... }
+		{ props.Attrs... }
+	>
+		<label tabindex="0" class="btn btn-ghost btn-circle btn-sm relative">
+			@IconSpan("lucide--bell", "size-5")
+			if props.UnreadCount > 0 {
+				<span class="badge badge-error badge-xs badge-outline absolute -top-0.5 -right-0.5">{ strconv.Itoa(props.UnreadCount) }</span>
+			}
+		</label>
+
+		<div class="dropdown-content bg-base-100 rounded-box shadow-sm border border-base-200 mt-2 w-80 z-20 p-0">
+			<div class="flex items-center justify-between px-4 py-3 border-b border-base-200">
+				<h3 class="text-sm font-semibold text-base-content">Notifications</h3>
+				<button class="btn btn-ghost btn-xs" onclick="markAllRead('{ props.ID }')" aria-label="Mark all as read">
+					@IconSpan("lucide--check-check", "size-3.5")
+					Mark all read
+				</button>
+			</div>
+
+			<div class="max-h-80 overflow-y-auto divide-y divide-base-200" id={ props.ID + "-list" }>
+				for _, item := range props.Items {
+					@dropdownNotificationRow(props.ID, item)
+				}
+				if len(props.Items) == 0 {
+					<div class="p-6 text-center text-sm text-base-content/50">No notifications</div>
+				}
+			</div>
+
+			if props.ViewAllHref != "" {
+				<div class="border-t border-base-200 p-2">
+					<a href={ templ.SafeURL(props.ViewAllHref) } class="btn btn-ghost btn-sm w-full text-sm">View all notifications</a>
+				</div>
+			}
+		</div>
+	</div>
+	@notificationDropdownScript(props.ID)
+}
+
+templ dropdownNotificationRow(dropdownID string, item NotificationItem) {
+	<div class={ "flex items-start gap-3 px-4 py-3 hover:bg-base-200 transition-colors",
+		templ.KV("bg-base-200/50", item.Unread) }
+		data-notification-id={ item.Title }
+		data-unread={ ternary(item.Unread, "true", "false") }>
+		<div class={ "rounded-lg p-2 shrink-0", item.IconClass }>
+			<span class={ "iconify size-4 " + item.IconName }></span>
+		</div>
+		<div class="flex-1 min-w-0">
+			<p class={ "text-sm truncate", templ.KV("font-semibold", item.Unread) }>{ item.Title }</p>
+			if item.Body != "" {
+				<p class="text-xs text-base-content/50 truncate mt-0.5">{ item.Body }</p>
+			}
+			<p class="text-xs text-base-content/40 mt-1">{ item.Time }</p>
+		</div>
+		if item.Unread {
+			<button class="btn btn-ghost btn-xs shrink-0 mt-1" onclick="markNotifRead(this, '{ dropdownID }')" aria-label="Mark as read">
+				@IconSpan("lucide--check", "size-3")
+			</button>
+		}
+	</div>
+}
+
+templ notificationDropdownScript(id string) {
+	<script>
+	if (!window._notifDropdownInit) {
+	  window._notifDropdownInit = true;
+
+	  window.markNotifRead = function(btn, dropdownId) {
+	    var row = btn.closest('[data-notification-id]');
+	    if (!row) return;
+	    row.dataset.unread = 'false';
+	    row.classList.remove('bg-base-200/50');
+	    var title = row.querySelector('.font-semibold');
+	    if (title) title.classList.remove('font-semibold');
+	    btn.remove();
+	    updateUnreadBadge(dropdownId);
+	  };
+
+	  window.markAllRead = function(dropdownId) {
+	    var container = document.getElementById(dropdownId + '-list');
+	    if (!container) return;
+	    container.querySelectorAll('[data-unread="true"]').forEach(function(row) {
+	      row.dataset.unread = 'false';
+	      row.classList.remove('bg-base-200/50');
+	      var title = row.querySelector('.font-semibold');
+	      if (title) title.classList.remove('font-semibold');
+	      var markBtn = row.querySelector('button');
+	      if (markBtn) markBtn.remove();
+	    });
+	    updateUnreadBadge(dropdownId);
+	  };
+
+	  function updateUnreadBadge(dropdownId) {
+	    var container = document.getElementById(dropdownId + '-list');
+	    if (!container) return;
+	    var unread = container.querySelectorAll('[data-unread="true"]').length;
+	    var dropdown = container.closest('[data-notification-dropdown]');
+	    if (!dropdown) return;
+	    var badge = dropdown.querySelector('.badge-error');
+	    var btn = dropdown.querySelector('.btn-circle');
+	    if (btn) {
+	      var existing = btn.querySelector('.badge');
+	      if (existing) existing.remove();
+	      if (unread > 0) {
+	        var newBadge = document.createElement('span');
+	        newBadge.className = 'badge badge-error badge-xs badge-outline absolute -top-0.5 -right-0.5';
+	        newBadge.textContent = unread;
+	        btn.appendChild(newBadge);
+	      }
+	    }
+	  }
+	}
+	</script>
+}

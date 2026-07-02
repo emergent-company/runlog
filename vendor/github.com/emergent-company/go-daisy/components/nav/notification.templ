@@ -1,0 +1,172 @@
+package nav
+
+import (
+	"strconv"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+type NotificationAction struct {
+	Label string
+	Href  string
+	Class string
+}
+
+type NotificationItem struct {
+	AvatarSrc string
+	AvatarAlt string
+	Name      string
+	Message   string
+	TimeAgo   string
+	Actions   []NotificationAction
+}
+
+type NotificationTab struct {
+	Label  string
+	Active bool
+	Badge  int
+}
+
+type NotificationVariantOpts struct {
+	Items []NotificationItem
+	Tabs  []NotificationTab
+}
+
+templ NotificationVariant(style string, opts NotificationVariantOpts) {
+	switch style {
+	case "basic":
+		<div class="dropdown dropdown-bottom sm:dropdown-end dropdown-center" { devmode.Attrs(ctx, "nav/NotificationVariant")... }>
+			<div tabindex="0" role="button" class="btn btn-circle btn-soft" aria-label="Notifications">
+				@ui.IconSpan("lucide--bell", "size-5")
+			</div>
+			<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-3 w-84 p-2 pt-3 shadow">
+				<div class="flex items-start justify-between px-2">
+					<p class="font-medium">Notification</p>
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonXS, Shape: ui.ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Close"}}){
+						@ui.IconSpan("lucide--x", "size-4")
+					}
+				</div>
+				if len(opts.Items) > 0 {
+					<div class="mt-3 flex items-center justify-center">
+						@ui.Badge(ui.BadgeProps{Label: "Today", Variant: ui.BadgePrimary, Style: ui.BadgeStyleSoft, Size: ui.BadgeSizeSM})
+					</div>
+					<div class="mt-2 space-y-0.5">
+						for _, item := range opts.Items {
+							<div class="rounded-box hover:bg-base-200 flex cursor-pointer items-center gap-3 px-2 py-1 transition-all">
+								<img class="bg-base-200 mask mask-squircle size-10 px-0.5 pt-0.5" alt={ item.AvatarAlt } src={ item.AvatarSrc } />
+								<p class="grow text-sm leading-tight">
+									{ item.Message }
+									<span class="text-base-content/60 float-end ms-2 text-xs">{ item.TimeAgo }</span>
+								</p>
+							</div>
+						}
+					</div>
+				}
+				<hr class="border-base-300 -mx-2 mt-2 border-dashed" />
+				<div class="flex items-center justify-between pt-2">
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonSM}){ "Mark as read" }
+					@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Style: ui.ButtonStyleSoft}){ "View All" }
+				</div>
+			</div>
+		</div>
+
+	case "tab":
+		<div class="dropdown dropdown-bottom sm:dropdown-end dropdown-center" { devmode.Attrs(ctx, "nav/NotificationVariant")... }>
+			<div tabindex="0" role="button" class="btn btn-circle btn-soft" aria-label="Notifications">
+				@ui.IconSpan("lucide--bell", "size-5")
+			</div>
+			<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-1 w-84 shadow">
+				<div class="bg-base-200/30 rounded-t-box border-base-200 border-b ps-4 pe-2 pt-3">
+					<div class="flex items-center justify-between">
+						<p class="font-medium">Notification</p>
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonGhost, Size: ui.ButtonXS, Shape: ui.ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Close"}}){
+							@ui.IconSpan("lucide--x", "size-4")
+						}
+					</div>
+					<div class="-ms-2 mt-2 -mb-px flex items-center justify-between">
+						<div role="tablist" class="tabs tabs-sm tabs-border">
+							for _, tab := range opts.Tabs {
+								<div role="tab" class={ "tab gap-2 px-3 font-medium", templ.KV("tab-active", tab.Active) }>
+									<span>{ tab.Label }</span>
+									if tab.Badge > 0 {
+										@ui.Badge(ui.BadgeProps{Label: strconv.Itoa(tab.Badge), Size: ui.BadgeSizeSM})
+									}
+								</div>
+							}
+						</div>
+					</div>
+				</div>
+				if len(opts.Items) > 0 {
+					for _, item := range opts.Items {
+						<div class="hover:bg-base-200/20 relative flex items-start gap-3 p-4 transition-all">
+							<div class="avatar avatar-online size-12">
+								<img class="from-primary/80 to-primary/60 mask mask-squircle bg-linear-to-b px-1 pt-1" alt={ item.AvatarAlt } src={ item.AvatarSrc } />
+							</div>
+							<div class="grow">
+								<p class="text-sm leading-tight">{ item.Message }</p>
+								<p class="text-base-content/60 text-xs">{ item.TimeAgo }</p>
+								if len(item.Actions) > 0 {
+									<div class="mt-2 flex items-center gap-2">
+										for _, a := range item.Actions {
+											<a href={ templ.SafeURL(a.Href) } class={ "btn btn-sm", a.Class }>{ a.Label }</a>
+										}
+									</div>
+								}
+							</div>
+						</div>
+					}
+				}
+			</div>
+		</div>
+
+	case "drawer":
+		<div class="drawer drawer-end z-40" { devmode.Attrs(ctx, "nav/NotificationVariant")... }>
+			<input id="notification-drawer" type="checkbox" class="drawer-toggle" />
+			<div class="drawer-content">
+				<label for="notification-drawer" class="btn btn-circle btn-soft" aria-label="Notifications">
+					@ui.IconSpan("lucide--bell", "size-5")
+				</label>
+			</div>
+			<div class="drawer-side">
+				<label for="notification-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+				<div class="bg-base-100 border-base-200 flex min-h-full w-80 flex-col border-s">
+					<div class="border-base-200 flex items-center justify-between border-b px-4 py-3">
+						<p class="font-medium">Notification</p>
+						<label for="notification-drawer" class="btn btn-xs btn-circle btn-ghost" aria-label="Close">
+							@ui.IconSpan("lucide--x", "size-4")
+						</label>
+					</div>
+					<div role="tablist" class="tabs tabs-sm tabs-border px-4 pt-3">
+						for _, tab := range opts.Tabs {
+							<div role="tab" class={ "tab gap-2", templ.KV("tab-active", tab.Active) }>
+								<span>{ tab.Label }</span>
+								if tab.Badge > 0 {
+									@ui.Badge(ui.BadgeProps{Label: strconv.Itoa(tab.Badge), Size: ui.BadgeSizeSM})
+								}
+							</div>
+						}
+					</div>
+					<div class="grow overflow-auto">
+						if len(opts.Items) > 0 {
+							for _, item := range opts.Items {
+								<div class="hover:bg-base-200/20 flex items-start gap-3 p-4 transition-all">
+									<div class="avatar avatar-online size-10">
+										<img class="mask mask-squircle" alt={ item.AvatarAlt } src={ item.AvatarSrc } />
+									</div>
+									<div class="grow">
+										<p class="text-sm leading-tight">{ item.Message }</p>
+										<p class="text-base-content/60 text-xs">{ item.TimeAgo }</p>
+									</div>
+								</div>
+							}
+						}
+					</div>
+					<div class="border-base-200 border-t px-4 py-3">
+						@ui.Button(ui.ButtonProps{Variant: ui.ButtonPrimary, Size: ui.ButtonSM, Style: ui.ButtonStyleSoft, ExtraClass: "w-full"}){ "View All" }
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

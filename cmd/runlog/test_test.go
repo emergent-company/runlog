@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+
+	runlog "github.com/emergent-company/runlog"
 	"path/filepath"
 	"testing"
 )
@@ -42,6 +44,10 @@ TEST_VAR=test_value
 import "testing"
 
 func TestDummy(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "test")
+	defer df.Done()
+	df.Describe("dummy")
+	df.Event("log", "dummy")
 	t.Log("dummy test")
 }
 `
@@ -55,6 +61,10 @@ func TestDummy(t *testing.T) {
 // TestCmdTest_ProfileEnvVar verifies that profile names set MEMORY_TEST_ENV correctly.
 // TestCmdTest_ProfileEnvVar verifies that passing a profile name sets the MEMORY_TEST_ENV environment variable correctly.
 func TestCmdTest_ProfileEnvVar(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "test")
+	defer df.Done()
+	df.Describe("cmd profileenvvar")
+	df.Event("log", "cmd profileenvvar")
 	tmpdir := setupTestEnv(t)
 	oldCwd, err := os.Getwd()
 	if err != nil {
@@ -89,6 +99,10 @@ func TestCmdTest_ProfileEnvVar(t *testing.T) {
 // TestCmdTest_EnvFileLoading verifies that .env files are loaded correctly.
 // TestCmdTest_EnvFileLoading verifies that loading .env files populates environment variables correctly.
 func TestCmdTest_EnvFileLoading(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "test")
+	defer df.Done()
+	df.Describe("cmd envfileloading")
+	df.Event("log", "cmd envfileloading")
 	tmpdir := setupTestEnv(t)
 	oldCwd, err := os.Getwd()
 	if err != nil {
@@ -109,10 +123,16 @@ func TestCmdTest_EnvFileLoading(t *testing.T) {
 
 	// Verify .env files exist
 	if _, err := os.Stat(filepath.Join(tmpdir, ".env")); err != nil {
+		df.Event("assertion", "FAIL: .env file not found")
 		t.Fatalf(".env not found: %v", err)
+	} else {
+		df.Event("assertion", ".env file exists")
 	}
 	if _, err := os.Stat(filepath.Join(tmpdir, ".env.localhost")); err != nil {
+		df.Event("assertion", "FAIL: .env.localhost not found")
 		t.Fatalf(".env.localhost not found: %v", err)
+	} else {
+		df.Event("assertion", ".env.localhost file exists")
 	}
 	if _, err := os.Stat(filepath.Join(tmpdir, ".env.test")); err != nil {
 		t.Fatalf(".env.test not found: %v", err)
@@ -124,6 +144,10 @@ func TestCmdTest_EnvFileLoading(t *testing.T) {
 // TestCmdTest_HelpFlag verifies that --help can be parsed.
 // TestCmdTest_HelpFlag verifies that the --help flag can be parsed without error.
 func TestCmdTest_HelpFlag(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "test")
+	defer df.Done()
+	df.Describe("cmd helpflag")
+	df.Event("log", "cmd helpflag")
 	// Test help flag parsing (which exits early)
 	err := cmdTest([]string{"--help"})
 	// Help exits with nil (success)
@@ -135,6 +159,10 @@ func TestCmdTest_HelpFlag(t *testing.T) {
 // TestCmdTest_ExtraFlagsAfterDashDash verifies parsing of flags after --.
 // TestCmdTest_ExtraFlagsAfterDashDash verifies that flags after the -- separator are parsed as extra go test flags.
 func TestCmdTest_ExtraFlagsAfterDashDash(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "test")
+	defer df.Done()
+	df.Describe("cmd extraflagsafterdashdash")
+	df.Event("log", "cmd extraflagsafterdashdash")
 	// Verify that arguments after -- are properly captured
 	// We test this by checking the parsing logic without exec
 	tmpdir := setupTestEnv(t)

@@ -28,6 +28,6 @@ templ HeroBody(title string, subtitle string, ctaLabel string) {
 	<div class="max-w-md" { devmode.Attrs(ctx, "ui/HeroBody")... }>
 		<h1 class="text-4xl font-bold">{ title }</h1>
 		<p class="py-4 text-base-content/60">{ subtitle }</p>
-		<button class="btn btn-primary">{ ctaLabel }</button>
+		@Button(ButtonProps{Variant: ButtonPrimary}) { { ctaLabel } }
 	</div>
 }

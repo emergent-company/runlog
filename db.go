@@ -3,7 +3,7 @@
 // RunDB: a SQLite-backed structured event log for test runs.
 //
 // Every test that creates a RunLog automatically gets its events persisted to
-// .runlog/runs.db (or $TEST_RUNS_DB if set).  Both Docker and host runs share
+// .runlog/runs.db.  Both Docker and host runs share
 // the same database so `runlog` shows a unified view.  The schema is
 // intentionally minimal: one row per test run, one row per event.  All
 // event-specific structure lives in the `details` TEXT column as a JSON blob
@@ -318,6 +318,22 @@ CREATE TABLE IF NOT EXISTS linter_runs (
 );
 CREATE INDEX IF NOT EXISTS idx_linter_runs_name_started
     ON linter_runs(linter_name, started_at DESC);
+	`,
+	},
+	{
+		version: 21,
+		sql: `
+-- coverage_pct stores the overall code coverage percentage for this test run
+-- (0.0 - 100.0). coverage_data stores the full per-function coverage JSON.
+ALTER TABLE test_runs ADD COLUMN coverage_pct   REAL;
+ALTER TABLE test_runs ADD COLUMN coverage_data  TEXT;
+`,
+	},
+	{
+		version: 22,
+		sql: `
+-- test_type classifies the test: unit, integration, e2e, component, etc.
+ALTER TABLE test_runs ADD COLUMN test_type TEXT NOT NULL DEFAULT '';
 `,
 	},
 }
@@ -424,7 +440,7 @@ func (rdb *RunDB) applyMigrations() error {
 // InsertRun inserts a new test_runs row and returns its auto-assigned ID.
 // runner identifies the execution environment (e.g. "host", "docker").
 // Pass "" to leave the runner column NULL.
-func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string, envName string, envVars map[string]string) (int64, error) {
+func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string, envName string, envVars map[string]string, testType string) (int64, error) {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 
@@ -444,8 +460,8 @@ func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string,
 		}
 	}
 	res, err := rdb.db.Exec(
-		`INSERT INTO test_runs(test_name, started_at, runner, env_name, env_vars) VALUES (?, ?, ?, ?, ?)`,
-		testName, startedAt.UTC().Format(time.RFC3339Nano), runnerVal, envNameVal, envVarsVal,
+		`INSERT INTO test_runs(test_name, started_at, runner, env_name, env_vars, test_type) VALUES (?, ?, ?, ?, ?, ?)`,
+		testName, startedAt.UTC().Format(time.RFC3339Nano), runnerVal, envNameVal, envVarsVal, testType,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("rundb: InsertRun: %w", err)
@@ -531,6 +547,18 @@ func (rdb *RunDB) UpdateRunCategory(id int64, category string) error {
 	return err
 }
 
+// UpdateRunCoverage stores code coverage data on the test_runs row.
+// coveragePct is the overall percentage (0.0-100.0), data is per-function JSON.
+func (rdb *RunDB) UpdateRunCoverage(id int64, coveragePct float64, coverageData string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(
+		`UPDATE test_runs SET coverage_pct = ?, coverage_data = ? WHERE id = ?`,
+		coveragePct, coverageData, id,
+	)
+	return err
+}
+
 // UpdateRunTimeout stores the timeout duration (in seconds) on the test_runs row.
 func (rdb *RunDB) UpdateRunTimeout(id int64, timeoutSeconds float64) error {
 	rdb.mu.Lock()
@@ -538,6 +566,17 @@ func (rdb *RunDB) UpdateRunTimeout(id int64, timeoutSeconds float64) error {
 	_, err := rdb.db.Exec(
 		`UPDATE test_runs SET timeout_seconds = ? WHERE id = ?`, timeoutSeconds, id,
 	)
+	return err
+}
+
+// UpdateRunField updates a single text column on the test_runs row identified by id.
+// field is the column name (e.g. "test_type", "category", "experiment").
+// value is the new text value.
+func (rdb *RunDB) UpdateRunField(id int64, field, value string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	q := fmt.Sprintf(`UPDATE test_runs SET %s = ? WHERE id = ?`, field)
+	_, err := rdb.db.Exec(q, value, id)
 	return err
 }
 
@@ -787,6 +826,9 @@ type RunRow struct {
 	CostUSD      *float64          // nil if no LLM calls made; estimated cost in USD
 	EnvVars      map[string]string // nil if not set; environment variables used during test
 	Category     *string           // nil if not set; self-declared via RunLog.SetCategory()
+	CoveragePct  *float64          // nil if no coverage data; percentage 0.0-100.0
+	CoverageData *string           // nil if no coverage data; JSON per-function coverage
+	TestType     string            // classification: unit, integration, e2e, component, etc.
 }
 
 // ChildEvent is one entry in the `children` JSON array stored on a group event.
@@ -836,7 +878,10 @@ func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
             r.env_vars,
             r.app_version,
             r.test_version,
-            r.category
+            r.category,
+            r.coverage_pct,
+            r.coverage_data,
+            r.test_type
         FROM test_runs r
         LEFT JOIN run_events e ON e.run_id = r.id
         WHERE r.started_at >= ?
@@ -870,6 +915,9 @@ func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
 		var costUSD *float64
 		var envVarsJSON *string
 		var appVersion, testVersion *string
+		var coveragePct *float64
+		var coverageData *string
+		var testType string
 		if err := rows.Scan(
 			&row.ID,
 			&row.TestName,
@@ -890,6 +938,9 @@ func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
 			&appVersion,
 			&testVersion,
 			&row.Category,
+			&coveragePct,
+			&coverageData,
+			&testType,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListRuns scan: %w", err)
 		}
@@ -928,6 +979,9 @@ func (rdb *RunDB) ListRuns(since time.Time, limit int) ([]RunRow, error) {
 		row.CostUSD = costUSD
 		row.AppVersion = appVersion
 		row.TestVersion = testVersion
+		row.CoveragePct = coveragePct
+		row.CoverageData = coverageData
+		row.TestType = testType
 		if envVarsJSON != nil && *envVarsJSON != "" {
 			var envVars map[string]string
 			if json.Unmarshal([]byte(*envVarsJSON), &envVars) == nil {
@@ -1149,7 +1203,8 @@ type TestStatRow struct {
 	MinDurationS float64
 	MaxDurationS float64
 	LastRunAt    time.Time
-	LastPassed   *bool // nil = last run was a skip or outcome unknown
+	LastPassed   *bool    // nil = last run was a skip or outcome unknown
+	AvgCoverage  *float64 // nil if no coverage data; average coverage across all runs
 }
 
 // TestStats returns per-test aggregated statistics for runs within the since
@@ -1166,7 +1221,8 @@ func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
 			AVG((julianday(finished_at) - julianday(started_at)) * 86400.0) AS avg_dur,
 			MIN((julianday(finished_at) - julianday(started_at)) * 86400.0) AS min_dur,
 			MAX((julianday(finished_at) - julianday(started_at)) * 86400.0) AS max_dur,
-			MAX(started_at) AS last_run_at
+			MAX(started_at) AS last_run_at,
+			AVG(coverage_pct) AS avg_coverage
 		FROM test_runs
 		WHERE finished_at IS NOT NULL
 		  AND started_at >= ?
@@ -1183,7 +1239,7 @@ func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
 	for rows.Next() {
 		var r TestStatRow
 		var lastRunStr string
-		var avgDur, minDur, maxDur *float64
+		var avgDur, minDur, maxDur, avgCov *float64
 		if err := rows.Scan(
 			&r.TestName,
 			&r.TotalRuns,
@@ -1194,6 +1250,7 @@ func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
 			&minDur,
 			&maxDur,
 			&lastRunStr,
+			&avgCov,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: TestStats scan: %w", err)
 		}
@@ -1206,6 +1263,9 @@ func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
 		}
 		if maxDur != nil {
 			r.MaxDurationS = *maxDur
+		}
+		if avgCov != nil {
+			r.AvgCoverage = avgCov
 		}
 		result = append(result, r)
 	}
@@ -1809,7 +1869,7 @@ func (rdb *RunDB) ListLinterRuns() ([]LinterRow, error) {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 	rows, err := rdb.db.Query(`
-		SELECT id, linter_name, command, status, exit_code, output, started_at, finished_at
+		SELECT id, linter_name, command, status, exit_code, COALESCE(output,''), started_at, finished_at
 		FROM linter_runs
 		WHERE id IN (SELECT MAX(id) FROM linter_runs GROUP BY linter_name)
 		ORDER BY linter_name`)
@@ -1833,7 +1893,7 @@ func (rdb *RunDB) GetLinterRun(id int64) (*LinterRow, error) {
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 	row := rdb.db.QueryRow(`
-		SELECT id, linter_name, command, status, exit_code, output, started_at, finished_at
+		SELECT id, linter_name, command, status, exit_code, COALESCE(output,''), started_at, finished_at
 		FROM linter_runs WHERE id = ?`, id)
 	var r LinterRow
 	var startedStr string
@@ -1856,7 +1916,7 @@ func (rdb *RunDB) ListLinterRunHistory(name string, offset, limit int) ([]Linter
 	var total int
 	_ = rdb.db.QueryRow(`SELECT COUNT(*) FROM linter_runs WHERE linter_name = ?`, name).Scan(&total)
 	rows, err := rdb.db.Query(`
-		SELECT id, linter_name, command, status, exit_code, output, started_at, finished_at
+		SELECT id, linter_name, command, status, exit_code, COALESCE(output,''), started_at, finished_at
 		FROM linter_runs
 		WHERE linter_name = ?
 		ORDER BY started_at DESC
@@ -1942,7 +2002,7 @@ func SharedDB() (*RunDB, error) { //nolint:deadcode
 // dbPath resolves the path for runs.db.
 //
 // Resolution order:
-//  1. TEST_RUNS_DB env var            — explicit override (absolute path)
+//  1. _RUNLOG_DAEMON_DB env var      — set by daemon for spawned test processes
 //  2. config file db: field           — from config.yaml in .runlog directory
 //  3. .runlog/runs.db                 — in the project's .runlog directory
 //  4. $TMPDIR/.../runs.db             — last-resort fallback
@@ -1951,7 +2011,7 @@ func SharedDB() (*RunDB, error) { //nolint:deadcode
 // (run.log, session-*.log) live under TEST_LOG_DIR, but the DB is always
 // at the project root so Docker and host runs share a single database.
 func dbPath() string { //nolint:deadcode
-	if d := os.Getenv("TEST_RUNS_DB"); d != "" {
+	if d := os.Getenv("_RUNLOG_DAEMON_DB"); d != "" {
 		return d
 	}
 	// Check config for an explicit db: field.

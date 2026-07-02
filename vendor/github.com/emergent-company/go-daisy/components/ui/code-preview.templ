@@ -21,9 +21,9 @@ templ CodePreview(tabs []CodeTab) {
 			<div class="tabs tabs-lift">
 				for i, tab := range tabs {
 					if i == 0 {
-						<input type="radio" name={ "cp-" + tabs[0].Label } class="tab" aria-label={ tab.Label } checked/>
+						<input type="radio" name={ "cp-" + tabs[0].Label } class="tab" aria-label={ tab.Label } checked />
 					} else {
-						<input type="radio" name={ "cp-" + tabs[0].Label } class="tab" aria-label={ tab.Label }/>
+						<input type="radio" name={ "cp-" + tabs[0].Label } class="tab" aria-label={ tab.Label } />
 					}
 					<div class="tab-content overflow-x-auto">
 						<pre class="text-xs" style="background-color:var(--shiki-bg,#0d1117);color:var(--shiki-punctuation,#c9d1d9);margin:0;padding:1rem;overflow-x:auto"><code class={ "language-" + tab.Lang }>{ tab.Code }</code></pre>
@@ -31,7 +31,14 @@ templ CodePreview(tabs []CodeTab) {
 				}
 			</div>
 		}
-		<button type="button" data-testid="code-preview-copy" style="position:absolute;top:0.25rem;right:0.5rem;z-index:10;opacity:0.6;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:var(--radius-field);cursor:pointer;color:inherit;background:transparent;border:none;padding:0" onclick="copyCode(this)" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'" aria-label="Copy to clipboard">
+		<button type="button" data-testid="code-preview-copy"
+		  data-tip="Copy"
+		  style="position:absolute;top:0.25rem;right:0.5rem;z-index:10;opacity:0.6;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:var(--radius-field);cursor:pointer;color:inherit;background:transparent;border:none;padding:0"
+		  class="tooltip tooltip-left"
+		  onclick="copyCode(this)"
+		  onmouseover="this.style.opacity='1'"
+		  onmouseout="this.style.opacity='0.6'"
+		  aria-label="Copy to clipboard">
 			<svg fill="currentColor" style="width:1rem;height:1rem" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M 16 3 C 14.742188 3 13.847656 3.890625 13.40625 5 L 6 5 L 6 28 L 26 28 L 26 5 L 18.59375 5 C 18.152344 3.890625 17.257813 3 16 3 Z M 16 5 C 16.554688 5 17 5.445313 17 6 L 17 7 L 20 7 L 20 9 L 12 9 L 12 7 L 15 7 L 15 6 C 15 5.445313 15.445313 5 16 5 Z M 8 7 L 10 7 L 10 11 L 22 11 L 22 7 L 24 7 L 24 26 L 8 26 Z"></path></svg>
 		</button>
 	</div>
@@ -39,19 +46,64 @@ templ CodePreview(tabs []CodeTab) {
 		(function() {
 			if (window._hljsLoaded) return;
 			window._hljsLoaded = true;
-			function highlight() { if (typeof hljs !== 'undefined') hljs.highlightAll(); }
-			if (typeof hljs !== 'undefined') { highlight(); return; }
+			var _hljsCbs = [];
+			window._hljsHighlightAll = function() {
+				if (typeof hljs !== 'undefined') { hljs.highlightAll(); return; }
+				_hljsCbs.push(function() { hljs.highlightAll(); });
+			};
+			function flushCbs() {
+				if (typeof hljs === 'undefined') return;
+				hljs.highlightAll();
+				for (var i = 0; i < _hljsCbs.length; i++) _hljsCbs[i]();
+				_hljsCbs = [];
+			}
+			if (typeof hljs !== 'undefined') { flushCbs(); return; }
 			var l = document.createElement('link');
 			l.rel = 'stylesheet';
 			l.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
 			document.head.appendChild(l);
 			var s = document.createElement('script');
 			s.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
-			s.onload = highlight;
+			s.onload = flushCbs;
 			document.head.appendChild(s);
 			document.addEventListener('htmx:after:settle', function() {
 				if (typeof hljs !== 'undefined') hljs.highlightAll();
 			});
+		})();
+	</script>
+		<script>
+		(function() {
+			if (window._cpCopyLoaded) return;
+			window._cpCopyLoaded = true;
+			function cpShowCopied(btn) {
+				btn._origTip = btn._origTip || btn.getAttribute('data-tip');
+				btn.setAttribute('data-tip', 'Copied!');
+				setTimeout(function() { btn.setAttribute('data-tip', btn._origTip || 'Copy'); }, 2000);
+			}
+			window.copyCode = function(btn) {
+				var c = btn.parentElement;
+				var r = c.querySelector('input[type="radio"]:checked');
+				var el;
+				if (r) {
+					el = r.nextElementSibling && r.nextElementSibling.querySelector('code');
+				} else {
+					el = c.querySelector('code');
+				}
+				if (!el) return;
+				var t = el.innerText;
+				if (navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText(t).then(function() { cpShowCopied(btn); }).catch(function() {});
+				} else {
+					var ta = document.createElement('textarea');
+					ta.value = t;
+					ta.style.position = 'fixed';
+					ta.style.left = '-9999px';
+					document.body.appendChild(ta);
+					ta.select();
+					try { document.execCommand('copy'); cpShowCopied(btn); } catch(e) {}
+					document.body.removeChild(ta);
+				}
+			};
 		})();
 	</script>
 }

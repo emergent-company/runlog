@@ -1,0 +1,30 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// AnimatedGradientText renders text with an animated gradient that shifts colors.
+// fromColor / toColor: Tailwind gradient color stops, e.g. "from-primary" "to-secondary"
+// size: Tailwind text size class, e.g. "text-3xl", "text-lg"
+// weight: Tailwind font weight, e.g. "font-bold", "font-black"
+templ AnimatedGradientText(text string, fromColor string, toColor string, size string, weight string) {
+	<span
+		class={ "bg-linear-to-r bg-clip-text text-transparent animate-gradient-shift",
+			fromColor,
+			toColor,
+			size,
+			weight }
+		{ devmode.Attrs(ctx, "ui/AnimatedGradientText")... }
+	>{ text }</span>
+}
+
+// GradientText renders static gradient text without animation.
+templ GradientText(text string, fromColor string, toColor string, size string, weight string) {
+	<span
+		class={ "bg-linear-to-r bg-clip-text text-transparent",
+			fromColor,
+			toColor,
+			size,
+			weight }
+		{ devmode.Attrs(ctx, "ui/GradientText")... }
+	>{ text }</span>
+}

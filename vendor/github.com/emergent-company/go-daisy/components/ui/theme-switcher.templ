@@ -1,0 +1,102 @@
+package ui
+
+// ThemeSwitcher renders a 3-way theme dropdown (Light/Dark/System) with
+// localStorage persistence, OS preference detection, iframe sync via
+// contentDocument, and parent-frame postMessage.
+templ ThemeSwitcher() {
+	<div class="dropdown dropdown-end">
+		<label tabindex="0" class="btn btn-sm btn-circle btn-ghost" data-testid="theme-toggle">
+			<span id="theme-icon-light" class="iconify lucide--sun size-4.5"></span>
+			<span id="theme-icon-dark" class="iconify lucide--moon size-4.5" style="display:none"></span>
+			<span id="theme-icon-system" class="iconify lucide--monitor-dot size-4.5" style="display:none"></span>
+		</label>
+		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-36 p-2 shadow-sm" data-testid="theme-dropdown">
+			<li><button data-theme-option="light" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--sun size-4"></span>Light<span id="check-light" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
+			<li><button data-theme-option="dark" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--moon size-4"></span>Dark<span id="check-dark" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
+			<li><button data-theme-option="system" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--monitor-dot size-4"></span>System<span id="check-system" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
+		</ul>
+	</div>
+	<script>
+		(function() {
+			var THEMES = { light: 'nord', dark: 'dracula' };
+			var STORAGE_KEY = 'gallery-ui-theme';
+			var PREVIEW_KEY = 'gallery-preview-theme';
+
+			function resolveTheme(mode) {
+				if (mode === 'system') {
+					return window.matchMedia('(prefers-color-scheme: dark)').matches ? THEMES.dark : THEMES.light;
+				}
+				return THEMES[mode] || THEMES.light;
+			}
+
+			function resolvePreviewMode(mode) {
+				if (mode === 'system') {
+					return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+				}
+				return mode;
+			}
+
+			function syncPreviewIframes(mode) {
+				var previewMode = resolvePreviewMode(mode);
+				try { localStorage.setItem(PREVIEW_KEY, previewMode); } catch(e) {}
+				var daisyTheme = THEMES[previewMode] || THEMES.light;
+				document.querySelectorAll('[id$="preview-frame"], [id*="examples-frame"]').forEach(function(f) {
+					try {
+						var d = f.contentDocument || f.contentWindow.document;
+						if (d && d.documentElement) {
+							d.documentElement.setAttribute('data-theme', daisyTheme);
+						}
+					} catch(e) {}
+				});
+			}
+
+			var _applying = false;
+			function applyTheme(mode) {
+				if (_applying) return;
+				_applying = true;
+				try {
+					var themeAttr = resolveTheme(mode);
+					var html = document.documentElement;
+					html.setAttribute('data-theme', themeAttr);
+					['light','dark','system'].forEach(function(m) {
+						var el = document.getElementById('theme-icon-' + m);
+						if (el) el.style.display = m === mode ? '' : 'none';
+						var ck = document.getElementById('check-' + m);
+						if (ck) ck.style.display = m === mode ? '' : 'none';
+					});
+					try { localStorage.setItem(STORAGE_KEY, mode); } catch(e) {}
+					syncPreviewIframes(mode);
+				} finally { _applying = false; }
+			}
+
+			var saved = null;
+			try { saved = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+			if (!saved) { saved = 'system'; }
+			applyTheme(saved);
+
+			var mq = window.matchMedia('(prefers-color-scheme: dark)');
+			mq.addEventListener('change', function() {
+				var cur = null;
+				try { cur = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+				if (cur === 'system') applyTheme('system');
+			});
+
+			document.addEventListener('htmx:historyRestore', function() {
+				var restored = null;
+				try { restored = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+				if (restored) applyTheme(restored);
+			});
+
+			document.addEventListener('htmx:afterSettle', function() {
+				var cur = null;
+				try { cur = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+				if (cur) syncPreviewIframes(cur);
+			});
+
+			document.addEventListener('click', function(e) {
+				var option = e.target.closest('[data-theme-option]');
+				if (option) { applyTheme(option.getAttribute('data-theme-option')); }
+			});
+		})();
+	</script>
+}

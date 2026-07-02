@@ -33,6 +33,7 @@ var sidebarGroups = []layout.SidebarGroup{
 			{Label: "Tests", Href: "/ui/tests", Icon: "lucide--flask-conical"},
 			{Label: "All Runs", Href: "/ui/runs", Icon: "lucide--list"},
 			{Label: "Linters", Href: "/ui/linters", Icon: "lucide--shield"},
+			{Label: "Environments", Href: "/ui/environments", Icon: "lucide--folder"},
 		},
 	},
 	{
@@ -49,13 +50,16 @@ var sidebarGroups = []layout.SidebarGroup{
 // ─────────────────────────────────────────────────────────────────────────────
 
 type dashboardData struct {
-	TotalTests int
-	TotalRuns  int
-	PassCount  int
-	FailCount  int
-	SkipCount  int
-	RecentRuns []runlog.RunRow
-	Categories []catSummary
+	TotalTests   int
+	TotalRuns    int
+	PassCount    int
+	FailCount    int
+	SkipCount    int
+	RecentRuns   []runlog.RunRow
+	Categories   []catSummary
+	EnvCount     int
+	EnvPassCount int
+	CoveragePct  *float64 // nil if no coverage data
 }
 
 type catSummary struct {
@@ -80,6 +84,7 @@ type testListEntry struct {
 	LastRunAt  string
 	RunCount   int
 	NeverRun   bool
+	TestType   string
 }
 
 type trendPoint struct {
@@ -99,6 +104,7 @@ type testStats struct {
 	TrendFlat   bool
 	HasCostData bool
 	AvgCost     string
+	AvgCoverage string
 }
 
 type runFilters struct {
@@ -288,6 +294,54 @@ type linterLauncherData struct {
 type linterRunDetailData struct {
 	LinterName string
 	Run        runlog.LinterRow
+}
+
+// ── Environment template data types ──────────────────────────────────────────
+
+type envListEntry struct {
+	Name           string
+	VarCount       int
+	CheckCount     int
+	HasTestScript  bool
+	HasSetupScript bool
+	Status         string // pass / fail / unknown
+}
+
+type envListData struct {
+	Envs []envListEntry
+}
+
+type envCheckResult struct {
+	Key       string
+	CheckType string
+	Value     string
+	Pass      bool
+	Error     string
+	Hint      string
+}
+
+type envDetailData struct {
+	Name         string
+	Status       string
+	VarCount     int
+	CheckCount   int
+	EnvVars      map[string]string
+	CheckResults []envCheckResult
+	TestScript   string
+	SetupScript  string
+}
+
+// ── Search types ─────────────────────────────────────────────────────────────
+
+type searchResultItem struct {
+	Icon  string // lucide icon identifier
+	Label string
+	Href  string
+}
+
+type searchResultSection struct {
+	Title string
+	Items []searchResultItem
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -649,6 +703,13 @@ func (al *ActiveLinter) Unsubscribe(ch chan string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // statusFromRun returns the status string for a RunRow.
+func coverageStr(pct *float64) string {
+	if pct == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.1f%%", *pct)
+}
+
 func statusFromRun(r runlog.RunRow) string {
 	if r.FinishedAt == nil {
 		return "running"
@@ -678,6 +739,7 @@ type WebApp struct {
 	sse       *SSEBroker
 	startedAt time.Time
 	workDir   string
+	cancel    context.CancelFunc
 }
 
 func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp {
@@ -723,9 +785,15 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 		workDir:   workDir,
 	}
 
+	if config.Name != "" {
+		SetAppName(config.Name)
+	}
+
 	app.sse.SetLinterManager(app.linterMgr)
-	go app.sse.Run(context.Background())
-	go app.runTimeoutWorker(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	app.cancel = cancel
+	go app.sse.Run(ctx)
+	go app.runTimeoutWorker(ctx)
 
 	// Static assets from go-daisy
 	e.StaticFS("/static", staticfs.FS())
@@ -768,18 +836,57 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 	e.POST("/linters/run-all", app.handleRunAllLinters)
 	e.GET("/linters/:name/events", app.handleLinterEvents)
 
+	// Environment routes
+	e.GET("/environments", app.handleEnvironments)
+	e.GET("/environments/:name", app.handleEnvironmentDetail)
+
+	// Search
+	e.GET("/search", app.handleSearch)
+
 	return app
 }
 
 // linterDefs returns the list of configured linters, falling back to lefthook
 // discovery if no linters are configured in the config file.
+// When the config defines projects, returns linters from all projects with
+// names prefixed as "project/name".
 func (app *WebApp) linterDefs() []runlog.LinterDef {
 	if len(app.config.Linters) > 0 {
 		return app.config.Linters
 	}
+
+	// Multi-project: collect linters from each project
+	if len(app.config.Projects) > 0 {
+		var all []runlog.LinterDef
+		seen := make(map[string]bool)
+		for _, p := range app.config.Projects {
+			dir := p.WorkDir
+			if dir == "" {
+				dir = app.workDir
+			}
+			linters := runlog.DiscoverLintersFromDir(dir)
+			for _, l := range linters {
+				name := p.Name + "/" + l.Name
+				if seen[name] {
+					continue
+				}
+				seen[name] = true
+				all = append(all, runlog.LinterDef{Name: name, Command: l.Command})
+			}
+		}
+		return all
+	}
+
+	// Single project: discover from lefthook
 	precommit, _ := runlog.DiscoverLintersFromLefthook(app.workDir, "pre-commit")
 	lint, _ := runlog.DiscoverLintersFromLefthook(app.workDir, "lint")
 	return runlog.MergeLinters(precommit, lint)
+}
+
+func (app *WebApp) Shutdown() {
+	if app.cancel != nil {
+		app.cancel()
+	}
 }
 
 func (app *WebApp) ServeHTTP(w http.ResponseWriter, r *http.Request) {
