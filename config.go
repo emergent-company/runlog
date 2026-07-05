@@ -168,10 +168,17 @@ func LoadConfig(dbDir string) (*Config, error) {
 
 // parseConfigFile reads and parses a configuration file.
 // We use a simple hand-rolled parser to avoid adding a YAML dependency.
+// parseConfigFile reads and parses a configuration file.
+// We use a simple hand-rolled parser to avoid adding a YAML dependency.
+//
+// Always returns a non-nil *Config, even when err != nil — callers that
+// discard the error (a common, defensible pattern for optional config, e.g.
+// `cfg, _ := LoadConfig(...)`) must never end up dereferencing a nil
+// pointer as a result.
 func parseConfigFile(path string) (*Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open config %s: %w", path, err)
+		return &Config{}, fmt.Errorf("open config %s: %w", path, err)
 	}
 	defer f.Close()
 
@@ -186,6 +193,7 @@ func parseConfigFile(path string) (*Config, error) {
 	var envSubSection string
 	var currentEnvKey string
 	var currentEnvCheck *EnvCheck
+	var currentCategory string
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -354,6 +362,24 @@ func parseConfigFile(path string) (*Config, error) {
 						currentEnv.SetupScript = strings.Trim(currentEnv.SetupScript, "\"'")
 					}
 				}
+			case "categories":
+				if strings.HasPrefix(trimmed, "- ") {
+					// Test-name item under the current category. Strip a
+					// single layer of surrounding quotes if the YAML author
+					// quoted the value (e.g. names containing ':').
+					item := strings.TrimPrefix(trimmed, "- ")
+					item = strings.Trim(item, "\"'")
+					if currentCategory != "" {
+						cfg.Categories[currentCategory] = append(cfg.Categories[currentCategory], item)
+					}
+				} else if strings.HasSuffix(trimmed, ":") {
+					// New category name, e.g. "auth:".
+					currentCategory = strings.TrimSuffix(trimmed, ":")
+					currentCategory = strings.Trim(currentCategory, "\"'")
+					if _, ok := cfg.Categories[currentCategory]; !ok {
+						cfg.Categories[currentCategory] = nil
+					}
+				}
 			}
 			continue
 		}
@@ -417,11 +443,17 @@ func parseConfigFile(path string) (*Config, error) {
 			envSubSection = ""
 			continue
 		}
+		if trimmed == "categories:" {
+			currentSection = "categories"
+			currentCategory = ""
+			cfg.Categories = make(map[string][]string)
+			continue
+		}
 
 		// Unknown top-level key — reject with error
 		key := strings.SplitN(trimmed, ":", 2)[0]
 		if !knownTopLevelKeys[key] {
-			return nil, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, artifacts_dir, env, test_packages, linters, projects, environments, categories)", path, key)
+			return cfg, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, artifacts_dir, env, test_packages, linters, projects, environments, categories)", path, key)
 		}
 	}
 
@@ -440,7 +472,7 @@ func parseConfigFile(path string) (*Config, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("read config %s: %w", path, err)
+		return cfg, fmt.Errorf("read config %s: %w", path, err)
 	}
 
 	return cfg, nil
