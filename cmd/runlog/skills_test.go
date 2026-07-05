@@ -38,11 +38,11 @@ func TestDiscoverEmbeddedSkills(t *testing.T) {
 	if err != nil {
 		t.Fatalf("discoverEmbeddedSkills: %v", err)
 	}
-	if len(skills) != 5 {
-		df.Event("assertion", "FAIL: expected 5 embedded skills")
-		t.Errorf("expected 5 embedded skills, got %d", len(skills))
+	if len(skills) != 6 {
+		df.Event("assertion", "FAIL: expected 6 embedded skills")
+		t.Errorf("expected 6 embedded skills, got %d", len(skills))
 	} else {
-		df.Event("assertion", "found 5 embedded skills")
+		df.Event("assertion", "found 6 embedded skills")
 	}
 
 	// All skills must have runlog- prefix.
@@ -59,6 +59,7 @@ func TestDiscoverEmbeddedSkills(t *testing.T) {
 		"runlog-verify-runs":        false,
 		"runlog-clear":              false,
 		"runlog-install-skills":     false,
+		"runlog-guide":              false,
 	}
 	for _, s := range skills {
 		if _, ok := expected[s.Name]; ok {

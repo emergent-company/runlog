@@ -85,9 +85,30 @@ func MustRunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...
 	invocation := fmt.Sprintf("%s %s", binary, strings.Join(args, " "))
 
 	if err != nil {
+		logCLIFailureIfActive(t, invocation, out, err)
 		t.Fatalf("CLI command failed: %s\nerror: %v\noutput:\n%s", invocation, err, out)
 	}
 	return out
+}
+
+// logCLIFailureIfActive records a "cli" event (with error/exit-code details)
+// for the active RunLog of this test, if one exists, before a Must* helper
+// calls t.Fatalf. This mirrors RunLog.Failf's log-before-fatal pattern so a
+// failed CLI command is never silently invisible in the run log — without
+// this, t.Fatalf calls runtime.Goexit immediately and the caller never gets
+// a chance to log the invocation, leaving an empty dangling section with no
+// diagnostic trace of what actually failed.
+func logCLIFailureIfActive(t *testing.T, invocation, output string, err error) { //nolint:deadcode
+	t.Helper()
+	v, ok := ActiveRunLogs.Load(t.Name())
+	if !ok {
+		return
+	}
+	rl, ok := v.(*RunLog)
+	if !ok || rl == nil {
+		return
+	}
+	rl.CLIStepErr("$ "+invocation, invocation, output, err)
 }
 
 // RunBinaryInDirWithHome is like MustRunBinaryInDirWithHome but returns an

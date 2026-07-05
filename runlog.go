@@ -705,6 +705,33 @@ func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) stri
 	return out
 }
 
+// MustRunCLIInDirWithHome runs `memory <args>` from dir with the given home
+// directory and emits exactly one CLI event. Fails the test on non-zero exit;
+// the failure is logged to the run log before t.Fatalf (see
+// logCLIFailureIfActive), so failed commands are never silently invisible.
+// This is the single source of truth for dir/home-aware CLI invocation —
+// prefer it over a locally-duplicated per-package wrapper.
+func (rl *RunLog) MustRunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) string { //nolint:deadcode
+	t.Helper()
+	out := MustRunCLIInDirWithHome(t, dir, home, args...)
+	invocation := "memory " + strings.Join(args, " ")
+	rl.CLI(invocation, out)
+	return out
+}
+
+// RunCLIInDirWithHome runs `memory <args>` from dir with the given home
+// directory, returns (output, error), and emits exactly one CLI event
+// (success or failure). Use this instead of manually pairing the
+// package-level RunCLIInDirWithHome with a separate rl.CLIErr call — doing
+// both double-records the event.
+func (rl *RunLog) RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string, error) { //nolint:deadcode
+	t.Helper()
+	out, err := RunCLIInDirWithHome(t, dir, home, args...)
+	invocation := "memory " + strings.Join(args, " ")
+	rl.CLIErr(invocation, out, err)
+	return out, err
+}
+
 // CLIStep is like CLI but uses desc as the short message shown in the run list
 // (e.g. "Revoke token") instead of the raw invocation string.  The full
 // invocation and output are still recorded in the inspector details.
