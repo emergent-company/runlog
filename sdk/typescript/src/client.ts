@@ -22,7 +22,7 @@ export class RunLogError extends Error {
 
 export class RunLogClient {
   constructor(
-    private baseUrl: string = 'http://localhost:5002',
+    private baseUrl: string = process.env.RUNLOG_DAEMON_URL || 'http://localhost:5002',
     private _fetch: typeof fetch = globalThis.fetch,
   ) {}
 

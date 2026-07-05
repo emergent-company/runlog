@@ -1,24 +1,47 @@
 {
-  "name": "@runlog/client",
-  "version": "0.1.0",
+  "name": "@emergent-company/runlog-client",
+  "version": "0.2.0",
   "description": "TypeScript SDK for the runlog test observability daemon",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emergent-company/runlog.git",
+    "directory": "sdk/typescript"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./jest": {
-      "types": "./dist/reporter.d.ts",
-      "import": "./dist/reporter.js",
-      "require": "./dist/reporter.cjs"
+      "import": {
+        "types": "./dist/reporter.d.ts",
+        "default": "./dist/reporter.js"
+      },
+      "require": {
+        "types": "./dist/reporter.d.cts",
+        "default": "./dist/reporter.cjs"
+      }
     },
     "./playwright": {
-      "types": "./dist/playwright.d.ts",
-      "import": "./dist/playwright.js",
-      "require": "./dist/playwright.cjs"
+      "import": {
+        "types": "./dist/playwright.d.ts",
+        "default": "./dist/playwright.js"
+      },
+      "require": {
+        "types": "./dist/playwright.d.cts",
+        "default": "./dist/playwright.cjs"
+      }
     }
   },
   "main": "./dist/index.cjs",

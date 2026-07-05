@@ -20,6 +20,11 @@ logs/
 tests/web/node_modules/
 sdk/typescript/node_modules/
 sdk/typescript/dist/
+sdk/typescript/*.tgz
+tests/web/test-results/
+tests/web/playwright-report/
+tests/web/.runlog/
+coverage.out
 Thumbs.db
 .vscode/
 .env.local
