@@ -72,5 +72,3 @@ require (
 )
 
 replace github.com/emergent-company/go-daisy => /root/go-daisy
-
-replace github.com/emergent-company/runlog => /root/runlog
