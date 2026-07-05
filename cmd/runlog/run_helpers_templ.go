@@ -657,6 +657,26 @@ type runsTableOpts struct {
 	Categories   map[int64]string // run ID → category name
 }
 
+// displayCategory returns cat, or "Uncategorized" if cat is empty — the
+// canonical bucket label for tests that never called RunLog.SetCategory().
+// Mirrors the bucketing done by runlog.RunDB.CategoryStats().
+func displayCategory(cat string) string {
+	if cat == "" {
+		return "Uncategorized"
+	}
+	return cat
+}
+
+// displayTestType returns t, or "other" if t is empty — the canonical bucket
+// label for tests that never had a test_type derived or set. Mirrors the
+// bucketing done by runlog.RunDB.TestTypeStats().
+func displayTestType(t string) string {
+	if t == "" {
+		return "other"
+	}
+	return t
+}
+
 func testTypeBadge(t string) string {
 	switch t {
 	case "unit":
@@ -834,7 +854,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 					var templ_7745c5c3_Var29 string
 					templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("run-%d", r.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 241, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 261, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 					if templ_7745c5c3_Err != nil {
@@ -847,7 +867,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 					var templ_7745c5c3_Var30 string
 					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("run-row-%d", r.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 242, Col: 50}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 262, Col: 50}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
 					if templ_7745c5c3_Err != nil {
@@ -860,7 +880,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 					var templ_7745c5c3_Var31 string
 					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/ui/runs/%d", r.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 244, Col: 46}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 264, Col: 46}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 					if templ_7745c5c3_Err != nil {
@@ -1003,7 +1023,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 								var templ_7745c5c3_Var38 string
 								templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(opts.Categories[r.ID])
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 270, Col: 72}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 290, Col: 72}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 								if templ_7745c5c3_Err != nil {
@@ -1059,7 +1079,7 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 							var templ_7745c5c3_Var42 string
 							templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(r.TestType)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 276, Col: 61}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 296, Col: 61}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 							if templ_7745c5c3_Err != nil {

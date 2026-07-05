@@ -72,7 +72,7 @@ type DaemonServer struct {
 	pidFile      string        // path to PID file, cleaned up before re-exec
 	restartCh    chan struct{} // closed by watchBinary; Start() does cleanup + Exec on main goroutine
 	cancel       context.CancelFunc
-	artifactsDir string        // path to directory for test artifacts (screenshots, etc.)
+	artifactsDir string // path to directory for test artifacts (screenshots, etc.)
 }
 
 // newDaemonServer creates a DaemonServer backed by the given RunDB and port.

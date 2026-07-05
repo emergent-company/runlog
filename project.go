@@ -26,6 +26,7 @@ func CreateProject(t *testing.T, home, srv, name string) string { //nolint:deadc
 	t.Helper()
 	args := append([]string{"projects", "create", "--name", name}, ProjectCreateOrgArgs()...)
 	out := MustRunCLIInDirWithHome(t, "", home, args...)
+	logCLISuccessIfActive(t, "memory "+strings.Join(args, " "), out)
 	t.Logf("projects create:\n%s", out)
 
 	projectID := ParseProjectID(out)
@@ -35,7 +36,9 @@ func CreateProject(t *testing.T, home, srv, name string) string { //nolint:deadc
 	t.Logf("project: %s (%s)", name, projectID)
 
 	// Set project_id in config so commands that don't honour --project find it.
-	MustRunCLIInDirWithHome(t, "", home, "config", "set", "project_id", projectID)
+	setArgs := []string{"config", "set", "project_id", projectID}
+	setOut := MustRunCLIInDirWithHome(t, "", home, setArgs...)
+	logCLISuccessIfActive(t, "memory "+strings.Join(setArgs, " "), setOut)
 
 	// Register with daemon for orphan tracking (best-effort).
 	daemonRegisterResource(projectID)

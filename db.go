@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1297,6 +1298,173 @@ func (rdb *RunDB) TestStats(since time.Time) ([]TestStatRow, error) {
 	}
 
 	return result, nil
+}
+
+// TestCatalogRow is one row per distinct test name, describing what the test
+// is and how it's currently classified — independent of run history. This is
+// the "what and how is tested" view: Category/TestType/Description/Tags all
+// reflect the test's MOST RECENT run, not an aggregate across all runs, since
+// classification can be added/changed over a test's lifetime and only the
+// latest value is meaningful. Category/TestType are "" if never set; callers
+// should display "Uncategorized"/"other" respectively.
+type TestCatalogRow struct {
+	TestName    string
+	Category    string
+	TestType    string
+	Description *RunDescription
+	Tags        []string
+	RunCount    int
+	LastRunAt   time.Time
+	LastStatus  string // "pass", "fail", "skip", "timeout", "running"
+}
+
+// ListTestCatalog returns one row per distinct test name reflecting its most
+// recently recorded category, test_type, description, and tags, plus overall
+// run_count and last status. Powers the Catalog page and the
+// CategoryStats/TestTypeStats aggregations below.
+func (rdb *RunDB) ListTestCatalog() ([]TestCatalogRow, error) {
+	rdb.mu.Lock()
+	rows, err := rdb.db.Query(`
+		SELECT t.test_name, t.run_count, t.last_started, t.category, t.test_type,
+		       t.description, t.tags, t.passed, t.skipped, t.reason
+		FROM (
+			SELECT test_name,
+			       COUNT(*)        OVER (PARTITION BY test_name) AS run_count,
+			       MAX(started_at) OVER (PARTITION BY test_name) AS last_started,
+			       category, test_type, description, tags, passed, skipped, reason,
+			       ROW_NUMBER()    OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
+			FROM test_runs
+		) t
+		WHERE t.rn = 1
+		ORDER BY t.test_name
+	`)
+	rdb.mu.Unlock()
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListTestCatalog: %w", err)
+	}
+	defer rows.Close()
+
+	var result []TestCatalogRow
+	for rows.Next() {
+		var name, lastStarted string
+		var runCount int
+		var category, testType, descJSON, tagsJSON, reason sql.NullString
+		var passed, skipped sql.NullInt64
+		if err := rows.Scan(&name, &runCount, &lastStarted, &category, &testType,
+			&descJSON, &tagsJSON, &passed, &skipped, &reason); err != nil {
+			continue
+		}
+		row := TestCatalogRow{TestName: name, RunCount: runCount}
+		if category.Valid {
+			row.Category = category.String
+		}
+		if testType.Valid {
+			row.TestType = testType.String
+		}
+		if lastStarted != "" {
+			row.LastRunAt, _ = time.Parse(time.RFC3339Nano, lastStarted)
+		}
+		if descJSON.Valid && descJSON.String != "" {
+			var d RunDescription
+			if json.Unmarshal([]byte(descJSON.String), &d) == nil {
+				row.Description = &d
+			}
+		}
+		if tagsJSON.Valid && tagsJSON.String != "" {
+			var tags []string
+			if json.Unmarshal([]byte(tagsJSON.String), &tags) == nil {
+				row.Tags = tags
+			}
+		}
+		switch {
+		case !passed.Valid:
+			row.LastStatus = "running"
+		case skipped.Valid && skipped.Int64 == 1:
+			row.LastStatus = "skip"
+		case passed.Int64 == 1:
+			row.LastStatus = "pass"
+		case reason.Valid && reason.String == "timed out":
+			row.LastStatus = "timeout"
+		default:
+			row.LastStatus = "fail"
+		}
+		result = append(result, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// CategoryStat is the test count for one category.
+type CategoryStat struct {
+	Name      string
+	TestCount int
+}
+
+// CategoryStats groups ListTestCatalog by each test's most recent category
+// ("Uncategorized" for tests that never called SetCategory), sorted by
+// TestCount descending then Name ascending. Used by the dashboard and TUI to
+// show a real per-category breakdown instead of a single hardcoded bucket.
+func (rdb *RunDB) CategoryStats() ([]CategoryStat, error) {
+	catalog, err := rdb.ListTestCatalog()
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int)
+	for _, row := range catalog {
+		name := row.Category
+		if name == "" {
+			name = "Uncategorized"
+		}
+		counts[name]++
+	}
+	stats := make([]CategoryStat, 0, len(counts))
+	for name, count := range counts {
+		stats = append(stats, CategoryStat{Name: name, TestCount: count})
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].TestCount != stats[j].TestCount {
+			return stats[i].TestCount > stats[j].TestCount
+		}
+		return stats[i].Name < stats[j].Name
+	})
+	return stats, nil
+}
+
+// TestTypeStat is the test count for one test_type value.
+type TestTypeStat struct {
+	Name      string
+	TestCount int
+}
+
+// TestTypeStats groups ListTestCatalog by each test's most recent test_type
+// ("other" for tests that never had one derived/set), sorted by TestCount
+// descending then Name ascending.
+func (rdb *RunDB) TestTypeStats() ([]TestTypeStat, error) {
+	catalog, err := rdb.ListTestCatalog()
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int)
+	for _, row := range catalog {
+		name := row.TestType
+		if name == "" {
+			name = "other"
+		}
+		counts[name]++
+	}
+	stats := make([]TestTypeStat, 0, len(counts))
+	for name, count := range counts {
+		stats = append(stats, TestTypeStat{Name: name, TestCount: count})
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		if stats[i].TestCount != stats[j].TestCount {
+			return stats[i].TestCount > stats[j].TestCount
+		}
+		return stats[i].Name < stats[j].Name
+	})
+	return stats, nil
 }
 
 // ListExperiments returns one ExperimentSummary per distinct non-null

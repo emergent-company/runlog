@@ -446,7 +446,7 @@ func cmdStats(db *runlog.RunDB, since time.Duration) error {
 
 // cmdTestsList prints a plain-text table of all known tests with their last
 // run status and age, discovered from the database and optional config.
-func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
+func cmdTestsList(db *runlog.RunDB, since time.Duration, category, testType string) error {
 	rows, err := db.ListRuns(time.Now().Add(-since), 0)
 	if err != nil {
 		return err
@@ -460,13 +460,35 @@ func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
 		return err
 	}
 
+	// Real per-test category/test_type from the catalog, replacing the old
+	// hardcoded "Uncategorized" bucket.
+	catalog, err := db.ListTestCatalog()
+	if err != nil {
+		return err
+	}
+	catByName, typeByName := categoryTestTypeMaps(catalog)
+
 	var entries []testEntry
 	for _, name := range names {
-		entries = append(entries, testEntry{Name: name, Category: "Uncategorized"})
+		cat := catByName[name]
+		if cat == "" {
+			cat = "Uncategorized"
+		}
+		tt := typeByName[name]
+		if tt == "" {
+			tt = "other"
+		}
+		if category != "" && cat != category {
+			continue
+		}
+		if testType != "" && tt != testType {
+			continue
+		}
+		entries = append(entries, testEntry{Name: name, Category: cat, TestType: tt})
 	}
 
-	fmt.Printf("%-20s  %-*s  %6s  %4s\n", "category", 55, "test name", "last", "st")
-	fmt.Println(strings.Repeat("─", 92))
+	fmt.Printf("%-20s  %-*s  %-12s  %6s  %4s\n", "category", 55, "test name", "type", "last", "st")
+	fmt.Println(strings.Repeat("─", 105))
 	prevCat := ""
 	for _, te := range entries {
 		catLabel := ""
@@ -483,8 +505,8 @@ func cmdTestsList(db *runlog.RunDB, since time.Duration) error {
 				break
 			}
 		}
-		fmt.Printf("%-20s  %-55s  %6s  %4s\n",
-			truncate(catLabel, 20), truncate(te.Name, 55), lastAge, lastStatus)
+		fmt.Printf("%-20s  %-55s  %-12s  %6s  %4s\n",
+			truncate(catLabel, 20), truncate(te.Name, 55), truncate(te.TestType, 12), lastAge, lastStatus)
 	}
 	return nil
 }
@@ -728,6 +750,16 @@ func cmdInspect(db *runlog.RunDB, runID int64) error {
 	}
 	fmt.Printf("events:   %d\n", run.EventCount)
 	fmt.Printf("test:     %s\n", run.TestName)
+	category := "Uncategorized"
+	if run.Category != nil && *run.Category != "" {
+		category = *run.Category
+	}
+	testType := run.TestType
+	if testType == "" {
+		testType = "other"
+	}
+	fmt.Printf("category: %s\n", category)
+	fmt.Printf("type:     %s\n", testType)
 	if run.Description != nil {
 		fmt.Printf("description:\n")
 		for _, chunk := range wrapText(run.Description.Summary, 80) {
@@ -1086,6 +1118,30 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 type testEntry struct {
 	Name     string
 	Category string
+	TestType string
+}
+
+// categoryTestTypeMaps builds test-name → category and test-name → test_type
+// lookup maps from a test catalog snapshot, defaulting blank values to
+// "Uncategorized" / "other" respectively. Shared by cmdTestsList (plain CLI
+// output) and loadTests (TUI) so both surfaces show real per-test
+// classification instead of a hardcoded literal.
+func categoryTestTypeMaps(catalog []runlog.TestCatalogRow) (cats, types map[string]string) {
+	cats = make(map[string]string, len(catalog))
+	types = make(map[string]string, len(catalog))
+	for _, c := range catalog {
+		cat := c.Category
+		if cat == "" {
+			cat = "Uncategorized"
+		}
+		tt := c.TestType
+		if tt == "" {
+			tt = "other"
+		}
+		cats[c.TestName] = cat
+		types[c.TestName] = tt
+	}
+	return cats, types
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3453,8 +3509,9 @@ func renderGantt(gd runlog.GanttData, width int) []string {
 // TUI — Tests tab views
 // ─────────────────────────────────────────────────────────────────────────────
 
-// viewTests renders the Tests tab: a list of all known tests, grouped by category,
-// with a right-side drawer showing the last run's description for the selected test.
+// viewTests renders the Tests tab: a list of all known tests, grouped by
+// category with test type shown alongside, and a right-side drawer showing
+// the last run's description for the selected test.
 func (m model) viewTests() string {
 	title := m.tabBar()
 	bodyHeight := m.height - 3 // tab bar + header + help
@@ -3466,8 +3523,8 @@ func (m model) viewTests() string {
 	}
 
 	// Column header
-	header := styleHeader.Render(fmt.Sprintf("  %-12s  %-*s  %6s  %4s",
-		"category", lw-30, "test name", "last", "st"))
+	header := styleHeader.Render(fmt.Sprintf("  %-12s  %-10s  %-*s  %6s  %4s",
+		"category", "type", lw-42, "test name", "last", "st"))
 	bodyHeight-- // header takes one line
 
 	// ── Left panel: test list ────────────────────────────────────────────────
@@ -3498,16 +3555,18 @@ func (m model) viewTests() string {
 				break
 			}
 		}
-		nameW := lw - 30
+		nameW := lw - 42
 		if nameW < 10 {
 			nameW = 10
 		}
 		name := truncate(te.Name, nameW)
 		catW := 12
 		cat := fmt.Sprintf("%-*s", catW, truncate(catLabel, catW))
+		typeW := 10
+		typ := fmt.Sprintf("%-*s", typeW, truncate(te.TestType, typeW))
 		if i == m.testCursor {
-			plain := fmt.Sprintf("  %-*s  %-*s  %6s  %4s",
-				catW, truncate(catLabel, catW), nameW, te.Name, lastAge, passLabel2(te.Name, m.runs))
+			plain := fmt.Sprintf("  %-*s  %-*s  %-*s  %6s  %4s",
+				catW, truncate(catLabel, catW), typeW, te.TestType, nameW, te.Name, lastAge, passLabel2(te.Name, m.runs))
 			leftRows = append(leftRows, styleSelected.Render(plain))
 		} else {
 			_ = cat
@@ -3516,8 +3575,8 @@ func (m model) viewTests() string {
 			if statusPart == "" {
 				statusPart = styleKind.Render("  —— ")
 			}
-			line := fmt.Sprintf("  %-*s  %-*s  %6s  %s",
-				catW, styleKind.Render(cat), nameW, te.Name, lastAge, statusPart)
+			line := fmt.Sprintf("  %-*s  %-*s  %-*s  %6s  %s",
+				catW, styleKind.Render(cat), typeW, styleKind.Render(typ), nameW, te.Name, lastAge, statusPart)
 			leftRows = append(leftRows, styleNormal.Render(line))
 		}
 	}
@@ -3541,6 +3600,7 @@ func (m model) viewTests() string {
 			drawerRows = append(drawerRows, "    "+styleDetailVal.Render(chunk))
 		}
 		add("category", te.Category)
+		add("type", te.TestType)
 		drawerRows = append(drawerRows, "")
 
 		// Find most recent run for this test
@@ -3887,11 +3947,25 @@ func (m model) loadTests() tea.Cmd {
 			return errMsg{err}
 		}
 
+		catalog, err := db.ListTestCatalog()
+		if err != nil {
+			return errMsg{err}
+		}
+		catByName, typeByName := categoryTestTypeMaps(catalog)
+
 		// Build entries with categories from config.
 		// Categorized tests appear first (in config order), uncategorized last.
 		var entries []testEntry
 		for _, name := range names {
-			entries = append(entries, testEntry{Name: name, Category: "Uncategorized"})
+			cat := catByName[name]
+			if cat == "" {
+				cat = "Uncategorized"
+			}
+			tt := typeByName[name]
+			if tt == "" {
+				tt = "other"
+			}
+			entries = append(entries, testEntry{Name: name, Category: cat, TestType: tt})
 		}
 
 		return testsLoadedMsg{entries: entries}
@@ -5340,6 +5414,8 @@ FLAGS
   --db <path>      path to runs.db  (default: auto-resolved to .runlog/runs.db)
   --since <dur>    time window for "runs", "tests", and TUI, e.g. 5m, 1h, 24h  (default: 24h)
   --json           (analyze only) output suggestions as JSON instead of text
+  --category <name>   filter by category, exact match (used by "tests")
+  --test-type <name>  filter by test type, exact match (used by "tests")
 
 EXAMPLES
   runlog                                # interactive TUI, last 24 hours (auto-refreshes)
@@ -5358,6 +5434,8 @@ EXAMPLES
   runlog experiments                    # table of all experiments
   runlog tests                          # table of all tests with last run status
   runlog tests --since 7d              # tests with runs from last 7 days
+  runlog tests --category integration   # tests in the "integration" category
+  runlog tests --test-type unit         # tests classified as test_type "unit"
   runlog tests TestCLIInstalled_Version # runs for that specific test
   runlog inspect 42                     # all events + inspector details for run 42
   runlog analyze 42                     # LLM analysis of run 42 with full trace
@@ -5457,8 +5535,9 @@ func main() {
 	// before the subcommand word are still honoured.
 	var dbPath string
 	var since time.Duration
-	var analyzeJSON *bool // set by "analyze" subcommand
-	var reapDryRun *bool  // set by "reap" subcommand
+	var analyzeJSON *bool                    // set by "analyze" subcommand
+	var reapDryRun *bool                     // set by "reap" subcommand
+	var testsCategory, testsTestType *string // set by "tests" subcommand
 
 	switch subcommand {
 	case "runs", "tail", "":
@@ -5509,6 +5588,8 @@ func main() {
 
 	case "tests":
 		fs, dbOut, sinceOut := subFS(subcommand, *globalDB, *globalSince)
+		testsCategory = fs.String("category", "", "filter by category (exact match)")
+		testsTestType = fs.String("test-type", "", "filter by test type (exact match)")
 		if err := fs.Parse(subArgs); err != nil {
 			if err == flag.ErrHelp {
 				os.Exit(0)
@@ -5752,7 +5833,7 @@ func main() {
 				os.Exit(1)
 			}
 		} else {
-			if err := cmdTestsList(db, since); err != nil {
+			if err := cmdTestsList(db, since, *testsCategory, *testsTestType); err != nil {
 				fmt.Fprintf(os.Stderr, "runlog tests: %v\n", err)
 				os.Exit(1)
 			}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -58,11 +59,22 @@ func (app *WebApp) handleDashboard(c echo.Context) error {
 			}
 		}
 	}
-	// Categories come only from the DB (SetCategory) or directory discovery.
-	// Without per-test DB lookups here, all tests are grouped as "Uncategorized".
+	// Categories reflect each test's most recently recorded category (set via
+	// RunLog.SetCategory()), aggregated across the FULL test catalog — not
+	// just the RecentRuns window queried above.
 	var categories []catSummary
-	if len(allTestNames) > 0 {
-		categories = []catSummary{{Name: "uncategorized", TestCount: len(allTestNames)}}
+	if catStats, err := app.db.CategoryStats(); err == nil {
+		categories = make([]catSummary, 0, len(catStats))
+		for _, cs := range catStats {
+			categories = append(categories, catSummary{Name: cs.Name, TestCount: cs.TestCount})
+		}
+	} else {
+		log.Printf("web: dashboard: CategoryStats: %v", err)
+		// Fall back to the old hardcoded single-bucket behavior only when the
+		// aggregation query itself fails — not as the normal code path.
+		if len(allTestNames) > 0 {
+			categories = []catSummary{{Name: "Uncategorized", TestCount: len(allTestNames)}}
+		}
 	}
 
 	// Environment status
@@ -115,6 +127,7 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 	search := c.QueryParam("search")
 	statusFilter := c.QueryParam("status")
 	catFilter := c.QueryParam("category")
+	testTypeFilter := c.QueryParam("test_type")
 	since := parseSinceParam(c.QueryParam("since"))
 	tagFilter := c.QueryParam("tags")
 	hasCost := c.QueryParam("has_cost") == "1"
@@ -138,6 +151,25 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 	if search != "" {
 		wheres = append(wheres, `r.test_name LIKE ?`)
 		args = append(args, "%"+search+"%")
+	}
+	// category is nullable TEXT (no default): "Uncategorized" means never set.
+	if catFilter != "" {
+		if catFilter == "Uncategorized" {
+			wheres = append(wheres, `(r.category IS NULL OR r.category = '')`)
+		} else {
+			wheres = append(wheres, `r.category = ?`)
+			args = append(args, catFilter)
+		}
+	}
+	// test_type is NOT NULL DEFAULT '' (unlike category): "other" means never
+	// set/derived, so no IS NULL clause is needed here.
+	if testTypeFilter != "" {
+		if testTypeFilter == "other" {
+			wheres = append(wheres, `r.test_type = ''`)
+		} else {
+			wheres = append(wheres, `r.test_type = ?`)
+			args = append(args, testTypeFilter)
+		}
 	}
 	if statusFilter != "" {
 		switch statusFilter {
@@ -266,6 +298,25 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 		runRows = append(runRows, r)
 	}
 	categories := sortedKeys(catSet)
+	// The dropdown must list ALL real categories, not just the ones present in
+	// this page's LIMIT/OFFSET window (catSet above is page-scoped). Fall back
+	// to the page-scoped list only if the aggregation query itself fails.
+	if catStats, err := app.db.CategoryStats(); err == nil {
+		allCatSet := make(map[string]bool, len(catStats))
+		for _, cs := range catStats {
+			allCatSet[cs.Name] = true
+		}
+		categories = sortedKeys(allCatSet)
+	}
+
+	var testTypes []string
+	if typeStats, err := app.db.TestTypeStats(); err == nil {
+		allTypeSet := make(map[string]bool, len(typeStats))
+		for _, ts := range typeStats {
+			allTypeSet[ts.Name] = true
+		}
+		testTypes = sortedKeys(allTypeSet)
+	}
 
 	f := runFilters{
 		Category: catFilter,
@@ -275,12 +326,13 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 		Tags:     tagFilter,
 		HasCost:  hasCost,
 		Offset:   offset,
+		TestType: testTypeFilter,
 	}
-	if render.IsPartial(c.Request()) && (offset > 0 || catFilter != "" || statusFilter != "" || c.QueryParam("since") != "" || search != "" || tagFilter != "" || hasCost) {
+	if render.IsPartial(c.Request()) && (offset > 0 || catFilter != "" || statusFilter != "" || c.QueryParam("since") != "" || search != "" || tagFilter != "" || hasCost || testTypeFilter != "") {
 		render.RenderPartial(c.Response().Writer, c.Request(), runsTableContent(runRows, catMap, total, f))
 	} else {
 		render.RenderAuto(c.Response().Writer, c.Request(),
-			AllRunsPage(runRows, catMap, total, f, categories), AllRunsContent(runRows, catMap, total, f, categories))
+			AllRunsPage(runRows, catMap, total, f, categories, testTypes), AllRunsContent(runRows, catMap, total, f, categories, testTypes))
 	}
 	return nil
 }
@@ -288,82 +340,41 @@ func (app *WebApp) handleAllRuns(c echo.Context) error {
 func (app *WebApp) handleTests(c echo.Context) error {
 	categoryFilter := c.QueryParam("category")
 	statusFilter := c.QueryParam("status")
-	rawDB := app.db.RawDB()
+	testTypeFilter := c.QueryParam("test_type")
 
-	// Single window-function query: run count, latest start, and pass/skip status per test.
-	// Uses idx_test_runs_name_started composite index for GROUP BY.
-	rows, err := rawDB.Query(`
-		SELECT t.test_name, t.run_count, t.last_started,
-		       t.passed, t.skipped, t.reason, t.category, t.test_type
-		FROM (
-			SELECT test_name,
-			       COUNT(*)       OVER (PARTITION BY test_name) AS run_count,
-			       MAX(started_at) OVER (PARTITION BY test_name) AS last_started,
-			       passed, skipped, reason, category, test_type,
-			       ROW_NUMBER()   OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
-			FROM test_runs
-		) t
-		WHERE t.rn = 1
-		ORDER BY t.test_name
-	`)
+	// ListTestCatalog already returns everything this handler needs (run
+	// count, last run time, category, test_type) PLUS Description/Tags/
+	// LastStatus for free — see runlog.RunDB.ListTestCatalog.
+	catalog, err := app.db.ListTestCatalog()
 	if err != nil {
-		return fmt.Errorf("batch query: %w", err)
+		return fmt.Errorf("list test catalog: %w", err)
 	}
-	defer rows.Close()
 
-	type aggRow struct {
-		Name        string
-		RunCount    int
-		LastStarted string
-		Category    *string
-		TestType    string
+	// Dropdown option lists reflect the FULL catalog, independent of the
+	// currently active filters — otherwise selecting a category would hide
+	// the test_type dropdown's remaining options and vice versa (the same
+	// class of bug fixed for the All Runs page's category dropdown).
+	typeStats, _ := app.db.TestTypeStats()
+	testTypes := make([]string, 0, len(typeStats))
+	for _, ts := range typeStats {
+		testTypes = append(testTypes, ts.Name)
 	}
-	var agg []aggRow
-	statusMap := make(map[string]string)
-	for rows.Next() {
-		var name string
-		var runCount int
-		var lastStarted string
-		var passed, skipped sql.NullInt64
-		var reason sql.NullString
-		var category sql.NullString
-		var testType string
-		if err := rows.Scan(&name, &runCount, &lastStarted, &passed, &skipped, &reason, &category, &testType); err != nil {
-			continue
-		}
-		var catPtr *string
-		if category.Valid {
-			catPtr = &category.String
-		}
-		agg = append(agg, aggRow{Name: name, RunCount: runCount, LastStarted: lastStarted, Category: catPtr, TestType: testType})
-		switch {
-		case !passed.Valid:
-			statusMap[name] = "running"
-		case skipped.Valid && skipped.Int64 == 1:
-			statusMap[name] = "skip"
-		case passed.Int64 == 1:
-			statusMap[name] = "pass"
-		case reason.Valid && reason.String == "timed out":
-			statusMap[name] = "timeout"
-		default:
-			statusMap[name] = "fail"
-		}
-	}
-	_ = rows.Close()
 
 	seen := make(map[string]bool)
-
-	// Build entries from DB runs
 	catMap := make(map[string][]testListEntry)
-	for _, a := range agg {
-		cat := "Uncategorized"
-		if a.Category != nil && *a.Category != "" {
-			cat = *a.Category
-		}
+	allCatSet := make(map[string]bool)
+	for _, row := range catalog {
+		cat := displayCategory(row.Category)
+		allCatSet[cat] = true
+		testType := displayTestType(row.TestType)
+
 		if categoryFilter != "" && cat != categoryFilter {
 			continue
 		}
-		status := statusMap[a.Name]
+		if testTypeFilter != "" && testType != testTypeFilter {
+			continue
+		}
+		status := row.LastStatus
 		if status == "" {
 			status = "none"
 		}
@@ -371,20 +382,19 @@ func (app *WebApp) handleTests(c echo.Context) error {
 			continue
 		}
 		lastRunAt := "-"
-		if a.LastStarted != "" {
-			if t, err := time.Parse(time.RFC3339Nano, a.LastStarted); err == nil {
-				lastRunAt = t.Format("Jan 02 15:04")
-			}
+		if !row.LastRunAt.IsZero() {
+			lastRunAt = row.LastRunAt.Format("Jan 02 15:04")
 		}
 		entry := testListEntry{
-			Name:       a.Name,
-			LastStatus: status,
-			LastRunAt:  lastRunAt,
-			RunCount:   a.RunCount,
-			TestType:   a.TestType,
+			Name:        row.TestName,
+			LastStatus:  status,
+			LastRunAt:   lastRunAt,
+			RunCount:    row.RunCount,
+			TestType:    row.TestType,
+			Description: row.Description,
 		}
 		catMap[cat] = append(catMap[cat], entry)
-		seen[a.Name] = true
+		seen[row.TestName] = true
 	}
 
 	// Merge discovered test functions from filesystem
@@ -412,12 +422,18 @@ func (app *WebApp) handleTests(c echo.Context) error {
 				if categoryFilter != "" && cat != categoryFilter {
 					continue
 				}
+				// Discovered-but-never-run tests have no recorded test_type,
+				// so they only belong to the "other" bucket.
+				if testTypeFilter != "" && testTypeFilter != "other" {
+					continue
+				}
 				entry := testListEntry{
 					Name:       f,
 					LastStatus: "never_run",
 					NeverRun:   true,
 				}
 				catMap[cat] = append(catMap[cat], entry)
+				allCatSet[cat] = true
 				seen[f] = true
 			}
 		}
@@ -431,19 +447,62 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		filteredCats = []testListCategory{}
 	}
 
-	// Build categories dropdown from DB/discovery categories only
-	allCats := make([]testListCategory, 0)
-	for _, name := range sortedKeys(catMap) {
-		allCats = append(allCats, testListCategory{Name: name, Tests: catMap[name]})
+	data := testListData{
+		Categories:     filteredCats,
+		AllCategories:  sortedKeys(allCatSet),
+		ActiveFilter:   categoryFilter,
+		StatusFilter:   statusFilter,
+		TestTypeFilter: testTypeFilter,
+		TestTypes:      testTypes,
 	}
-	if len(allCats) == 0 {
-		allCats = filteredCats
-	}
-
-	data := testListData{Categories: allCats, ActiveFilter: categoryFilter, StatusFilter: statusFilter}
 
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		TestsPage(data), TestsContent(data))
+	return nil
+}
+
+func (app *WebApp) handleCatalog(c echo.Context) error {
+	categoryFilter := c.QueryParam("category")
+	testTypeFilter := c.QueryParam("test_type")
+	search := strings.TrimSpace(c.QueryParam("search"))
+
+	catalog, err := app.db.ListTestCatalog()
+	if err != nil {
+		return fmt.Errorf("list test catalog: %w", err)
+	}
+
+	catSet := make(map[string]bool)
+	typeSet := make(map[string]bool)
+	searchLower := strings.ToLower(search)
+	rows := make([]runlog.TestCatalogRow, 0, len(catalog))
+	for _, row := range catalog {
+		cat := displayCategory(row.Category)
+		catSet[cat] = true
+		testType := displayTestType(row.TestType)
+		typeSet[testType] = true
+
+		if categoryFilter != "" && cat != categoryFilter {
+			continue
+		}
+		if testTypeFilter != "" && testType != testTypeFilter {
+			continue
+		}
+		if searchLower != "" && !strings.Contains(strings.ToLower(row.TestName), searchLower) {
+			continue
+		}
+		rows = append(rows, row)
+	}
+
+	data := catalogData{
+		Rows:           rows,
+		CategoryFilter: categoryFilter,
+		TestTypeFilter: testTypeFilter,
+		Search:         search,
+		Categories:     sortedKeys(catSet),
+		TestTypes:      sortedKeys(typeSet),
+	}
+	render.RenderAuto(c.Response().Writer, c.Request(),
+		CatalogPage(data), CatalogContent(data))
 	return nil
 }
 
@@ -496,6 +555,20 @@ func (app *WebApp) handleTestDetail(c echo.Context) error {
 		_ = rawDB.QueryRow(`SELECT COUNT(*) FROM test_runs WHERE test_name=? AND cost_usd IS NOT NULL AND cost_usd>0`, testName).Scan(&hasCost)
 	}
 
+	// Category/TestType/Description reflect the most recent run (runs[0] —
+	// queryRunsForTest orders by started_at DESC) rather than a new query;
+	// classification can change over a test's lifetime, so only the latest
+	// recorded value is meaningful here.
+	var category, testType string
+	var description *runlog.RunDescription
+	if len(runs) > 0 {
+		if runs[0].Category != nil {
+			category = *runs[0].Category
+		}
+		testType = runs[0].TestType
+		description = runs[0].Description
+	}
+
 	data := testDetailData{
 		TestName:    testName,
 		Runs:        runs,
@@ -505,6 +578,9 @@ func (app *WebApp) handleTestDetail(c echo.Context) error {
 		Stats:       stats,
 		TagFilter:   tagFilter,
 		HasCostData: hasCost,
+		Category:    category,
+		TestType:    testType,
+		Description: description,
 	}
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		TestDetailPage(data), TestDetailContent(data))
@@ -926,7 +1002,7 @@ func queryRunsForTest(rawDB *sql.DB, testName string, limit, offset int, tagFilt
 		SELECT id, test_name, started_at, finished_at, passed, skipped,
 		       description, tags, experiment, runner, reason, env_name,
 		       input_tokens, output_tokens, cost_usd, env_vars,
-		       app_version, test_version, category
+		       app_version, test_version, category, test_type
 		FROM test_runs
 		WHERE test_name = ?`
 	args := []any{testName}
@@ -948,7 +1024,7 @@ func fetchRunByID(rawDB *sql.DB, id int64) *runlog.RunRow {
 		SELECT id, test_name, started_at, finished_at, passed, skipped,
 		       description, tags, experiment, runner, reason, env_name,
 		       input_tokens, output_tokens, cost_usd, env_vars,
-		       app_version, test_version, category
+		       app_version, test_version, category, test_type
 		FROM test_runs WHERE id = ?`, id)
 	if err != nil {
 		return nil
@@ -981,7 +1057,7 @@ func scanRunRows(rows *sql.Rows) ([]runlog.RunRow, error) {
 			&descJSON, &tagsJSON, &experiment,
 			&runner, &reason, &envName,
 			&inputTokens, &outputTokens, &costUSD, &envVarsJSON,
-			&appVersion, &testVersion, &r.Category,
+			&appVersion, &testVersion, &r.Category, &r.TestType,
 		); err != nil {
 			return nil, fmt.Errorf("scan run row: %w", err)
 		}

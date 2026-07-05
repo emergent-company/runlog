@@ -17,7 +17,7 @@ import (
 
 const runsPerPage = 50
 
-func AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) templ.Component {
+func AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string, testTypes []string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -50,7 +50,7 @@ func AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f run
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = allRunsContent(rows, catMap, total, f, categories).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = allRunsContent(rows, catMap, total, f, categories, testTypes).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,7 +64,7 @@ func AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f run
 	})
 }
 
-func AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) templ.Component {
+func AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string, testTypes []string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -85,7 +85,7 @@ func AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = allRunsContent(rows, catMap, total, f, categories).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = allRunsContent(rows, catMap, total, f, categories, testTypes).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -93,7 +93,7 @@ func AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 	})
 }
 
-func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) templ.Component {
+func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string, testTypes []string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -129,6 +129,21 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			"hx-push-url": "true",
 			"hx-sync":     "closest [data-testid='runs-filters']:drop",
 			"data-testid": "filter-category",
+		}).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		typeOpts := [][2]string{{"", "All"}}
+		for _, tt := range testTypes {
+			typeOpts = append(typeOpts, [2]string{tt, tt})
+		}
+		templ_7745c5c3_Err = form.FormSelect("test_type", "Type", f.TestType, typeOpts, "", form.LabelAbove, "", "", templ.Attributes{
+			"hx-get":      "/ui/runs",
+			"hx-target":   "#runs-table",
+			"hx-trigger":  "change",
+			"hx-push-url": "true",
+			"hx-sync":     "closest [data-testid='runs-filters']:drop",
+			"data-testid": "filter-test-type",
 		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -208,7 +223,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d run(s)", total))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/all_runs.templ`, Line: 94, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/all_runs.templ`, Line: 108, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -262,7 +277,7 @@ func runsTableContent(rows []runlog.RunRow, catMap map[int64]string, total int, 
 				return templ_7745c5c3_Err
 			}
 			if f.Offset+runsPerPage < total {
-				templ_7745c5c3_Err = loadMoreButton(fmt.Sprintf("/ui/runs?offset=%d&category=%s&status=%s&since=%s&search=%s&tags=%s&has_cost=%s", f.Offset+runsPerPage, f.Category, f.Status, f.Since, f.Search, f.Tags, boolToOneZeroStr(f.HasCost)), "#runs-table").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = loadMoreButton(fmt.Sprintf("/ui/runs?offset=%d&category=%s&status=%s&since=%s&search=%s&tags=%s&has_cost=%s&test_type=%s", f.Offset+runsPerPage, f.Category, f.Status, f.Since, f.Search, f.Tags, boolToOneZeroStr(f.HasCost), f.TestType), "#runs-table").Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

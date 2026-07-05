@@ -9,17 +9,17 @@ import (
 
 const runsPerPage = 50
 
-templ AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) {
+templ AllRunsPage(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string, testTypes []string) {
 	@AppPage(fmt.Sprintf("Runlog - %s - All Runs", appName()), sidebarGroups) {
-		@allRunsContent(rows, catMap, total, f, categories)
+		@allRunsContent(rows, catMap, total, f, categories, testTypes)
 	}
 }
 
-templ AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) {
-	@allRunsContent(rows, catMap, total, f, categories)
+templ AllRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string, testTypes []string) {
+	@allRunsContent(rows, catMap, total, f, categories, testTypes)
 }
 
-templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string) {
+templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f runFilters, categories []string, testTypes []string) {
 	<div data-testid="all-runs-page">
 		<h1 class="text-2xl font-bold mb-6">All Runs</h1>
 		<div class="flex flex-wrap gap-3 mb-4 items-end" data-testid="runs-filters">
@@ -36,6 +36,20 @@ templ allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f
 				"hx-push-url": "true",
 				"hx-sync":     "closest [data-testid='runs-filters']:drop",
 				"data-testid": "filter-category",
+			})
+			{{
+				typeOpts := [][2]string{{"", "All"}}
+				for _, tt := range testTypes {
+					typeOpts = append(typeOpts, [2]string{tt, tt})
+				}
+			}}
+			@form.FormSelect("test_type", "Type", f.TestType, typeOpts, "", form.LabelAbove, "", "", templ.Attributes{
+				"hx-get":      "/ui/runs",
+				"hx-target":   "#runs-table",
+				"hx-trigger":  "change",
+				"hx-push-url": "true",
+				"hx-sync":     "closest [data-testid='runs-filters']:drop",
+				"data-testid": "filter-test-type",
 			})
 			@form.FormSelect("status", "Status", f.Status, [][2]string{
 				{"", "All"},
@@ -103,7 +117,7 @@ templ runsTableContent(rows []runlog.RunRow, catMap map[int64]string, total int,
 	if len(rows) > 0 {
 		@runsTable(rows, runsTableOpts{ShowID: true, ShowCategory: true, ShowTestType: true, Categories: catMap})
 		if f.Offset+runsPerPage < total {
-			@loadMoreButton(fmt.Sprintf("/ui/runs?offset=%d&category=%s&status=%s&since=%s&search=%s&tags=%s&has_cost=%s", f.Offset+runsPerPage, f.Category, f.Status, f.Since, f.Search, f.Tags, boolToOneZeroStr(f.HasCost)), "#runs-table")
+			@loadMoreButton(fmt.Sprintf("/ui/runs?offset=%d&category=%s&status=%s&since=%s&search=%s&tags=%s&has_cost=%s&test_type=%s", f.Offset+runsPerPage, f.Category, f.Status, f.Since, f.Search, f.Tags, boolToOneZeroStr(f.HasCost), f.TestType), "#runs-table")
 		}
 	} else {
 		@emptyState("No runs match filters.")

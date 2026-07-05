@@ -40,11 +40,25 @@ templ testsContentInner(data testListData) {
 			data-testid="category-filter"
 		>
 			<option value="">All Categories</option>
-			for _, cat := range data.Categories {
-				if data.ActiveFilter == cat.Name {
-					<option value={ cat.Name } selected>{ cat.Name }</option>
+			for _, cat := range data.AllCategories {
+				if data.ActiveFilter == cat {
+					<option value={ cat } selected>{ cat }</option>
 				} else {
-					<option value={ cat.Name }>{ cat.Name }</option>
+					<option value={ cat }>{ cat }</option>
+				}
+			}
+		</select>
+		<select
+			class="select select-bordered select-sm w-full max-w-xs"
+			name="test_type"
+			data-testid="test-type-filter"
+		>
+			<option value="">All Types</option>
+			for _, tt := range data.TestTypes {
+				if data.TestTypeFilter == tt {
+					<option value={ tt } selected>{ tt }</option>
+				} else {
+					<option value={ tt }>{ tt }</option>
 				}
 			}
 		</select>
@@ -136,6 +150,9 @@ templ flatTestTable(data testListData) {
 					>
 							@table.TableCell("", nil) {
 								@text(e.Name)
+								if e.Description != nil && e.Description.Summary != "" {
+									<div class="text-xs text-base-content/50 mt-0.5">{ truncateMessage(e.Description.Summary, 100) }</div>
+								}
 							}
 							@table.TableCell("", nil) {
 								@statusBadge(e.LastStatus)

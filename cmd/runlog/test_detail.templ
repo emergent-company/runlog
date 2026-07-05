@@ -28,6 +28,30 @@ templ testDetailContent(data testDetailData) {
 			><span class="iconify lucide--play size-3.5"></span> Run Test</button>
 		</div>
 		<div id="launch-area" data-testid="launch-area"></div>
+		if data.Category != "" || data.TestType != "" {
+			<div class="flex items-center gap-2 mb-4" data-testid="test-meta-badges">
+				if data.Category != "" {
+					<span class="badge badge-ghost badge-sm">{ data.Category }</span>
+				}
+				if data.TestType != "" {
+					<span class={ testTypeBadge(data.TestType) }>{ data.TestType }</span>
+				}
+			</div>
+		}
+		if data.Description != nil {
+			<div class="mb-4 card bg-base-100 border border-base-200 shadow-sm" data-testid="test-description">
+				<div class="card-body p-3">
+					<p class="text-sm">{ data.Description.Summary }</p>
+					if len(data.Description.Bullets) > 0 {
+						<ul class="list-disc list-inside text-sm text-base-content/60 space-y-0.5 mt-1">
+							for _, b := range data.Description.Bullets {
+								<li>{ b }</li>
+							}
+						</ul>
+					}
+				</div>
+			</div>
+		}
 		if data.Stats != nil {
 			<div class="mb-6" data-testid="test-stats">
 				@statsGrid([]statItem{

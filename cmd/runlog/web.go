@@ -31,6 +31,7 @@ var sidebarGroups = []layout.SidebarGroup{
 		Items: []layout.SidebarItem{
 			{Label: "Dashboard", Href: "/ui/", Icon: "lucide--layout-dashboard"},
 			{Label: "Tests", Href: "/ui/tests", Icon: "lucide--flask-conical"},
+			{Label: "Catalog", Href: "/ui/catalog", Icon: "lucide--book"},
 			{Label: "All Runs", Href: "/ui/runs", Icon: "lucide--list"},
 			{Label: "Linters", Href: "/ui/linters", Icon: "lucide--shield"},
 			{Label: "Environments", Href: "/ui/environments", Icon: "lucide--folder"},
@@ -68,9 +69,16 @@ type catSummary struct {
 }
 
 type testListData struct {
-	Categories   []testListCategory
-	ActiveFilter string
-	StatusFilter string
+	Categories []testListCategory
+	// AllCategories/TestTypes are the FULL (unfiltered) option lists for the
+	// category/test_type dropdowns — sourced independently of Categories so
+	// that picking one filter doesn't hide the other dropdown's remaining
+	// options (Categories itself is pre-filtered for table rendering).
+	AllCategories  []string
+	ActiveFilter   string
+	StatusFilter   string
+	TestTypeFilter string
+	TestTypes      []string
 }
 
 type testListCategory struct {
@@ -79,12 +87,24 @@ type testListCategory struct {
 }
 
 type testListEntry struct {
-	Name       string
-	LastStatus string
-	LastRunAt  string
-	RunCount   int
-	NeverRun   bool
-	TestType   string
+	Name        string
+	LastStatus  string
+	LastRunAt   string
+	RunCount    int
+	NeverRun    bool
+	TestType    string
+	Description *runlog.RunDescription
+}
+
+// catalogData backs the /ui/catalog page: one row per distinct test name,
+// independent of run history windows, with classification/description data.
+type catalogData struct {
+	Rows           []runlog.TestCatalogRow
+	CategoryFilter string
+	TestTypeFilter string
+	Search         string
+	Categories     []string // full option list for the category dropdown
+	TestTypes      []string // full option list for the test_type dropdown
 }
 
 type trendPoint struct {
@@ -115,6 +135,7 @@ type runFilters struct {
 	Tags     string
 	HasCost  bool
 	Offset   int
+	TestType string
 }
 
 type testDetailData struct {
@@ -126,6 +147,11 @@ type testDetailData struct {
 	Stats       *testStats
 	TagFilter   string
 	HasCostData bool
+	// Category/TestType/Description reflect the most recent run for this test
+	// (data.Runs[0]) — see handleTestDetail.
+	Category    string
+	TestType    string
+	Description *runlog.RunDescription
 }
 
 type runDetailData struct {
@@ -823,6 +849,7 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 	e.GET("/experiments/:name", app.handleExperimentDetail)
 	e.GET("/tests", app.handleTests)
 	e.GET("/tests/:name", app.handleTestDetail)
+	e.GET("/catalog", app.handleCatalog)
 	e.GET("/runs", app.handleAllRuns)
 	e.GET("/runs/:id", app.handleRunDetail)
 	e.GET("/runs/:id/events/:eventID", app.handleEventChildren)
