@@ -111,6 +111,25 @@ func logCLIFailureIfActive(t *testing.T, invocation, output string, err error) {
 	rl.CLIStepErr("$ "+invocation, invocation, output, err)
 }
 
+// logCLISuccessIfActive records a "cli" event for the active RunLog of this
+// test, if one exists. Used by multi-step helpers (e.g. SetupCLIAuth) that
+// run several CLI commands on the caller's behalf — without this, those
+// commands would run with zero trace in the run log, violating the E2E Test
+// Constitution's Rule 5 ("CLI Steps Are Logged"). No-op if no RunLog is
+// active for this test, so plain (non-RunLog) callers are unaffected.
+func logCLISuccessIfActive(t *testing.T, invocation, output string) { //nolint:deadcode
+	t.Helper()
+	v, ok := ActiveRunLogs.Load(t.Name())
+	if !ok {
+		return
+	}
+	rl, ok := v.(*RunLog)
+	if !ok || rl == nil {
+		return
+	}
+	rl.CLI(invocation, output)
+}
+
 // RunBinaryInDirWithHome is like MustRunBinaryInDirWithHome but returns an
 // error instead of failing the test — used when non-zero exit is expected or
 // for polling where transient failures are OK.
@@ -162,17 +181,22 @@ func SetupCLIAuth(t *testing.T, home string) { //nolint:deadcode
 	if AuthMode() == "account" {
 		// Write credentials.json so the CLI considers itself authenticated.
 		// Do NOT set api_key — that would make the CLI skip credentials.json.
-		MustRunCLIInDirWithHome(t, "", home, "set-token", SetToken(), "--server", srv)
-		MustRunCLIInDirWithHome(t, "", home, "config", "set", "server_url", srv)
+		out := MustRunCLIInDirWithHome(t, "", home, "set-token", SetToken(), "--server", srv)
+		logCLISuccessIfActive(t, "memory set-token <token> --server "+srv, out)
+		out = MustRunCLIInDirWithHome(t, "", home, "config", "set", "server_url", srv)
+		logCLISuccessIfActive(t, "memory config set server_url "+srv, out)
 		// Some servers don't expose the org-list endpoint for synthetic tokens,
 		// so auto-detection fails.  Set org_id explicitly when provided.
 		if id := OrgID(); id != "" {
-			MustRunCLIInDirWithHome(t, "", home, "config", "set", "org_id", id)
+			out = MustRunCLIInDirWithHome(t, "", home, "config", "set", "org_id", id)
+			logCLISuccessIfActive(t, "memory config set org_id "+id, out)
 		}
 	} else {
 		// Standalone: server accepts a plain API key via X-API-Key header.
-		MustRunCLIInDirWithHome(t, "", home, "config", "set", "server_url", srv)
-		MustRunCLIInDirWithHome(t, "", home, "config", "set", "api_key", E2ETestToken())
+		out := MustRunCLIInDirWithHome(t, "", home, "config", "set", "server_url", srv)
+		logCLISuccessIfActive(t, "memory config set server_url "+srv, out)
+		out = MustRunCLIInDirWithHome(t, "", home, "config", "set", "api_key", E2ETestToken())
+		logCLISuccessIfActive(t, "memory config set api_key ***", out)
 	}
 }
 
