@@ -763,6 +763,40 @@ func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) { //nol
 	rl.dbEvent("cli", desc, details)
 }
 
+// HTTPCall emits an http_call event with full request/response details.
+// method, url, and statusCode are required. requestBody and responseBody
+// are optional and truncated to 2048 bytes in the event details.
+//
+// This is the canonical way to record an HTTP request/response pair — the
+// event message is a short one-line summary ("GET /api/health → 200"); the
+// full method/url/status/bodies live in details for the expanded view.
+//
+//	resp, err := http.Get(server.URL + "/api/health")
+//	body, _ := io.ReadAll(resp.Body)
+//	rl.HTTPCall("GET", "/api/health", resp.StatusCode, "", string(body))
+func (rl *RunLog) HTTPCall(method, url string, statusCode int, requestBody, responseBody string) { //nolint:deadcode
+	rl.t.Helper()
+	details := map[string]any{
+		"method":      method,
+		"url":         url,
+		"status_code": statusCode,
+	}
+	if requestBody != "" {
+		if len(requestBody) > 2048 {
+			requestBody = requestBody[:2048] + "..."
+		}
+		details["request_body"] = requestBody
+	}
+	if responseBody != "" {
+		if len(responseBody) > 2048 {
+			responseBody = responseBody[:2048] + "..."
+		}
+		details["response_body"] = responseBody
+	}
+	msg := fmt.Sprintf("%s %s → %d", method, url, statusCode)
+	rl.dbEvent("http_call", msg, details)
+}
+
 // exitCode extracts the integer exit code from a command error.
 // Returns 1 for generic errors, 0 if err is nil.
 func exitCode(err error) int { //nolint:deadcode

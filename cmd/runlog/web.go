@@ -199,21 +199,27 @@ func ansiToHTML(s string) string {
 				j++
 			}
 			code := s[i+2 : j]
-			if code == "0" {
+			switch code {
+			case "0":
 				buf.WriteString(`</span>`)
-			} else if code == "1" {
+			case "1":
 				buf.WriteString(`<span class="font-bold">`)
-			} else {
+			case "2":
+				buf.WriteString(`<span class="opacity-50">`)
+			case "22", "39":
+				// bold-off / default-fg: close current span
+				buf.WriteString(`</span>`)
+			default:
 				colorClass := ""
 				switch code {
 				case "90":
 					colorClass = "text-base-content/50"
+				case "31":
+					colorClass = "text-error"
 				case "32":
 					colorClass = "text-success"
 				case "33":
 					colorClass = "text-warning"
-				case "31":
-					colorClass = "text-error"
 				case "34":
 					colorClass = "text-info"
 				case "35":

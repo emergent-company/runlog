@@ -54,6 +54,7 @@ var knownTopLevelKeys = map[string]bool{
 	"db":            true,
 	"daemon_port":   true,
 	"work_dir":      true,
+	"artifacts_dir": true,
 	"env":           true,
 	"test_packages": true,
 	"linters":       true,
@@ -86,6 +87,11 @@ type Config struct {
 	// WorkDir is the working directory for test execution.
 	// If set, tests run with this as their working directory (instead of cwd).
 	WorkDir string `yaml:"work_dir"`
+
+	// ArtifactsDir is the directory where test artifacts (screenshots, traces)
+	// are stored and served from /artifact/. Defaults to <work_dir>/.runlog/artifacts/.
+	// Must match RUNLOG_ARTIFACTS_DIR used by the test reporter.
+	ArtifactsDir string `yaml:"artifacts_dir"`
 
 	// Env maps environment variable names to values that are set for every test run.
 	// Example: {"MEMORY_TEST_SERVER": "http://localhost:3002"}
@@ -383,6 +389,11 @@ func parseConfigFile(path string) (*Config, error) {
 			cfg.WorkDir = strings.Trim(cfg.WorkDir, "\"'")
 			continue
 		}
+		if strings.HasPrefix(trimmed, "artifacts_dir:") {
+			cfg.ArtifactsDir = strings.TrimSpace(strings.TrimPrefix(trimmed, "artifacts_dir:"))
+			cfg.ArtifactsDir = strings.Trim(cfg.ArtifactsDir, "\"'")
+			continue
+		}
 		if trimmed == "env:" {
 			currentSection = "env"
 			continue
@@ -410,7 +421,7 @@ func parseConfigFile(path string) (*Config, error) {
 		// Unknown top-level key — reject with error
 		key := strings.SplitN(trimmed, ":", 2)[0]
 		if !knownTopLevelKeys[key] {
-			return nil, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, env, test_packages, linters, projects, environments, categories)", path, key)
+			return nil, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, artifacts_dir, env, test_packages, linters, projects, environments, categories)", path, key)
 		}
 	}
 

@@ -67,13 +67,13 @@ func TestMyFeature(t *testing.T) {
 		Title:       "HTTP Call",
 		Description: "Captures HTTP request/response details as structured http_call events. Records method, URL, status code, and response body.",
 		ID:          "http-call", Lang: "go",
-		Code: `rec := runlog.NewRunRecorder(db)
-rec.RegisterRun("my-test")
+		Code: `rl := runlog.NewRunLog(t)
+defer rl.Close()
 
 resp, err := http.Get(server.URL + "/api/health")
 body, _ := io.ReadAll(resp.Body)
 
-rec.HTTPCall("GET", "/api/health",
+rl.HTTPCall("GET", "/api/health",
     resp.StatusCode, "", string(body))`,
 		Events: []runlog.EventRow{
 			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
@@ -84,15 +84,12 @@ rec.HTTPCall("GET", "/api/health",
 		Title:       "CLI Capture",
 		Description: "Wraps any CLI command execution and records the full command, exit code, and stdout/stderr as a cli event.",
 		ID:          "cli-capture", Lang: "go",
-		Code: `rec := runlog.NewRunRecorder(db)
-rec.RegisterRun("deploy-test")
+		Code: `rl := runlog.NewRunLog(t)
+defer rl.Close()
 
-output := rec.CLICapture("kubectl apply -f deploy.yaml", func() error {
-    cmd := exec.Command("kubectl", "apply", "-f", "deploy.yaml")
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stderr
-    return cmd.Run()
-})`,
+cmd := exec.Command("kubectl", "apply", "-f", "deploy.yaml")
+output, err := cmd.CombinedOutput()
+rl.CLIErr("kubectl apply -f deploy.yaml", string(output), err)`,
 		Events: []runlog.EventRow{
 			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
 			{Seq: 2, Kind: "cli", Message: "$ kubectl apply -f deploy.yaml", ElapsedS: 0.1, Details: strPtr(`{"command":"kubectl apply -f deploy.yaml","exit_code":0,"output":"deployment.apps/my-app created\n"}`)},
@@ -172,16 +169,15 @@ await saveArtifact(runId, page, 'after-login');`,
 	},
 	{
 		Title:       "Daemon",
-		Description: "RunRecorder auto-registers with the daemon when RUNLOG_DAEMON_URL is set.",
+		Description: "NewRunLog auto-registers with the daemon when RUNLOG_DAEMON_URL is set, falling back to direct DB writes otherwise.",
 		ID:          "daemon-integration", Lang: "go",
-		Code: `rec := runlog.NewRunRecorder(db)
-runID, _ := rec.RegisterRun("my-test-suite")
-defer rec.MarkDone(runID, !t.Failed())
+		Code: `rl := runlog.NewRunLog(t)
+defer rl.Close()
 
-output := rec.CLICapture("runlog runs --since 1h", func() error {
-    return cmdRuns(db, 24*time.Hour)
-})
-rec.HTTPCall("GET", "/health", 200, "", "ok")`,
+out, err := exec.Command("runlog", "runs", "--since", "1h").CombinedOutput()
+rl.CLIErr("runlog runs --since 1h", string(out), err)
+
+rl.HTTPCall("GET", "/health", 200, "", "ok")`,
 		Events: []runlog.EventRow{
 			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
 			{Seq: 2, Kind: "cli", Message: "$ runlog runs --since 1h", ElapsedS: 0.1, Details: strPtr(`{"command":"runlog runs --since 1h","exit_code":0}`)},

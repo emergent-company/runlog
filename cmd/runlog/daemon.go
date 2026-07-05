@@ -644,20 +644,6 @@ func (d *DaemonServer) handleMarkRunDone(w http.ResponseWriter, r *http.Request,
 	args = append(args, runID)
 	_, _ = rawDB.Exec(q, args...)
 
-	// Log a failure event when the test failed with a reason
-	if !passed && reason != "" {
-		var testRunID int64
-		if err := rawDB.QueryRow(`SELECT id FROM test_runs WHERE daemon_run_id=?`, runID).Scan(&testRunID); err == nil {
-			var maxSeq int
-			_ = rawDB.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM run_events WHERE run_id=?`, testRunID).Scan(&maxSeq)
-			now := time.Now().UTC().Format(time.RFC3339)
-			_, _ = rawDB.Exec(
-				`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message)
-				 VALUES (?, ?, ?, 0, 'failure', ?)`,
-				testRunID, maxSeq+1, now, reason)
-		}
-	}
-
 	select {
 	case d.sweepCh <- struct{}{}:
 	default:
@@ -888,6 +874,36 @@ type insertEventRequest struct {
 	Details map[string]any `json:"details,omitempty"`
 }
 
+// knownEventKinds is the registry of event kinds the daemon/UI knows how to
+// render specially (badge color, expand-panel layout). It is intentionally a
+// superset covering both documented kinds (events_reference.templ) and
+// runtime-only kinds not yet listed there (coverage, token_summary,
+// trace_span, gantt_row). Used only for a soft warning on ingestion — never
+// to reject events, since a new/unrecognized kind must never break a test.
+var knownEventKinds = map[string]bool{
+	"section":       true,
+	"cli":           true,
+	"log":           true,
+	"failure":       true,
+	"skip":          true,
+	"gantt":         true,
+	"gantt_row":     true,
+	"http_call":     true,
+	"artifact":      true,
+	"state_change":  true,
+	"tag":           true,
+	"token_usage":   true,
+	"token_summary": true,
+	"metric":        true,
+	"assertion":     true,
+	"pw_action":     true,
+	"pw_assert":     true,
+	"pw_step":       true,
+	"coverage":      true,
+	"trace_span":    true,
+	"error":         true,
+}
+
 func (d *DaemonServer) handleInsertEvent(w http.ResponseWriter, r *http.Request, runID string) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 16*1024))
 	if err != nil {
@@ -902,6 +918,13 @@ func (d *DaemonServer) handleInsertEvent(w http.ResponseWriter, r *http.Request,
 	if req.Kind == "" {
 		http.Error(w, "kind required", http.StatusBadRequest)
 		return
+	}
+	if !knownEventKinds[req.Kind] {
+		// Never reject unknown kinds (fail-open — a novel kind from a new SDK
+		// producer must never break a test run). Log a warning so mislabeled
+		// or typo'd kinds (e.g. a network request wrongly tagged "cli") are
+		// visible during development instead of silently shipping.
+		log.Printf("daemon: warning: event kind %q is not in the known kind registry (run %s) — see events_reference.templ", req.Kind, runID)
 	}
 
 	rawDB := d.db.RawDB()

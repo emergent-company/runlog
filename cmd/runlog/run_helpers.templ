@@ -78,6 +78,16 @@ func runBadgeIntent(status string) ui.BadgeIntent {
 		return ui.BadgeWarning
 	case "running":
 		return ui.BadgeInfo
+	case "info":
+		return ui.BadgeInfo
+	case "primary":
+		return ui.BadgePrimary
+	case "secondary":
+		return ui.BadgeSecondary
+	case "accent":
+		return ui.BadgeAccent
+	case "warning":
+		return ui.BadgeWarning
 	default:
 		return ui.BadgeNeutral
 	}

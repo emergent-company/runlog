@@ -340,8 +340,11 @@ func runDaemonInternal(args []string) error {
 	// Kill any existing process on the target port before starting.
 	killProcessOnPort(port)
 
-	// Resolve artifacts directory: <workDir>/.runlog/artifacts/
-	artifactsDir := filepath.Join(workDir, ".runlog", "artifacts")
+	// Resolve artifacts directory: cfg.ArtifactsDir if set, else <workDir>/.runlog/artifacts/
+	artifactsDir := cfg.ArtifactsDir
+	if artifactsDir == "" {
+		artifactsDir = filepath.Join(workDir, ".runlog", "artifacts")
+	}
 
 	srv := newDaemonServer(db, port, *timeoutFlag, artifactsDir, *devFlag)
 	srv.pidFile = pidFile

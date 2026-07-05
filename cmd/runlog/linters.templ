@@ -282,7 +282,7 @@ templ linterRunDetailContent(data linterRunDetailData) {
 			</div>
 		</div>
 		if data.Run.Output != "" {
-			<div class="text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] whitespace-pre-wrap leading-relaxed border border-base-content/10 bg-base-100">{ ansiToHTML(data.Run.Output) }&nbsp;</div>
+			<pre class="text-xs font-mono p-4 rounded-box overflow-auto max-h-[70vh] leading-relaxed border border-base-content/10 bg-base-100" style="white-space: pre-wrap">@templ.Raw(ansiToHTML(data.Run.Output))&nbsp;</pre>
 		} else if data.Run.Status == "passed" {
 			<div class="text-base-content/40 text-sm text-center py-8">Linter passed — no issues found.</div>
 		} else if data.Run.Status == "failed" {

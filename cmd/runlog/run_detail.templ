@@ -112,7 +112,7 @@ templ runDetailContent(data runDetailData) {
 				<div class="card bg-base-100 border border-base-200 shadow-sm">
 					<div class="card-body p-4">
 						<h2 class="card-title text-sm font-semibold text-base-content mb-1">Reason</h2>
-						<div class="text-xs font-mono whitespace-pre-wrap break-all text-base-content/80">{ *data.Run.Reason }</div>
+						<pre class="text-xs font-mono break-all text-base-content/80" style="white-space: pre-wrap">@templ.Raw(ansiToHTML(*data.Run.Reason))</pre>
 					</div>
 				</div>
 			</div>
@@ -358,15 +358,25 @@ templ eventRow(e runlog.EventRow, isDebug bool) {
 func eventKindIntent(kind string) string {
 	switch kind {
 	case "section":
-		return "info"
+		return "primary"
 	case "cli":
-		return "info"
+		return "warning"
 	case "log":
+		return "info"
+	case "error":
+		return "fail"
+	case "pw_action":
+		return "info"
+	case "pw_assert":
+		return "pass"
+	case "pw_step":
 		return "info"
 	case "assertion":
 		return "pass"
 	case "http_call":
-		return "info"
+		return "accent"
+	case "artifact":
+		return "secondary"
 	case "failure":
 		return "fail"
 	case "skip":
@@ -374,6 +384,8 @@ func eventKindIntent(kind string) string {
 	case "metric":
 		return "pass"
 	case "gantt":
+		return "info"
+	case "state_change":
 		return "info"
 	case "token_usage":
 		return "info"
@@ -383,6 +395,7 @@ func eventKindIntent(kind string) string {
 }
 
 func truncateMessage(msg string, maxLen int) string {
+	msg = stripANSI(msg)
 	if len(msg) <= maxLen {
 		return msg
 	}

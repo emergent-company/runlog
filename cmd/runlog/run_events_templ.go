@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"sort"
+	"strings"
 
 	"github.com/emergent-company/go-daisy/components/table"
 	"github.com/emergent-company/go-daisy/components/ui"
@@ -49,7 +51,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("event-children-%d", data.EventID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 17, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 19, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -94,6 +96,16 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+		} else if (data.Kind == "pw_action" || data.Kind == "pw_assert" || data.Kind == "pw_step") && isJSON(data.Details) {
+			templ_7745c5c3_Err = renderPWEventDetail(data.Kind, data.Details).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if data.Kind == "failure" && isJSON(data.Details) {
+			templ_7745c5c3_Err = renderFailureDetail(data.Details).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		} else if len(data.Children) > 0 {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"ml-4 border-l-2 border-base-300 pl-3\"><table class=\"table table-xs w-full\"><tbody><!-- lint:allow-raw -->")
 			if templ_7745c5c3_Err != nil {
@@ -107,7 +119,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("child-row-%d-%d", data.EventID, i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 40, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 46, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 				if templ_7745c5c3_Err != nil {
@@ -120,7 +132,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", data.EventID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 41, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 47, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -133,7 +145,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 42, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 48, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 				if templ_7745c5c3_Err != nil {
@@ -238,7 +250,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("child-detail-%d-%d", data.EventID, i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 59, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 65, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 				if templ_7745c5c3_Err != nil {
@@ -308,7 +320,7 @@ func renderGanttChart(eventID int64, details string) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(details)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 97, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 103, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -413,7 +425,7 @@ func renderedDetails(details string) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatJSON(details))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 193, Col: 132}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 199, Col: 132}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -431,7 +443,7 @@ func renderedDetails(details string) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(details)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 196, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 202, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -683,6 +695,16 @@ func renderChildDetail(c runlog.ChildEvent) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+		} else if c.Kind == "pw_action" || c.Kind == "pw_assert" || c.Kind == "pw_step" {
+			templ_7745c5c3_Err = renderPWEventDetail(c.Kind, c.Details).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if c.Kind == "failure" {
+			templ_7745c5c3_Err = renderFailureDetail(c.Details).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		} else {
 			templ_7745c5c3_Err = renderedDetails(c.Details).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
@@ -732,19 +754,29 @@ func renderChildCLI(details string) templ.Component {
 func childKindIntent(kind string) string {
 	switch kind {
 	case "cli":
-		return "info"
+		return "warning"
 	case "log":
 		return "info"
 	case "assertion":
 		return "pass"
 	case "http_call":
-		return "info"
+		return "accent"
+	case "artifact":
+		return "secondary"
 	case "section":
-		return "info"
+		return "primary"
 	case "failure":
 		return "fail"
 	case "skip":
 		return "skip"
+	case "pw_action":
+		return "info"
+	case "pw_assert":
+		return "pass"
+	case "pw_step":
+		return "info"
+	case "error":
+		return "fail"
 	default:
 		return "neutral"
 	}
@@ -779,18 +811,70 @@ type _renderLogDetail struct {
 }
 
 func (r *_renderLogDetail) Render(ctx context.Context, w io.Writer) error {
-	_, err := fmt.Fprintf(w, `<div class="text-sm space-y-1">`)
+	if len(r.details) == 0 {
+		return nil
+	}
+	// Collect ordered keys: "message" first, then alphabetical remainder
+	keys := make([]string, 0, len(r.details))
+	if _, ok := r.details["message"]; ok {
+		keys = append(keys, "message")
+	}
+	rest := make([]string, 0, len(r.details))
+	for k := range r.details {
+		if k != "message" {
+			rest = append(rest, k)
+		}
+	}
+	sort.Strings(rest)
+	keys = append(keys, rest...)
+
+	_, err := fmt.Fprintf(w, `<div class="space-y-2">`)
 	if err != nil {
 		return err
 	}
-	for k, v := range r.details {
+
+	for i, k := range keys {
+		v := r.details[k]
 		val := fmt.Sprintf("%v", v)
-		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
-			html.EscapeString(k), html.EscapeString(val))
+
+		// Add a visual separator between entries (not before the first)
+		if i > 0 {
+			_, err = fmt.Fprintf(w, `<div class="border-t border-base-content/10 pt-2">`)
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = fmt.Fprintf(w, `<div>`)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Key label
+		_, err = fmt.Fprintf(w, `<span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">%s</span>`,
+			html.EscapeString(k))
+		if err != nil {
+			return err
+		}
+
+		// Value: use <pre> for multi-line or long values, inline span otherwise
+		if strings.Contains(val, "\n") || len(val) > 120 {
+			_, err = fmt.Fprintf(w, `<pre class="mt-1 font-mono text-xs whitespace-pre-wrap break-all bg-base-300 rounded p-2 max-h-48 overflow-auto">%s</pre>`,
+				html.EscapeString(val))
+		} else {
+			_, err = fmt.Fprintf(w, `<div class="mt-0.5 font-mono text-xs break-all">%s</div>`,
+				html.EscapeString(val))
+		}
+		if err != nil {
+			return err
+		}
+
+		_, err = fmt.Fprint(w, `</div>`)
 		if err != nil {
 			return err
 		}
 	}
+
 	_, err = fmt.Fprint(w, `</div>`)
 	return err
 }
@@ -818,19 +902,129 @@ func (r *_renderAssertionDetail) Render(ctx context.Context, w io.Writer) error 
 	if err != nil {
 		return err
 	}
-	for k, v := range r.details {
-		if k == "expected" || k == "actual" {
-			continue
-		}
-		val := fmt.Sprintf("%v", v)
-		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
-			html.EscapeString(k), html.EscapeString(val))
-		if err != nil {
-			return err
-		}
-	}
 	_, err = fmt.Fprint(w, `</div>`)
 	return err
+}
+
+// renderPWEventDetail renders expanded detail for pw_action, pw_assert, pw_step events.
+// These are emitted by the runlog Playwright reporter with structured fields:
+//
+//	pw_action: title, locator?, url?, value?, key?, location?
+//	pw_assert: matcher, passed, locator?, expected?, actual?, location?
+//	pw_step:   (no details — title is the step label)
+func renderPWEventDetail(kind, detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		// Status badge for pw_assert
+		if kind == "pw_assert" {
+			passed, _ := details["passed"].(bool)
+			badgeClass := "badge-success"
+			badgeText := "pass"
+			if !passed {
+				badgeClass = "badge-error"
+				badgeText = "fail"
+			}
+			if _, err := fmt.Fprintf(w, `<div class="flex items-center gap-2 mb-2"><span class="badge badge-sm %s">%s</span>`, badgeClass, badgeText); err != nil {
+				return err
+			}
+			if matcher := getStrField(details, "matcher"); matcher != "" {
+				if _, err := fmt.Fprintf(w, `<span class="font-mono text-xs text-base-content/70">%s</span>`, html.EscapeString(matcher)); err != nil {
+					return err
+				}
+			}
+			if _, err := fmt.Fprint(w, `</div>`); err != nil {
+				return err
+			}
+		}
+
+		// Primary structural fields rendered as labelled rows
+		primary := []struct{ key, label string }{
+			{"locator", "locator"},
+			{"url", "url"},
+			{"value", "value"},
+			{"key", "key"},
+			{"expected", "expected"},
+			{"actual", "actual"},
+			{"error", "error"},
+		}
+		for _, f := range primary {
+			val := getStrField(details, f.key)
+			if val == "" {
+				continue
+			}
+			if _, err := fmt.Fprintf(w,
+				`<div class="flex items-start gap-2 mb-1"><span class="font-semibold text-xs min-w-20 text-base-content/50 uppercase tracking-wide">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
+				f.label, html.EscapeString(val)); err != nil {
+				return err
+			}
+		}
+
+		// Source location — shown dimmed at the end
+		if loc := getStrField(details, "location"); loc != "" {
+			if _, err := fmt.Fprintf(w,
+				`<div class="mt-1 text-xs text-base-content/40 font-mono">@ %s</div>`,
+				html.EscapeString(loc)); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// renderFailureDetail renders expanded detail for "failure" events.
+// Emitted with a short, clean message plus structured details, e.g.:
+//
+//	{matcher, passed, locator?, expected?, actual?, location?, error?}
+//	{step_kind, step_title, location?, error?}
+//
+// The raw error/details.error field (often the full multi-line Playwright
+// error with ANSI color codes) is rendered through ansiToHTML in a <pre>
+// block, matching how CLI output is displayed elsewhere in the events UI.
+func renderFailureDetail(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		if matcher := getStrField(details, "matcher"); matcher != "" {
+			if _, err := fmt.Fprintf(w, `<span class="font-mono text-xs text-base-content/70 mb-2 inline-block">%s</span>`, html.EscapeString(matcher)); err != nil {
+				return err
+			}
+		}
+
+		primary := []struct{ key, label string }{
+			{"locator", "locator"},
+			{"expected", "expected"},
+			{"actual", "actual"},
+			{"step_kind", "step kind"},
+			{"step_title", "step"},
+		}
+		for _, f := range primary {
+			val := getStrField(details, f.key)
+			if val == "" {
+				continue
+			}
+			if _, err := fmt.Fprintf(w,
+				`<div class="flex items-start gap-2 mb-1"><span class="font-semibold text-xs min-w-20 text-base-content/50 uppercase tracking-wide">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
+				f.label, html.EscapeString(val)); err != nil {
+				return err
+			}
+		}
+
+		if loc := getStrField(details, "location"); loc != "" {
+			if _, err := fmt.Fprintf(w,
+				`<div class="mb-1 text-xs text-base-content/40 font-mono">@ %s</div>`,
+				html.EscapeString(loc)); err != nil {
+				return err
+			}
+		}
+
+		if errText := getStrField(details, "error"); errText != "" {
+			if _, err := fmt.Fprintf(w, `<pre class="font-mono text-xs whitespace-pre-wrap max-h-96 overflow-auto bg-base-300 p-3 rounded mt-2">%s</pre>`, ansiToHTML(errText)); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 var _ = templruntime.GeneratedTemplate

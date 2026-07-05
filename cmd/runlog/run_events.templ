@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"sort"
+	"strings"
 
 	"github.com/emergent-company/go-daisy/components/table"
 	"github.com/emergent-company/go-daisy/components/ui"
@@ -30,6 +32,10 @@ templ EventChildrenPartial(data eventChildrenData) {
 			@renderAssertionDetail(data.Details)
 		} else if data.Kind == "coverage" && isJSON(data.Details) {
 			@renderCoverage(data.Details)
+		} else if (data.Kind == "pw_action" || data.Kind == "pw_assert" || data.Kind == "pw_step") && isJSON(data.Details) {
+			@renderPWEventDetail(data.Kind, data.Details)
+		} else if data.Kind == "failure" && isJSON(data.Details) {
+			@renderFailureDetail(data.Details)
 		} else if len(data.Children) > 0 {
 			<div class="ml-4 border-l-2 border-base-300 pl-3">
 				<table class="table table-xs w-full">
@@ -399,6 +405,10 @@ templ renderChildDetail(c runlog.ChildEvent) {
 		@renderAssertionDetail(c.Details)
 	} else if c.Kind == "log" && isJSON(c.Details) {
 		@renderLogDetail(c.Details)
+	} else if c.Kind == "pw_action" || c.Kind == "pw_assert" || c.Kind == "pw_step" {
+		@renderPWEventDetail(c.Kind, c.Details)
+	} else if c.Kind == "failure" {
+		@renderFailureDetail(c.Details)
 	} else {
 		@renderedDetails(c.Details)
 	}
@@ -443,19 +453,29 @@ func renderChildCLI(details string) templ.Component {
 func childKindIntent(kind string) string {
 	switch kind {
 	case "cli":
-		return "info"
+		return "warning"
 	case "log":
 		return "info"
 	case "assertion":
 		return "pass"
 	case "http_call":
-		return "info"
+		return "accent"
+	case "artifact":
+		return "secondary"
 	case "section":
-		return "info"
+		return "primary"
 	case "failure":
 		return "fail"
 	case "skip":
 		return "skip"
+	case "pw_action":
+		return "info"
+	case "pw_assert":
+		return "pass"
+	case "pw_step":
+		return "info"
+	case "error":
+		return "fail"
 	default:
 		return "neutral"
 	}
@@ -490,18 +510,70 @@ type _renderLogDetail struct {
 }
 
 func (r *_renderLogDetail) Render(ctx context.Context, w io.Writer) error {
-	_, err := fmt.Fprintf(w, `<div class="text-sm space-y-1">`)
+	if len(r.details) == 0 {
+		return nil
+	}
+	// Collect ordered keys: "message" first, then alphabetical remainder
+	keys := make([]string, 0, len(r.details))
+	if _, ok := r.details["message"]; ok {
+		keys = append(keys, "message")
+	}
+	rest := make([]string, 0, len(r.details))
+	for k := range r.details {
+		if k != "message" {
+			rest = append(rest, k)
+		}
+	}
+	sort.Strings(rest)
+	keys = append(keys, rest...)
+
+	_, err := fmt.Fprintf(w, `<div class="space-y-2">`)
 	if err != nil {
 		return err
 	}
-	for k, v := range r.details {
+
+	for i, k := range keys {
+		v := r.details[k]
 		val := fmt.Sprintf("%v", v)
-		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
-			html.EscapeString(k), html.EscapeString(val))
+
+		// Add a visual separator between entries (not before the first)
+		if i > 0 {
+			_, err = fmt.Fprintf(w, `<div class="border-t border-base-content/10 pt-2">`)
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = fmt.Fprintf(w, `<div>`)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Key label
+		_, err = fmt.Fprintf(w, `<span class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">%s</span>`,
+			html.EscapeString(k))
+		if err != nil {
+			return err
+		}
+
+		// Value: use <pre> for multi-line or long values, inline span otherwise
+		if strings.Contains(val, "\n") || len(val) > 120 {
+			_, err = fmt.Fprintf(w, `<pre class="mt-1 font-mono text-xs whitespace-pre-wrap break-all bg-base-300 rounded p-2 max-h-48 overflow-auto">%s</pre>`,
+				html.EscapeString(val))
+		} else {
+			_, err = fmt.Fprintf(w, `<div class="mt-0.5 font-mono text-xs break-all">%s</div>`,
+				html.EscapeString(val))
+		}
+		if err != nil {
+			return err
+		}
+
+		_, err = fmt.Fprint(w, `</div>`)
 		if err != nil {
 			return err
 		}
 	}
+
 	_, err = fmt.Fprint(w, `</div>`)
 	return err
 }
@@ -529,17 +601,126 @@ func (r *_renderAssertionDetail) Render(ctx context.Context, w io.Writer) error 
 	if err != nil {
 		return err
 	}
-	for k, v := range r.details {
-		if k == "expected" || k == "actual" {
-			continue
-		}
-		val := fmt.Sprintf("%v", v)
-		_, err = fmt.Fprintf(w, `<div class="flex items-start gap-2"><span class="font-semibold text-xs min-w-20 text-base-content/60">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
-			html.EscapeString(k), html.EscapeString(val))
-		if err != nil {
-			return err
-		}
-	}
 	_, err = fmt.Fprint(w, `</div>`)
 	return err
+}
+
+// renderPWEventDetail renders expanded detail for pw_action, pw_assert, pw_step events.
+// These are emitted by the runlog Playwright reporter with structured fields:
+//   pw_action: title, locator?, url?, value?, key?, location?
+//   pw_assert: matcher, passed, locator?, expected?, actual?, location?
+//   pw_step:   (no details — title is the step label)
+func renderPWEventDetail(kind, detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		// Status badge for pw_assert
+		if kind == "pw_assert" {
+			passed, _ := details["passed"].(bool)
+			badgeClass := "badge-success"
+			badgeText := "pass"
+			if !passed {
+				badgeClass = "badge-error"
+				badgeText = "fail"
+			}
+			if _, err := fmt.Fprintf(w, `<div class="flex items-center gap-2 mb-2"><span class="badge badge-sm %s">%s</span>`, badgeClass, badgeText); err != nil {
+				return err
+			}
+			if matcher := getStrField(details, "matcher"); matcher != "" {
+				if _, err := fmt.Fprintf(w, `<span class="font-mono text-xs text-base-content/70">%s</span>`, html.EscapeString(matcher)); err != nil {
+					return err
+				}
+			}
+			if _, err := fmt.Fprint(w, `</div>`); err != nil {
+				return err
+			}
+		}
+
+		// Primary structural fields rendered as labelled rows
+		primary := []struct{ key, label string }{
+			{"locator", "locator"},
+			{"url", "url"},
+			{"value", "value"},
+			{"key", "key"},
+			{"expected", "expected"},
+			{"actual", "actual"},
+			{"error", "error"},
+		}
+		for _, f := range primary {
+			val := getStrField(details, f.key)
+			if val == "" {
+				continue
+			}
+			if _, err := fmt.Fprintf(w,
+				`<div class="flex items-start gap-2 mb-1"><span class="font-semibold text-xs min-w-20 text-base-content/50 uppercase tracking-wide">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
+				f.label, html.EscapeString(val)); err != nil {
+				return err
+			}
+		}
+
+		// Source location — shown dimmed at the end
+		if loc := getStrField(details, "location"); loc != "" {
+			if _, err := fmt.Fprintf(w,
+				`<div class="mt-1 text-xs text-base-content/40 font-mono">@ %s</div>`,
+				html.EscapeString(loc)); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// renderFailureDetail renders expanded detail for "failure" events.
+// Emitted with a short, clean message plus structured details, e.g.:
+//
+//	{matcher, passed, locator?, expected?, actual?, location?, error?}
+//	{step_kind, step_title, location?, error?}
+//
+// The raw error/details.error field (often the full multi-line Playwright
+// error with ANSI color codes) is rendered through ansiToHTML in a <pre>
+// block, matching how CLI output is displayed elsewhere in the events UI.
+func renderFailureDetail(detailsJSON string) templ.Component {
+	details := parseEventDetails(detailsJSON)
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		if matcher := getStrField(details, "matcher"); matcher != "" {
+			if _, err := fmt.Fprintf(w, `<span class="font-mono text-xs text-base-content/70 mb-2 inline-block">%s</span>`, html.EscapeString(matcher)); err != nil {
+				return err
+			}
+		}
+
+		primary := []struct{ key, label string }{
+			{"locator", "locator"},
+			{"expected", "expected"},
+			{"actual", "actual"},
+			{"step_kind", "step kind"},
+			{"step_title", "step"},
+		}
+		for _, f := range primary {
+			val := getStrField(details, f.key)
+			if val == "" {
+				continue
+			}
+			if _, err := fmt.Fprintf(w,
+				`<div class="flex items-start gap-2 mb-1"><span class="font-semibold text-xs min-w-20 text-base-content/50 uppercase tracking-wide">%s</span><span class="font-mono text-xs break-all">%s</span></div>`,
+				f.label, html.EscapeString(val)); err != nil {
+				return err
+			}
+		}
+
+		if loc := getStrField(details, "location"); loc != "" {
+			if _, err := fmt.Fprintf(w,
+				`<div class="mb-1 text-xs text-base-content/40 font-mono">@ %s</div>`,
+				html.EscapeString(loc)); err != nil {
+				return err
+			}
+		}
+
+		if errText := getStrField(details, "error"); errText != "" {
+			if _, err := fmt.Fprintf(w, `<pre class="font-mono text-xs whitespace-pre-wrap max-h-96 overflow-auto bg-base-300 p-3 rounded mt-2">%s</pre>`, ansiToHTML(errText)); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
