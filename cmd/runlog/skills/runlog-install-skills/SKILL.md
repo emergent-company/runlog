@@ -38,6 +38,7 @@ The following skills are bundled in the `runlog` binary:
 
 | Skill Name | Description |
 |---|---|
+| `runlog-guide` | Comprehensive LLM reference for the runlog library and CLI |
 | `runlog-test-designer` | Design and write high-quality e2e tests |
 | `runlog-verify-e2e-changes` | Compile and smoke-test e2e suite changes |
 | `runlog-verify-runs` | Audit run log quality |
