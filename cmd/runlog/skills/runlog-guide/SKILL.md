@@ -3,7 +3,7 @@ name: runlog-guide
 description: Comprehensive reference for the runlog Go library and CLI. Covers architecture, all three API tiers (RunLog/TestContext/Fixture), chainable assertions, event model, SQLite schema, config file, CLI commands, and common workflows. Load this when writing tests, inspecting runs, auditing quality, or extending runlog.
 metadata:
   author: emergent
-  version: "1.0"
+  version: "1.1"
 ---
 
 # runlog — LLM Reference Guide
@@ -93,6 +93,11 @@ rl.CLIStep(desc, invocation, output string)               // custom description 
 rl.CLIStepErr(desc, invocation, output string, err error) // custom desc + error
 rl.MustRunCLI(t *testing.T, args ...string) string        // runs "memory <args>" + logs
 rl.MustRunCLIInDir(t *testing.T, dir string, args ...string) string
+rl.MustRunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) string // dir+home-aware; single source of truth, prefer over local wrappers
+rl.RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string, error) // non-fatal variant; returns (output, error), logs exactly one event
+
+// HTTP logging
+rl.HTTPCall(method, url string, statusCode int, requestBody, responseBody string) // logs a full request/response as an http_call event
 
 // Events
 rl.Event(kind, message string, details any)   // custom structured event (any JSON-serializable details)
@@ -341,7 +346,8 @@ All events stored in `run_events`. The `details` column is a JSON blob — no sc
 |------|-----------|-------------|
 | `section` | `rl.Section()` | Collapsible group header (timeline) |
 | `log` | `rl.Printf()`, `rl.LogStep()` | Timeline entry |
-| `cli` | `rl.CLI()`, `rl.CLIStep()`, `s.CLI()`, `fx.CLI()` | Timeline (with invocation + output in details) |
+| `cli` | `rl.CLI()`, `rl.CLIStep()`, `s.CLI()`, `fx.CLI()`, `rl.MustRunCLIInDirWithHome()` | Timeline (with invocation + output in details) |
+| `http_call` | `rl.HTTPCall()` | Timeline (method/url/status_code + request/response bodies in details) |
 | `assertion` | `rl.AssertionStep()` | Timeline (expected/actual comparison layout) |
 | `failure` | `rl.Failf()` | Timeline (highlighted red) |
 | `skip` | `rl.Skipf()` | Timeline |
@@ -363,6 +369,32 @@ rl.Event("deployment", "Deployed to staging", map[string]any{
     "duration_ms": 3420,
 })
 ```
+
+### Event contract: kind, message, details
+
+Every event (from `RunLog` methods and from the daemon's `POST /runs/:id/events`
+endpoint used by the TypeScript SDK) follows the same three-field shape:
+
+- **kind** — short snake_case type, e.g. `cli`, `http_call`, `failure`. The
+  canonical list the web UI renders specially (badge colors + expand-panel
+  layouts) lives in `cmd/runlog/events_reference.templ`. Unrecognized kinds
+  never break anything — the daemon logs a warning and falls back to a
+  generic JSON view — but reusing an existing kind for something it doesn't
+  mean (e.g. tagging a network request `cli`) produces mislabeled UI rows;
+  prefer a new, accurately-named kind instead.
+- **message** — short, single-line, human-readable summary shown directly in
+  the events table (e.g. `"GET /api/health → 200"`, `"$ go build ./..."`).
+  Keep it under ~150 chars, no ANSI/control characters — the table truncates
+  and does not interpret ANSI here. Put the full/colorized text in `details`.
+- **details** — optional JSON-serializable map with the rich payload for the
+  expanded view (e.g. `{method, url, status_code, response_body}` for
+  `http_call`, `{command, exit_code, output}` for `cli`). Full multi-line or
+  ANSI-colored text belongs here, not in `message`.
+
+`RunLog.CLI`, `RunLog.CLIErr`, and `RunLog.HTTPCall` are the reference
+implementations of this contract; `RunLog.Event` is the generic escape hatch
+for custom kinds that should still follow it. See `doc.go` for the full
+package-level doc comment.
 
 ### Section children model
 
@@ -469,7 +501,9 @@ daemon_port: 7430
 # Working directory for test execution
 work_dir: /path/to/project
 
-# Artifacts directory (screenshots, traces served at /artifact/)
+# Artifacts directory (screenshots, traces served at /artifact/).
+# Defaults to <work_dir>/.runlog/artifacts/. Must match RUNLOG_ARTIFACTS_DIR
+# used by the TS SDK/reporter.
 artifacts_dir: .runlog/artifacts
 
 # Environment variables set for every test run
@@ -557,6 +591,8 @@ Global flags:
   --db <path>       path to runs.db (default: auto-resolved)
   --since <dur>     time window, e.g. 5m, 1h, 24h (default: 24h)
   --json            (analyze only) output as JSON
+  --category <name>   filter by category, exact match (used by "tests")
+  --test-type <name>  filter by test type, exact match (used by "tests")
 ```
 
 ### `runlog test` — environment-aware test runner
@@ -830,7 +866,17 @@ runlog runs --since 2h               # list recent runs
 runlog inspect <run-id>              # full event timeline for one run
 runlog show <run-id>                 # summary dump
 runlog tests TestMyFeature           # all runs for a specific test
+runlog tests --category integration  # tests in the "integration" category
+runlog tests --test-type unit        # tests classified as test_type "unit"
 ```
+
+### Browse the test catalog (web UI)
+
+The `/ui/catalog` page (sidebar: "Catalog") is the fastest way to answer
+"what and how is tested" without opening tests one-by-one then runs
+one-by-one: one row per distinct test — Name/Category/Type/Tags/
+Description/Runs/Last Status/Last Run — filterable by category and
+test_type, searchable by name. Backed by `RunDB.ListTestCatalog`.
 
 ### Audit run quality
 
@@ -873,10 +919,12 @@ runlog trace <run-id>                          # replay stored conversation
 | `t.Fatalf` after RunLog created | `rl.Failf` — failures must appear in `runlog inspect` |
 | `defer rl.Close()` | `t.Cleanup(rl.Close)` — runs even on panic |
 | Empty section: `rl.Section("X")` with no child events | Add at least one `rl.Printf` inside the section |
-| HTTP call without logging | `rl.CLIStep("description", "POST /api/...", body)` after every HTTP call |
+| HTTP call without logging | `rl.HTTPCall(method, url, statusCode, reqBody, respBody)` after every HTTP call |
 | Missing `rl.Describe` | Add immediately after `NewRunLog`, before any other code |
 | `t.Skip(...)` instead of `rl.Skipf(...)` | `rl.Skipf` records the reason in the DB |
 | Logs outside any section | Wrap in `rl.Section("section name")` |
+| Locally-duplicated dir+home CLI wrapper with manual `rl.CLI`/`rl.CLIErr` call | `rl.MustRunCLIInDirWithHome` / `rl.RunCLIInDirWithHome` — single source of truth, logs exactly one event |
+| `exec.Command`/CLI helper that calls `t.Fatalf` directly on failure with no RunLog trace | Use the `Must*` helpers above — they log the failure event before `t.Fatalf` (production data: 55% of FAIL runs in `tests/cli/*` had zero failure event before this fix) |
 
 ---
 
@@ -885,10 +933,11 @@ runlog trace <run-id>                          # replay stored conversation
 The `runlog` binary serves a web UI at port 4099 (configurable). Access via `http://<hostname>:4099`.
 
 Pages:
-- **Dashboard** — failing tests, recent activity, system status
-- **Tests** — all known tests with pass/fail/skip counts, last run, categories
-- **Test detail** — run history for one test with sparklines
-- **Runs** — all recent runs with filter/pagination
+- **Dashboard** — failing tests, recent activity, real category breakdown (`CategoryStats`)
+- **Catalog** (`/ui/catalog`) — one row per distinct test: Name/Category/Type/Tags/Description/Runs/Last Status/Last Run; filterable by category + test_type, searchable by name
+- **Tests** — all known tests with pass/fail/skip counts, last run, Describe() summary subtitle; category + test_type filters
+- **Test detail** — run history for one test with sparklines, Category/Type badges, full Describe() summary+bullets
+- **Runs** — all recent runs with filter/pagination (category + test_type filters both actually apply to the query)
 - **Run detail** — full event timeline with expandable sections
 - **Experiments** — grouped runs by experiment name, LLM suggestions
 - **Linters** — run linters and view output in real-time
