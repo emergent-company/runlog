@@ -213,7 +213,9 @@ templ runDetailContent(data runDetailData) {
 
 // eventsSection renders the events table, always including debug rows (hidden by CSS).
 templ eventsSection(data runDetailData) {
-	if len(data.TimelineEvents) > 0 || len(data.MetaEvents) > 0 {
+	if len(data.UnwrappedChildren) > 0 {
+		@unwrappedEventsTable(data.UnwrappedChildren, data.MetaEvents, true, data.Run.ID)
+	} else if len(data.TimelineEvents) > 0 || len(data.MetaEvents) > 0 {
 		@eventsTable(data.TimelineEvents, data.MetaEvents, true, data.Run.ID)
 	} else if data.IsActive {
 		@emptyState("No events recorded yet. Waiting for test to emit events...")
@@ -283,6 +285,73 @@ templ eventsTable(timeline []runlog.EventRow, meta []runlog.EventRow, showDebug 
 			}
 		}
 	}
+}
+
+// unwrappedEventsTable renders a run whose only timeline event is a single
+// section with no sibling steps to organize against. Rendering that section
+// as its own collapsible header row would add a pointless extra click with
+// zero organizational benefit, so its children are rendered directly as the
+// main table's rows instead. Detail rows are pre-rendered and toggled purely
+// client-side (same mechanism as EventChildrenPartial's nested child rows),
+// so no per-row server round-trip is needed.
+templ unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow, showDebug bool, runID int64) {
+	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+		@table.TableHead() {
+			@table.TableHeadRow() {
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-12">Seq</th> <!-- lint:allow-raw -->
+				@table.TableHeadCell("Kind")
+				@table.TableHeadCell("Message")
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-20">Elapsed</th> <!-- lint:allow-raw -->
+			}
+		}
+		@table.TableBody() {
+			if showDebug {
+				for _, e := range meta {
+					@eventRow(e, true)
+				}
+			}
+			<!-- lint:allow-raw -->
+			for i, c := range children {
+				<tr
+					id={ fmt.Sprintf("unwrapped-row-%d", i) }
+					data-child-idx={ fmt.Sprintf("%d", i) }
+					class="hover cursor-pointer unwrapped-row"
+				>
+					@table.TableCell("text-right w-12", nil) {
+						@text(fmt.Sprintf("%d", i+1))
+					}
+					@table.TableCell("", nil) {
+						@ui.Badge(ui.BadgeProps{Label: c.Kind, Variant: runBadgeIntent(childKindIntent(c.Kind)), Size: ui.BadgeSizeSM})
+					}
+					@table.TableCell("", nil) {
+						@text(truncateMessage(c.Message, 80))
+					}
+					@table.TableCell("text-right w-20", nil) {
+						@text(fmtElapsed(c.ElapsedS))
+					}
+				</tr>
+				<!-- lint:allow-raw -->
+				<tr id={ fmt.Sprintf("unwrapped-detail-%d", i) } class="hidden">
+					<!-- lint:allow-raw -->
+					<td colspan="4" class="bg-base-200 p-3">
+						@renderChildDetail(c)
+					</td>
+				</tr>
+			}
+		}
+	}
+	<script>
+		(function() {
+			var rows = document.querySelectorAll('tr.unwrapped-row');
+			for (var i = 0; i < rows.length; i++) {
+				rows[i].addEventListener('click', function(e) {
+					var idx = this.getAttribute('data-child-idx');
+					var detail = document.getElementById('unwrapped-detail-' + idx);
+					if (detail) detail.classList.toggle('hidden');
+				});
+			}
+		})();
+	</script>
 }
 
 templ eventRow(e runlog.EventRow, isDebug bool) {

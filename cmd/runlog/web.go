@@ -154,12 +154,13 @@ type testDetailData struct {
 }
 
 type runDetailData struct {
-	Run            runlog.RunRow
-	TimelineEvents []runlog.EventRow
-	MetaEvents     []runlog.EventRow
-	ShowDebug      bool
-	IsActive       bool
-	SSEURL         string
+	Run               runlog.RunRow
+	TimelineEvents    []runlog.EventRow
+	MetaEvents        []runlog.EventRow
+	UnwrappedChildren []runlog.ChildEvent
+	ShowDebug         bool
+	IsActive          bool
+	SSEURL            string
 }
 
 // ── Time formatting ──────────────────────────────────────────────────────────
@@ -278,6 +279,29 @@ var metaRunEventKinds = map[string]bool{
 	"metric":        true,
 	"app_version":   true,
 	"test_version":  true,
+}
+
+// splitRunEvents separates a run's raw events into timeline (execution steps)
+// and meta (tags, versions, token usage — debug-only) rows, and detects the
+// common case of a single top-level section with no sibling timeline events.
+// A lone section adds a pointless extra click-to-expand layer with nothing
+// to organize against, so its children are unwrapped and rendered directly
+// as if they were top-level events instead.
+func splitRunEvents(events []runlog.EventRow) (timeline, meta []runlog.EventRow, unwrapped []runlog.ChildEvent) {
+	timeline = make([]runlog.EventRow, 0, len(events))
+	meta = make([]runlog.EventRow, 0, len(events))
+	for _, e := range events {
+		if metaRunEventKinds[e.Kind] {
+			meta = append(meta, e)
+		} else {
+			timeline = append(timeline, e)
+		}
+	}
+	if len(timeline) == 1 && timeline[0].Kind == "section" && len(timeline[0].Children) > 0 {
+		unwrapped = timeline[0].Children
+		timeline = nil
+	}
+	return timeline, meta, unwrapped
 }
 
 type eventChildrenData struct {

@@ -606,15 +606,7 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 		events = []runlog.EventRow{}
 	}
 
-	timeline := make([]runlog.EventRow, 0, len(events))
-	meta := make([]runlog.EventRow, 0, len(events))
-	for _, e := range events {
-		if metaRunEventKinds[e.Kind] {
-			meta = append(meta, e)
-		} else {
-			timeline = append(timeline, e)
-		}
-	}
+	timeline, meta, unwrapped := splitRunEvents(events)
 
 	showDebug := c.QueryParam("debug") == "1"
 
@@ -625,12 +617,13 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 	}
 
 	data := runDetailData{
-		Run:            *run,
-		TimelineEvents: timeline,
-		MetaEvents:     meta,
-		ShowDebug:      showDebug,
-		IsActive:       isActive,
-		SSEURL:         sseURL,
+		Run:               *run,
+		TimelineEvents:    timeline,
+		MetaEvents:        meta,
+		UnwrappedChildren: unwrapped,
+		ShowDebug:         showDebug,
+		IsActive:          isActive,
+		SSEURL:            sseURL,
 	}
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		RunDetailPage(data), RunDetailContent(data))
@@ -657,23 +650,16 @@ func (app *WebApp) handleRunEventsTable(c echo.Context) error {
 		events = []runlog.EventRow{}
 	}
 
-	timeline := make([]runlog.EventRow, 0, len(events))
-	meta := make([]runlog.EventRow, 0, len(events))
-	for _, e := range events {
-		if metaRunEventKinds[e.Kind] {
-			meta = append(meta, e)
-		} else {
-			timeline = append(timeline, e)
-		}
-	}
+	timeline, meta, unwrapped := splitRunEvents(events)
 
 	showDebug := c.QueryParam("debug") == "1"
 
 	data := runDetailData{
-		Run:            *run,
-		TimelineEvents: timeline,
-		MetaEvents:     meta,
-		ShowDebug:      showDebug,
+		Run:               *run,
+		TimelineEvents:    timeline,
+		MetaEvents:        meta,
+		UnwrappedChildren: unwrapped,
+		ShowDebug:         showDebug,
 	}
 	render.RenderPartial(c.Response().Writer, c.Request(), eventsSection(data))
 	return nil
@@ -974,20 +960,13 @@ func (app *WebApp) buildEventsTableHTML(ctx context.Context, runID int64) (strin
 	if events == nil {
 		events = []runlog.EventRow{}
 	}
-	timeline := make([]runlog.EventRow, 0, len(events))
-	meta := make([]runlog.EventRow, 0, len(events))
-	for _, e := range events {
-		if metaRunEventKinds[e.Kind] {
-			meta = append(meta, e)
-		} else {
-			timeline = append(timeline, e)
-		}
-	}
+	timeline, meta, unwrapped := splitRunEvents(events)
 	data := runDetailData{
-		Run:            *run,
-		TimelineEvents: timeline,
-		MetaEvents:     meta,
-		IsActive:       run.FinishedAt == nil,
+		Run:               *run,
+		TimelineEvents:    timeline,
+		MetaEvents:        meta,
+		UnwrappedChildren: unwrapped,
+		IsActive:          run.FinishedAt == nil,
 	}
 	var buf strings.Builder
 	if err := eventsSection(data).Render(ctx, &buf); err != nil {
