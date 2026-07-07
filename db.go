@@ -337,6 +337,20 @@ ALTER TABLE test_runs ADD COLUMN coverage_data  TEXT;
 ALTER TABLE test_runs ADD COLUMN test_type TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		version: 23,
+		sql: `
+-- Backfill: FinishRunWithCost previously updated the 'passed' outcome column
+-- (0=fail/1=pass/2=skip/3=timeout) on test completion but never updated the
+-- 'skipped' boolean column, which several read paths (dashboard, all-runs,
+-- tests list) check directly instead of deriving from passed=2. Every test
+-- that was actually skipped therefore displayed as FAILED everywhere in the
+-- UI, with no reason shown, since it also isn't a real failure. This
+-- backfills all pre-existing rows; FinishRunWithCost itself is fixed in
+-- code to set both columns together going forward.
+UPDATE test_runs SET skipped = 1 WHERE passed = 2 AND skipped = 0;
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -637,8 +651,8 @@ func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunO
 		costVal = costUSD
 	}
 	_, err := rdb.db.Exec(
-		`UPDATE test_runs SET finished_at = ?, passed = ?, reason = ?, input_tokens = ?, output_tokens = ?, cost_usd = ? WHERE id = ?`,
-		finishedAt.UTC().Format(time.RFC3339Nano), int(outcome), reasonVal, inputTokVal, outputTokVal, costVal, id,
+		`UPDATE test_runs SET finished_at = ?, passed = ?, skipped = ?, reason = ?, input_tokens = ?, output_tokens = ?, cost_usd = ? WHERE id = ?`,
+		finishedAt.UTC().Format(time.RFC3339Nano), int(outcome), outcome == OutcomeSkip, reasonVal, inputTokVal, outputTokVal, costVal, id,
 	)
 	return err
 }
