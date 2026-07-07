@@ -31,7 +31,7 @@ var sidebarGroups = []layout.SidebarGroup{
 		Items: []layout.SidebarItem{
 			{Label: "Dashboard", Href: "/ui/", Icon: "lucide--layout-dashboard"},
 			{Label: "Tests", Href: "/ui/tests", Icon: "lucide--flask-conical"},
-			{Label: "Catalog", Href: "/ui/catalog", Icon: "lucide--book"},
+			{Label: "Catalog", Href: "/ui/catalog", Icon: "lucide--book-open"},
 			{Label: "All Runs", Href: "/ui/runs", Icon: "lucide--list"},
 			{Label: "Linters", Href: "/ui/linters", Icon: "lucide--shield"},
 			{Label: "Environments", Href: "/ui/environments", Icon: "lucide--folder"},
@@ -87,13 +87,12 @@ type testListCategory struct {
 }
 
 type testListEntry struct {
-	Name        string
-	LastStatus  string
-	LastRunAt   string
-	RunCount    int
-	NeverRun    bool
-	TestType    string
-	Description *runlog.RunDescription
+	Name       string
+	LastStatus string
+	LastRunAt  string
+	RunCount   int
+	NeverRun   bool
+	TestType   string
 }
 
 // catalogData backs the /ui/catalog page: one row per distinct test name,

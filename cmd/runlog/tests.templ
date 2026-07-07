@@ -150,9 +150,6 @@ templ flatTestTable(data testListData) {
 					>
 							@table.TableCell("", nil) {
 								@text(e.Name)
-								if e.Description != nil && e.Description.Summary != "" {
-									<div class="text-xs text-base-content/50 mt-0.5">{ truncateMessage(e.Description.Summary, 100) }</div>
-								}
 							}
 							@table.TableCell("", nil) {
 								@statusBadge(e.LastStatus)

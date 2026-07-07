@@ -386,12 +386,11 @@ func (app *WebApp) handleTests(c echo.Context) error {
 			lastRunAt = row.LastRunAt.Format("Jan 02 15:04")
 		}
 		entry := testListEntry{
-			Name:        row.TestName,
-			LastStatus:  status,
-			LastRunAt:   lastRunAt,
-			RunCount:    row.RunCount,
-			TestType:    row.TestType,
-			Description: row.Description,
+			Name:       row.TestName,
+			LastStatus: status,
+			LastRunAt:  lastRunAt,
+			RunCount:   row.RunCount,
+			TestType:   row.TestType,
 		}
 		catMap[cat] = append(catMap[cat], entry)
 		seen[row.TestName] = true
