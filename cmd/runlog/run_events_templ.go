@@ -269,7 +269,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</tbody></table></div><script>\n\t\t\t\t(function() {\n\t\t\t\t\tvar tables = document.querySelectorAll('[data-event-id]');\n\t\t\t\t\tfor (var t = 0; t < tables.length; t++) {\n\t\t\t\t\t\t(function(table) {\n\t\t\t\t\t\t\ttable.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\tvar row = e.target.closest('tr.child-row');\n\t\t\t\t\t\t\t\tif (!row) return;\n\t\t\t\t\t\t\t\tvar idx = row.getAttribute('data-child-idx');\n\t\t\t\t\t\t\t\tvar eid = row.getAttribute('data-event-id');\n\t\t\t\t\t\t\t\tvar detail = document.getElementById('child-detail-' + eid + '-' + idx);\n\t\t\t\t\t\t\t\tif (detail) detail.classList.toggle('hidden');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t})(tables[t]);\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</tbody></table></div><script>\n\t\t\t\t(function() {\n\t\t\t\t\tvar tables = document.querySelectorAll('[data-event-id]');\n\t\t\t\t\tfor (var t = 0; t < tables.length; t++) {\n\t\t\t\t\t\t(function(table) {\n\t\t\t\t\t\t\ttable.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\tvar row = e.target.closest('tr.child-row');\n\t\t\t\t\t\t\t\tif (!row) return;\n\t\t\t\t\t\t\t\tvar idx = row.getAttribute('data-child-idx');\n\t\t\t\t\t\t\t\tvar eid = row.getAttribute('data-event-id');\n\t\t\t\t\t\t\t\tvar detail = document.getElementById('child-detail-' + eid + '-' + idx);\n\t\t\t\t\t\t\t\tif (!detail) return;\n\t\t\t\t\t\t\t\tdetail.classList.toggle('hidden');\n\t\t\t\t\t\t\t\tif (!detail.classList.contains('hidden') && typeof hljs !== 'undefined') {\n\t\t\t\t\t\t\t\t\thljs.highlightElement(detail.querySelector('code'));\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t})(tables[t]);\n\t\t\t\t\t}\n\t\t\t\t})();\n\t\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -284,7 +284,7 @@ func EventChildrenPartial(data eventChildrenData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</td>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<script>\n\t\t\tif (!window._hljsLoaded) {\n\t\t\t\twindow._hljsLoaded = true;\n\t\t\t\t(function loadHLJS(cb) {\n\t\t\t\t\tif (typeof hljs !== 'undefined') { cb(); return; }\n\t\t\t\t\tvar l = document.createElement('link');\n\t\t\t\t\tl.rel = 'stylesheet';\n\t\t\t\t\tl.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';\n\t\t\t\t\tdocument.head.appendChild(l);\n\t\t\t\t\tvar s = document.createElement('script');\n\t\t\t\t\ts.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';\n\t\t\t\t\ts.onload = function() { if (typeof hljs !== 'undefined') cb(); };\n\t\t\t\t\tdocument.head.appendChild(s);\n\t\t\t\t})(function() { hljs.highlightAll(); });\n\t\t\t}\n\t\t</script></td>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -320,7 +320,7 @@ func renderGanttChart(eventID int64, details string) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(details)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 103, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 123, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -425,7 +425,7 @@ func renderedDetails(details string) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatJSON(details))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 199, Col: 132}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 219, Col: 132}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -443,7 +443,7 @@ func renderedDetails(details string) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(details)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 202, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_events.templ`, Line: 222, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -477,7 +477,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Request headers
 		if hdrs, ok := details["request_headers"].(map[string]any); ok && len(hdrs) > 0 {
 			hJSON := mapToJSON(hdrs)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2" open><summary class="collapse-title text-xs font-semibold">Request Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
 			if err != nil {
 				return err
 			}
@@ -485,7 +485,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Response headers
 		if hdrs, ok := details["response_headers"].(map[string]any); ok && len(hdrs) > 0 {
 			hJSON := mapToJSON(hdrs)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Response Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2" open><summary class="collapse-title text-xs font-semibold">Response Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
 			if err != nil {
 				return err
 			}
@@ -503,7 +503,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Request body
 		if body, ok := details["request_body"]; ok && body != nil {
 			rendered := renderBody(body)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto">%s</pre></div></details>`, html.EscapeString(rendered))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto"><code class="language-json hljs">%s</code></pre></div></details>`, html.EscapeString(rendered))
 			if err != nil {
 				return err
 			}
@@ -511,7 +511,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Response body
 		if body, ok := details["response_body"]; ok && body != nil {
 			rendered := renderBody(body)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box" open><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-base-300 p-2 rounded mt-1">%s</pre></div></details>`, html.EscapeString(rendered))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box" open><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-base-300 p-2 rounded mt-1"><code class="language-json hljs">%s</code></pre></div></details>`, html.EscapeString(rendered))
 			if err != nil {
 				return err
 			}

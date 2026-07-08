@@ -83,7 +83,11 @@ templ EventChildrenPartial(data eventChildrenData) {
 								var idx = row.getAttribute('data-child-idx');
 								var eid = row.getAttribute('data-event-id');
 								var detail = document.getElementById('child-detail-' + eid + '-' + idx);
-								if (detail) detail.classList.toggle('hidden');
+								if (!detail) return;
+								detail.classList.toggle('hidden');
+								if (!detail.classList.contains('hidden') && typeof hljs !== 'undefined') {
+									hljs.highlightElement(detail.querySelector('code'));
+								}
 							});
 						})(tables[t]);
 					}
@@ -94,6 +98,22 @@ templ EventChildrenPartial(data eventChildrenData) {
 		} else {
 			@emptyState("No details")
 		}
+		<script>
+			if (!window._hljsLoaded) {
+				window._hljsLoaded = true;
+				(function loadHLJS(cb) {
+					if (typeof hljs !== 'undefined') { cb(); return; }
+					var l = document.createElement('link');
+					l.rel = 'stylesheet';
+					l.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+					document.head.appendChild(l);
+					var s = document.createElement('script');
+					s.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
+					s.onload = function() { if (typeof hljs !== 'undefined') cb(); };
+					document.head.appendChild(s);
+				})(function() { hljs.highlightAll(); });
+			}
+		</script>
 	</td>
 }
 
@@ -222,7 +242,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Request headers
 		if hdrs, ok := details["request_headers"].(map[string]any); ok && len(hdrs) > 0 {
 			hJSON := mapToJSON(hdrs)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2" open><summary class="collapse-title text-xs font-semibold">Request Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
 			if err != nil {
 				return err
 			}
@@ -230,7 +250,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Response headers
 		if hdrs, ok := details["response_headers"].(map[string]any); ok && len(hdrs) > 0 {
 			hJSON := mapToJSON(hdrs)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Response Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2" open><summary class="collapse-title text-xs font-semibold">Response Headers (%d)</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-40 overflow-auto">%s</pre></div></details>`, len(hdrs), html.EscapeString(hJSON))
 			if err != nil {
 				return err
 			}
@@ -248,7 +268,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Request body
 		if body, ok := details["request_body"]; ok && body != nil {
 			rendered := renderBody(body)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto">%s</pre></div></details>`, html.EscapeString(rendered))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box mb-2"><summary class="collapse-title text-xs font-semibold">Request Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto"><code class="language-json hljs">%s</code></pre></div></details>`, html.EscapeString(rendered))
 			if err != nil {
 				return err
 			}
@@ -256,7 +276,7 @@ func renderHttpCall(detailsJSON string) templ.Component {
 		// Response body
 		if body, ok := details["response_body"]; ok && body != nil {
 			rendered := renderBody(body)
-			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box" open><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-base-300 p-2 rounded mt-1">%s</pre></div></details>`, html.EscapeString(rendered))
+			_, err = fmt.Fprintf(w, `<details class="collapse collapse-arrow bg-base-300 rounded-box" open><summary class="collapse-title text-xs font-semibold">Response Body</summary><div class="collapse-content"><pre class="font-mono text-xs whitespace-pre-wrap max-h-64 overflow-auto bg-base-300 p-2 rounded mt-1"><code class="language-json hljs">%s</code></pre></div></details>`, html.EscapeString(rendered))
 			if err != nil {
 				return err
 			}

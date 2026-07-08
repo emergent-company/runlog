@@ -334,7 +334,7 @@ templ unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow,
 				<tr id={ fmt.Sprintf("unwrapped-detail-%d", i) } class="hidden">
 					<!-- lint:allow-raw -->
 					<td colspan="4" class="bg-base-200 p-3">
-						<div class="ml-4 border-l-2 border-base-300 pl-3">
+						<div class="ml-12 border-l-2 border-base-300 pl-3">
 							@renderChildDetail(c)
 						</div>
 					</td>
@@ -349,10 +349,30 @@ templ unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow,
 				rows[i].addEventListener('click', function(e) {
 					var idx = this.getAttribute('data-child-idx');
 					var detail = document.getElementById('unwrapped-detail-' + idx);
-					if (detail) detail.classList.toggle('hidden');
+					if (!detail) return;
+					detail.classList.toggle('hidden');
+					if (!detail.classList.contains('hidden') && typeof hljs !== 'undefined') {
+						hljs.highlightElement(detail.querySelector('code'));
+					}
 				});
 			}
 		})();
+	</script>
+	<script>
+		if (!window._hljsLoaded) {
+			window._hljsLoaded = true;
+			(function loadHLJS(cb) {
+				if (typeof hljs !== 'undefined') { cb(); return; }
+				var l = document.createElement('link');
+				l.rel = 'stylesheet';
+				l.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+				document.head.appendChild(l);
+				var s = document.createElement('script');
+				s.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
+				s.onload = function() { if (typeof hljs !== 'undefined') cb(); };
+				document.head.appendChild(s);
+			})(function() { hljs.highlightAll(); });
+		}
 	</script>
 }
 
