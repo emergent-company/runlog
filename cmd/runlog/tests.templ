@@ -29,7 +29,7 @@ templ testsContentInner(data testListData) {
 	<h1 class="text-2xl font-bold mb-4">Tests</h1>
 	<form
 		class="flex flex-wrap gap-3 mb-4 items-end"
-		hx-get="/ui/tests"
+		hx-get=TestsURL()
 		hx-target="[data-testid='tests-content']"
 		hx-trigger="change from:select"
 		hx-push-url="true"
@@ -146,7 +146,7 @@ templ flatTestTable(data testListData) {
 						id={ "test-" + e.Name }
 						data-testid={ "test-row-" + e.Name }
 						class="hover"
-						data-href={ "/ui/tests/" + url.PathEscape(e.Name) }
+						data-href={ TestDetailURL(e.Name) }
 					>
 							@table.TableCell("", nil) {
 								@text(e.Name)

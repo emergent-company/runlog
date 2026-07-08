@@ -878,9 +878,9 @@ func runsTable(runs []runlog.RunRow, opts runsTableOpts) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var31 string
-					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/ui/runs/%d", r.ID))
+					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(RunDetailURL(r.ID))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 264, Col: 46}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_helpers.templ`, Line: 264, Col: 32}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 					if templ_7745c5c3_Err != nil {

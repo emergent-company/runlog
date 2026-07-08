@@ -261,7 +261,7 @@ templ runsTable(runs []runlog.RunRow, opts runsTableOpts) {
 					id={ fmt.Sprintf("run-%d", r.ID) }
 					data-testid={ fmt.Sprintf("run-row-%d", r.ID) }
 					class="hover"
-					hx-get={ fmt.Sprintf("/ui/runs/%d", r.ID) }
+					hx-get={ RunDetailURL(r.ID) }
 					hx-target="#main-content"
 					hx-swap="innerHTML"
 					hx-push-url="true"

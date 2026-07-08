@@ -19,7 +19,7 @@ templ ExperimentDetailContent(exp runlog.ExperimentSummary) {
 templ experimentDetailContent(exp runlog.ExperimentSummary) {
 	<div data-testid="experiment-detail-page">
 		<div class="flex items-center gap-4 mb-6">
-			@backButton("/ui/experiments")
+			@backButton(ExperimentsURL())
 			<h1 class="text-2xl font-bold">{ exp.Name }</h1>
 		</div>
 		<div class="mb-6">

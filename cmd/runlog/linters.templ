@@ -26,7 +26,7 @@ templ lintersContent(data linterListData) {
 			<h1 class="text-2xl font-bold">Linters</h1>
 			<button
 				class="btn btn-primary btn-sm"
-				hx-post="/ui/linters/run-all"
+				hx-post=RunAllLintersURL()
 				hx-sync="#main-content:replace"
 			>
 				<span class="iconify lucide--play size-4"></span>
@@ -39,7 +39,7 @@ templ lintersContent(data linterListData) {
 	</div>
 	<script type="text/javascript">
 	(function() {
-		var es = new EventSource('/ui/linters/events');
+		var es = new EventSource({ LinterEventsSSEURL() });
 		es.addEventListener('linter-done', function(e) {
 			var data = JSON.parse(e.data);
 			var row = document.getElementById('linter-' + data.name);
@@ -72,7 +72,7 @@ templ linterTable(entries []linterListEntry) {
 						id={ "linter-" + e.Name }
 						data-testid={ "linter-row-" + e.Name }
 						class="hover"
-						hx-get={ "/ui/linters/" + url.PathEscape(e.Name) }
+						hx-get={ LinterDetailURL(e.Name) }
 						hx-target="#main-content"
 						hx-swap="innerHTML"
 						hx-push-url="true"
@@ -107,7 +107,7 @@ templ linterTable(entries []linterListEntry) {
 								@ui.DropdownMenu(nil) {
 									<li>
 										<button
-											data-run-linter={ url.PathEscape(e.Name) }
+											data-run-linter={ linterURLSegment(e.Name) }
 											class="w-full text-left px-4 py-2 text-sm"
 										>Run Linter</button>
 									</li>
@@ -126,7 +126,7 @@ templ linterTable(entries []linterListEntry) {
 			var btn = e.target.closest('[data-run-linter]');
 			if (!btn || typeof htmx === 'undefined') return;
 			var name = btn.getAttribute('data-run-linter');
-			htmx.ajax('POST', '/ui/linters/' + encodeURIComponent(name) + '/run', {
+			htmx.ajax('POST', '/ui/linters/' + name + '/run', {
 				target: '#main-content',
 				swap: 'innerHTML'
 			});
@@ -160,7 +160,7 @@ templ LinterDetailContent(data linterDetailData) {
 
 templ linterDetailContent(data linterDetailData) {
 	<div data-testid="linter-detail">
-		@backButton("/ui/linters")
+		@backButton(LintersURL())
 		<div class="flex items-center justify-between mb-4 mt-2">
 			<div>
 				<h1 class="text-2xl font-bold">{ data.Name }</h1>
@@ -169,7 +169,7 @@ templ linterDetailContent(data linterDetailData) {
 			<button
 				data-testid="run-linter-btn"
 				class="btn btn-primary btn-sm"
-				hx-post={ "/ui/linters/" + url.PathEscape(data.Name) + "/run" }
+				hx-post={ RunLinterURL(data.Name) }
 				hx-sync="#main-content:replace"
 			>
 				<span class="iconify lucide--play size-4"></span>
@@ -181,7 +181,7 @@ templ linterDetailContent(data linterDetailData) {
 				@linterRunsTable(data.Runs)
 				if data.Offset+data.Limit < data.TotalRuns {
 					@loadMoreButton(
-						fmt.Sprintf("/ui/linters/%s?offset=%d", url.PathEscape(data.Name), data.Offset+data.Limit),
+						LinterDetailPaginatedURL(data.Name, data.Offset+data.Limit),
 						"#runs-section",
 					)
 				}
@@ -208,7 +208,7 @@ templ linterRunsTable(runs []runlog.LinterRow) {
 					id={ fmt.Sprintf("linter-run-%d", r.ID) }
 					data-testid={ fmt.Sprintf("linter-run-row-%d", r.ID) }
 					class="hover cursor-pointer"
-					hx-get={ fmt.Sprintf("/ui/linters/%s/runs/%d", url.PathEscape(r.LinterName), r.ID) }
+					hx-get={ LinterRunDetailURL(r.LinterName, r.ID) }
 					hx-target="#main-content"
 					hx-swap="innerHTML"
 					hx-push-url="true"
@@ -258,7 +258,7 @@ templ LinterRunDetailContent(data linterRunDetailData) {
 
 templ linterRunDetailContent(data linterRunDetailData) {
 	<div data-testid="linter-run-detail">
-		@backButton(fmt.Sprintf("/ui/linters/%s", url.PathEscape(data.LinterName)))
+		@backButton(LinterDetailURL(data.LinterName))
 		<div class="flex items-center justify-between mb-4 mt-2">
 			<div>
 				<h1 class="text-2xl font-bold">{ data.LinterName }</h1>
@@ -294,7 +294,7 @@ templ linterRunDetailContent(data linterRunDetailData) {
 }
 
 templ LinterLauncherView(data linterLauncherData) {
-	<div class="border border-base-content/10 rounded-box bg-base-100 overflow-hidden" data-testid="linter-launcher-view" data-sse-url={ data.SSEURL } data-linter-name={ data.LinterName }>
+	<div class="border border-base-content/10 rounded-box bg-base-100 overflow-hidden" data-testid="linter-launcher-view" data-sse-url={ data.SSEURL } 	data-linter-name={ linterURLSegment(data.LinterName) }>
 		<div class="flex items-center gap-3 px-4 py-2.5 bg-base-200/50 border-b border-base-content/5">
 			<span id="linter-launch-status" class="flex items-center gap-2">
 				<span class="loading loading-spinner loading-sm text-primary" data-testid="linter-launch-spinner"></span>
@@ -330,7 +330,7 @@ templ LinterLauncherView(data linterLauncherData) {
 				}
 				if (typeof htmx !== 'undefined') {
 					setTimeout(function() {
-						htmx.ajax('GET', '/ui/linters/' + encodeURIComponent(linterName), {target: '#main-content', swap: 'innerHTML', pushUrl: 'true'});
+						htmx.ajax('GET', '/ui/linters/' + linterName, {target: '#main-content', swap: 'innerHTML', pushUrl: 'true'});
 					}, 1500);
 				}
 			});

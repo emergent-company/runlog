@@ -71,7 +71,7 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 			</footer>
 			<script type="text/javascript">
 			(function() {
-				var es = new EventSource('/ui/stream?topic=footer');
+				var es = new EventSource({ SSEStreamURL("footer") });
 				es.addEventListener('footer-status', function(e) {
 					var el = document.getElementById('footer-status');
 					if (el) el.innerHTML = JSON.parse(e.data).html;

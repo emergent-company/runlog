@@ -28,7 +28,7 @@ templ ExperimentsPage(experiments []runlog.ExperimentSummary) {
 								id={ "exp-" + exp.Name }
 								data-testid={ "experiment-row-" + exp.Name }
 								class="hover"
-								hx-get={ "/ui/experiments/" + exp.Name }
+								hx-get={ ExperimentDetailURL(exp.Name) }
 								hx-target="#main-content"
 								hx-swap="innerHTML"
 								hx-push-url="true"
@@ -84,7 +84,7 @@ templ ExperimentsContent(experiments []runlog.ExperimentSummary) {
 							id={ "exp-" + exp.Name }
 							data-testid={ "experiment-row-" + exp.Name }
 							class="hover"
-							hx-get={ "/ui/experiments/" + exp.Name }
+							hx-get={ ExperimentDetailURL(exp.Name) }
 							hx-target="#main-content"
 							hx-swap="innerHTML"
 							hx-push-url="true"

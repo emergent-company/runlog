@@ -18,12 +18,12 @@ templ TestDetailContent(data testDetailData) {
 templ testDetailContent(data testDetailData) {
 	<div data-testid="test-detail-content">
 		<div class="flex items-center gap-4 mb-6">
-			@backButton("/ui/tests")
+			@backButton(TestsURL())
 			<h1 class="text-2xl font-bold grow" data-testid="test-name">{ data.TestName }</h1>
 			<button
 				type="button"
 				class="btn btn-primary btn-sm"
-				hx-post={ "/ui/launch/" + url.PathEscape(data.TestName) }
+				hx-post={ LaunchURL(data.TestName) }
 				data-testid="run-test-btn"
 			><span class="iconify lucide--play size-3.5"></span> Run Test</button>
 		</div>
@@ -91,7 +91,7 @@ templ testDetailContent(data testDetailData) {
 					class="input input-bordered input-xs w-40"
 					name="tag"
 					data-testid="tag-filter"
-					hx-get={ fmt.Sprintf("/ui/tests/%s", url.PathEscape(data.TestName)) }
+					hx-get={ TestDetailURL(data.TestName) }
 					hx-target="#main-content"
 					hx-swap="innerHTML"
 					hx-sync="#main-content:replace"

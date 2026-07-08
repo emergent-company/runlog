@@ -10,7 +10,6 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 
 	"github.com/emergent-company/go-daisy/components/table"
@@ -117,7 +116,7 @@ func catalogContent(data catalogData) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div data-testid=\"catalog-content\"><h1 class=\"text-2xl font-bold mb-4\">Catalog</h1><form class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"/ui/catalog\" hx-target=\"[data-testid='catalog-content']\" hx-trigger=\"change from:select, keyup changed delay:500ms from:input\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"catalog-category-filter\"><option value=\"\">All Categories</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div data-testid=\"catalog-content\"><h1 class=\"text-2xl font-bold mb-4\">Catalog</h1><form class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"CatalogURL()\" hx-target=\"[data-testid='catalog-content']\" hx-trigger=\"change from:select, keyup changed delay:500ms from:input\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"catalog-category-filter\"><option value=\"\">All Categories</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -475,9 +474,9 @@ func catalogTable(rows []runlog.TestCatalogRow) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var22 string
-					templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue("/ui/tests/" + url.PathEscape(row.TestName))
+					templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(TestDetailURL(row.TestName))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/catalog.templ`, Line: 105, Col: 57}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/catalog.templ`, Line: 105, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 					if templ_7745c5c3_Err != nil {

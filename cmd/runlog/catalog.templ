@@ -27,7 +27,7 @@ templ catalogContent(data catalogData) {
 		<h1 class="text-2xl font-bold mb-4">Catalog</h1>
 		<form
 			class="flex flex-wrap gap-3 mb-4 items-end"
-			hx-get="/ui/catalog"
+			hx-get=CatalogURL()
 			hx-target="[data-testid='catalog-content']"
 			hx-trigger="change from:select, keyup changed delay:500ms from:input"
 			hx-push-url="true"
@@ -102,7 +102,7 @@ templ catalogTable(rows []runlog.TestCatalogRow) {
 					id={ "catalog-" + row.TestName }
 					data-testid={ "catalog-row-" + row.TestName }
 					class="hover"
-					hx-get={ "/ui/tests/" + url.PathEscape(row.TestName) }
+					hx-get={ TestDetailURL(row.TestName) }
 					hx-target="#main-content"
 					hx-swap="innerHTML"
 					hx-push-url="true"

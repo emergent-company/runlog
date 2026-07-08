@@ -16,7 +16,7 @@ templ LaunchView(data launchData) {
 			class="bg-base-300 text-sm font-mono p-4 rounded-box overflow-auto max-h-96 whitespace-pre-wrap"
 			data-testid="log-output"
 		></pre>
-		@backButton("/ui/tests/" + url.PathEscape(data.TestName))
+		@backButton(TestDetailURL(data.TestName))
 	</div>
 	<script type="text/javascript">
 		(function() {
@@ -54,7 +54,7 @@ templ LaunchButton(testName string) {
 		type="button"
 		class="btn btn-primary btn-sm"
 		data-testid={ "launch-" + testName }
-		hx-post={ "/ui/launch/" + url.PathEscape(testName) }
+		hx-post={ LaunchURL(testName) }
 		hx-target="#launch-area"
 		hx-swap="innerHTML"
 	>Run Test</button>

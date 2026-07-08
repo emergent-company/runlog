@@ -151,7 +151,7 @@ func testsContentInner(data testListData) templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h1 class=\"text-2xl font-bold mb-4\">Tests</h1><form class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"/ui/tests\" hx-target=\"[data-testid='tests-content']\" hx-trigger=\"change from:select\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"category-filter\"><option value=\"\">All Categories</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h1 class=\"text-2xl font-bold mb-4\">Tests</h1><form class=\"flex flex-wrap gap-3 mb-4 items-end\" hx-get=\"TestsURL()\" hx-target=\"[data-testid='tests-content']\" hx-trigger=\"change from:select\" hx-push-url=\"true\"><select class=\"select select-bordered select-sm w-full max-w-xs\" name=\"category\" data-testid=\"category-filter\"><option value=\"\">All Categories</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -541,9 +541,9 @@ func flatTestTable(data testListData) templ.Component {
 								return templ_7745c5c3_Err
 							}
 							var templ_7745c5c3_Var21 string
-							templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue("/ui/tests/" + url.PathEscape(e.Name))
+							templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(TestDetailURL(e.Name))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 149, Col: 55}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/tests.templ`, Line: 149, Col: 39}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 							if templ_7745c5c3_Err != nil {

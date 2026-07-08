@@ -16,7 +16,7 @@ templ SearchModal() {
 					autocomplete="off"
 					name="q"
 					data-testid="search-input"
-					hx-get="/ui/search"
+					hx-get=SearchURL()
 					hx-trigger="keyup changed delay:300ms"
 					hx-target="#search-results"
 					hx-swap="outerHTML"

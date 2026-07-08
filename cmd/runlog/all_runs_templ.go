@@ -123,7 +123,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			catOpts = append(catOpts, [2]string{cat, cat})
 		}
 		templ_7745c5c3_Err = form.FormSelect("category", "Category", f.Category, catOpts, "", form.LabelAbove, "", "", templ.Attributes{
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "change",
 			"hx-push-url": "true",
@@ -138,7 +138,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			typeOpts = append(typeOpts, [2]string{tt, tt})
 		}
 		templ_7745c5c3_Err = form.FormSelect("test_type", "Type", f.TestType, typeOpts, "", form.LabelAbove, "", "", templ.Attributes{
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "change",
 			"hx-push-url": "true",
@@ -155,7 +155,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			{"skip", "Skip"},
 			{"running", "Running"},
 		}, "", form.LabelAbove, "", "", templ.Attributes{
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "change",
 			"hx-push-url": "true",
@@ -172,7 +172,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			{"7d", "Last 7 days"},
 			{"30d", "Last 30 days"},
 		}, "", form.LabelAbove, "", "", templ.Attributes{
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "change",
 			"hx-push-url": "true",
@@ -183,7 +183,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = form.FormInput("search", "Test name", f.Search, "Search by name...", form.LabelAbove, "", "", templ.Attributes{
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "keyup changed delay:500ms",
 			"hx-push-url": "true",
@@ -194,7 +194,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = form.FormInput("tags", "Tags", f.Tags, "Filter by tag...", form.LabelAbove, "", "", templ.Attributes{
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "keyup changed delay:500ms",
 			"hx-push-url": "true",
@@ -206,7 +206,7 @@ func allRunsContent(rows []runlog.RunRow, catMap map[int64]string, total int, f 
 		}
 		templ_7745c5c3_Err = form.FormCheckbox("has_cost", "Has cost data", f.HasCost, "", templ.Attributes{
 			"value":       "1",
-			"hx-get":      "/ui/runs",
+			"hx-get":      AllRunsURL(),
 			"hx-target":   "#runs-table",
 			"hx-trigger":  "change",
 			"hx-push-url": "true",

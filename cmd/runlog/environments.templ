@@ -48,7 +48,7 @@ templ envTable(entries []envListEntry) {
 						id={ "env-" + e.Name }
 						data-testid={ "env-row-" + e.Name }
 						class="hover cursor-pointer"
-						hx-get={ "/ui/environments/" + url.PathEscape(e.Name) }
+						hx-get={ EnvironmentDetailURL(e.Name) }
 						hx-target="#main-content"
 						hx-swap="innerHTML"
 						hx-push-url="true"
@@ -111,7 +111,7 @@ templ EnvDetailContent(data envDetailData) {
 
 templ envDetailContent(data envDetailData) {
 	<div data-testid="env-detail">
-		@backButton("/ui/environments")
+		@backButton(EnvironmentsURL())
 		<div class="flex items-center justify-between mb-4 mt-2">
 			<div>
 				<h1 class="text-2xl font-bold">{ data.Name }</h1>

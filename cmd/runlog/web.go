@@ -29,19 +29,19 @@ var sidebarGroups = []layout.SidebarGroup{
 	{
 		Label: "Navigation",
 		Items: []layout.SidebarItem{
-			{Label: "Dashboard", Href: "/ui/", Icon: "lucide--layout-dashboard"},
-			{Label: "Tests", Href: "/ui/tests", Icon: "lucide--flask-conical"},
-			{Label: "Catalog", Href: "/ui/catalog", Icon: "lucide--book-open"},
-			{Label: "All Runs", Href: "/ui/runs", Icon: "lucide--list"},
-			{Label: "Linters", Href: "/ui/linters", Icon: "lucide--shield"},
-			{Label: "Environments", Href: "/ui/environments", Icon: "lucide--folder"},
+			{Label: "Dashboard", Href: HomeURL(), Icon: "lucide--layout-dashboard"},
+			{Label: "Tests", Href: TestsURL(), Icon: "lucide--flask-conical"},
+			{Label: "Catalog", Href: CatalogURL(), Icon: "lucide--book-open"},
+			{Label: "All Runs", Href: AllRunsURL(), Icon: "lucide--list"},
+			{Label: "Linters", Href: LintersURL(), Icon: "lucide--shield"},
+			{Label: "Environments", Href: EnvironmentsURL(), Icon: "lucide--folder"},
 		},
 	},
 	{
 		Label: "Reference",
 		Items: []layout.SidebarItem{
-			{Label: "SDK", Href: "/ui/events", Icon: "lucide--file-text"},
-			{Label: "Experiments", Href: "/ui/experiments", Icon: "lucide--layers"},
+			{Label: "SDK", Href: SDKReferenceURL(), Icon: "lucide--file-text"},
+			{Label: "Experiments", Href: ExperimentsURL(), Icon: "lucide--layers"},
 		},
 	},
 }

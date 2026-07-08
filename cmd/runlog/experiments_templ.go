@@ -185,7 +185,7 @@ func ExperimentsPage(experiments []runlog.ExperimentSummary) templ.Component {
 								return templ_7745c5c3_Err
 							}
 							var templ_7745c5c3_Var9 string
-							templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue("/ui/experiments/" + exp.Name)
+							templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(ExperimentDetailURL(exp.Name))
 							if templ_7745c5c3_Err != nil {
 								return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/experiments.templ`, Line: 31, Col: 46}
 							}
@@ -509,7 +509,7 @@ func ExperimentsContent(experiments []runlog.ExperimentSummary) templ.Component 
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var22 string
-						templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue("/ui/experiments/" + exp.Name)
+						templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(ExperimentDetailURL(exp.Name))
 						if templ_7745c5c3_Err != nil {
 							return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/experiments.templ`, Line: 87, Col: 45}
 						}

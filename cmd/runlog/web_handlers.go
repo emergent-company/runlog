@@ -613,7 +613,7 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 	isActive := run.FinishedAt == nil
 	sseURL := ""
 	if isActive {
-		sseURL = fmt.Sprintf("/ui/runs/%d/status", id)
+		sseURL = RunStatusSSEURL(id)
 	}
 
 	data := runDetailData{
@@ -826,7 +826,7 @@ func (app *WebApp) handleLaunchTest(c echo.Context) error {
 	}
 
 	// Redirect to the run detail page.
-	target := fmt.Sprintf("/ui/runs/%d", runID)
+	target := RunDetailURL(runID)
 	if render.IsHTMX(c.Request()) {
 		w := c.Response().Writer
 		w.Header().Set("HX-Redirect", target)
@@ -1275,6 +1275,7 @@ func (app *WebApp) handleLinters(c echo.Context) error {
 
 func (app *WebApp) handleLinterDetail(c echo.Context) error {
 	name := c.Param("name")
+	name = strings.Replace(name, "--", "/", -1)
 	var def *runlog.LinterDef
 	for _, d := range app.linterDefs() {
 		if d.Name == name {
@@ -1308,6 +1309,7 @@ func (app *WebApp) handleLinterDetail(c echo.Context) error {
 
 func (app *WebApp) handleRunLinter(c echo.Context) error {
 	name := c.Param("name")
+	name = strings.Replace(name, "--", "/", -1)
 	var cmd string
 	for _, d := range app.linterDefs() {
 		if d.Name == name {
@@ -1329,7 +1331,7 @@ func (app *WebApp) handleRunLinter(c echo.Context) error {
 
 	data := linterLauncherData{
 		LinterName: name,
-		SSEURL:     fmt.Sprintf("/ui/linters/%s/events", url.PathEscape(name)),
+		SSEURL:     LinterEventsSSEURLFor(name),
 		Command:    cmd,
 	}
 	render.RenderPartial(c.Response().Writer, c.Request(), LinterLauncherView(data))
@@ -1348,7 +1350,7 @@ func (app *WebApp) handleRunAllLinters(c echo.Context) error {
 			<-al.done
 		}
 	}()
-	target := fmt.Sprintf("/ui/linters?_=%d", time.Now().UnixMilli())
+	target := LintersCacheBustURL()
 	if render.IsHTMX(c.Request()) {
 		w := c.Response().Writer
 		w.Header().Set("HX-Redirect", target)
@@ -1361,6 +1363,7 @@ func (app *WebApp) handleRunAllLinters(c echo.Context) error {
 
 func (app *WebApp) handleLinterRunDetail(c echo.Context) error {
 	name := c.Param("name")
+	name = strings.Replace(name, "--", "/", -1)
 	runIDStr := c.Param("runID")
 	runID, err := strconv.ParseInt(runIDStr, 10, 64)
 	if err != nil {
@@ -1468,6 +1471,7 @@ func (app *WebApp) handleEnvironmentDetail(c echo.Context) error {
 
 func (app *WebApp) handleLinterEvents(c echo.Context) error {
 	linterName := c.Param("name")
+	linterName = strings.Replace(linterName, "--", "/", -1)
 	al := app.linterMgr.Get(linterName)
 	if al == nil {
 		return echo.NewHTTPError(http.StatusNotFound, "no active linter: "+linterName)
@@ -1575,7 +1579,7 @@ func (app *WebApp) handleSearch(c echo.Context) error {
 				items = append(items, searchResultItem{
 					Icon:  "lucide--flask-conical",
 					Label: name,
-					Href:  "/ui/tests/" + url.PathEscape(name),
+					Href:  TestDetailURL(name),
 				})
 			}
 		}
@@ -1602,7 +1606,7 @@ func (app *WebApp) handleSearch(c echo.Context) error {
 				items = append(items, searchResultItem{
 					Icon:  "lucide--list",
 					Label: label,
-					Href:  fmt.Sprintf("/ui/runs/%d", id),
+					Href:  RunDetailURL(id),
 				})
 			}
 		}
@@ -1625,7 +1629,7 @@ func (app *WebApp) handleSearch(c echo.Context) error {
 				items = append(items, searchResultItem{
 					Icon:  "lucide--shield",
 					Label: name,
-					Href:  "/ui/linters/" + url.PathEscape(name),
+					Href:  LinterDetailURL(name),
 				})
 			}
 		}
@@ -1649,7 +1653,7 @@ func (app *WebApp) handleSearch(c echo.Context) error {
 				items = append(items, searchResultItem{
 					Icon:  "lucide--layers",
 					Label: name,
-					Href:  "/ui/experiments/" + url.PathEscape(name),
+					Href:  ExperimentDetailURL(name),
 				})
 			}
 		}
