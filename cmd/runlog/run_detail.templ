@@ -165,28 +165,7 @@ templ runDetailContent(data runDetailData) {
 				</div>
 			</div>
 		}
-		<div class="flex items-center justify-between mb-3 mt-8">
-			@sectionHeading("Events")
-			<label class="flex items-center gap-2 cursor-pointer" data-testid="debug-toggle">
-				<span class="text-xs text-base-content/60">Debug</span>
-				<input
-					type="checkbox"
-					class="toggle toggle-xs"
-					if data.ShowDebug {
-						checked
-					}
-					onclick="document.getElementById('events-section').classList.toggle('debug-visible', this.checked)"
-				/>
-			</label>
-		</div>
-		<div
-			id="events-section"
-			if data.ShowDebug {
-				class="debug-visible"
-			}
-		>
-			@eventsSection(data)
-		</div>
+		@runDetailTabs(data)
 		if data.IsActive && data.SSEURL != "" {
 			<div id="run-status-observer" data-sse-url={ data.SSEURL } style="display:none"></div>
 			<script>
@@ -222,6 +201,44 @@ templ eventsSection(data runDetailData) {
 	} else {
 		@emptyState("No events recorded for this run. The test passed without emitting any timeline events.")
 	}
+}
+
+templ runDetailTabs(data runDetailData) {
+	<div class="mb-4 mt-4">
+		<div role="tablist" class="tabs tabs-bordered">
+			<input type="radio" name="detail-tabs" class="tab" aria-label="Events" checked="checked" />
+			<div role="tabpanel" class="tab-content p-0 pt-4">
+				<div class="flex items-center justify-between mb-3">
+					@sectionHeading("Events")
+					<label class="flex items-center gap-2 cursor-pointer" data-testid="debug-toggle">
+						<span class="text-xs text-base-content/60">Debug</span>
+						<input
+							type="checkbox"
+							class="toggle toggle-xs"
+							if data.ShowDebug {
+								checked
+							}
+							onclick="document.getElementById('events-section').classList.toggle('debug-visible', this.checked)"
+						/>
+					</label>
+				</div>
+				<div
+					id="events-section"
+					if data.ShowDebug {
+						class="debug-visible"
+					}
+				>
+					@eventsSection(data)
+				</div>
+			</div>
+			if data.RawOutput != "" {
+				<input type="radio" name="detail-tabs" class="tab" aria-label="Raw Output" />
+				<div role="tabpanel" class="tab-content p-0 pt-4">
+					<pre class="font-mono text-xs whitespace-pre-wrap break-all max-h-96 overflow-auto bg-base-300 p-3 rounded border border-base-content/10">{ data.RawOutput }</pre>
+				</div>
+			}
+		</div>
+	</div>
 }
 
 templ metaTagBadges(e runlog.EventRow) {

@@ -58,6 +58,10 @@ type RunLog struct {
 	runID int64
 	seq   atomic.Int64 // monotonically increasing event sequence number
 
+	// Daemon HTTP client (SDK mode; set when RUNLOG_DAEMON_URL is configured).
+	daemon      *DaemonClient
+	daemonRunID string
+
 	// Section-as-collapsible-parent tracking.
 	// Every call to Section() starts a new group event; subsequent dbEvent
 	// calls are stored as children of that group until the next Section() or Close().
@@ -197,6 +201,12 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 		t.Logf("warn: RunLog: SharedDB: %v", err)
 	}
 
+	// SDK mode: prefer HTTP to daemon over direct DB when available.
+	if du := os.Getenv("RUNLOG_DAEMON_URL"); du != "" && rl.runID != 0 {
+		rl.daemon = NewDaemonClient(du)
+		rl.daemonRunID = fmt.Sprintf("%d", rl.runID)
+	}
+
 	// Auto-populate experiment from the EXPERIMENT env var.
 	if exp := os.Getenv("EXPERIMENT"); exp != "" {
 		rl.SetExperiment(exp)
@@ -265,20 +275,25 @@ func (rl *RunLog) Close() { //nolint:deadcode
 		rl.t.Logf("run log written: %s", rl.path)
 	}
 
-	// Persist run outcome to DB.
-	if rl.db != nil && rl.runID != 0 {
-		var outcome RunOutcome
-		var reason string
-		switch {
-		case rl.t.Skipped():
-			outcome = OutcomeSkip
-			reason = rl.skipReason
-		case rl.t.Failed():
-			outcome = OutcomeFail
-			reason = rl.lastFailMsg
-		default:
-			outcome = OutcomePass
+	// Persist run outcome to DB or daemon.
+	var outcome RunOutcome
+	var reason string
+	switch {
+	case rl.t.Skipped():
+		outcome = OutcomeSkip
+		reason = rl.skipReason
+	case rl.t.Failed():
+		outcome = OutcomeFail
+		reason = rl.lastFailMsg
+	default:
+		outcome = OutcomePass
+	}
+	if rl.daemon != nil {
+		rl.daemon.markDoneNF(rl.t, rl.daemonRunID, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD)
+		if rl.coverageData != "" && rl.coveragePct > 0 {
+			rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "coverage_pct", fmt.Sprintf("%.4f", rl.coveragePct))
 		}
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.FinishRunWithCost(rl.runID, now, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD); err != nil {
 			rl.t.Logf("warn: RunLog: DB FinishRunWithCost: %v", err)
 		}
@@ -422,7 +437,9 @@ func (rl *RunLog) SetExperiment(name string) { //nolint:deadcode
 
 	rl.writef("experiment: %s\n", name)
 
-	if rl.db != nil && rl.runID != 0 {
+	if rl.daemon != nil {
+		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "experiment", name)
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunExperiment(rl.runID, name); err != nil {
 			rl.t.Logf("warn: RunLog.SetExperiment: DB UpdateRunExperiment: %v", err)
 		}
@@ -443,7 +460,9 @@ func (rl *RunLog) SetCategory(category string) { //nolint:deadcode
 
 	rl.writef("category: %s\n", category)
 
-	if rl.db != nil && rl.runID != 0 {
+	if rl.daemon != nil {
+		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "category", category)
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunCategory(rl.runID, category); err != nil {
 			rl.t.Logf("warn: RunLog.SetCategory: DB UpdateRunCategory: %v", err)
 		}
@@ -463,7 +482,9 @@ func (rl *RunLog) SetTestType(testType string) { //nolint:deadcode
 
 	rl.writef("test_type: %s\n", testType)
 
-	if rl.db != nil && rl.runID != 0 {
+	if rl.daemon != nil {
+		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "test_type", testType)
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunField(rl.runID, "test_type", testType); err != nil {
 			rl.t.Logf("warn: RunLog.SetTestType: DB UpdateRunField: %v", err)
 		}
@@ -484,7 +505,9 @@ func (rl *RunLog) SetTimeout(d time.Duration) { //nolint:deadcode
 
 	rl.writef("timeout: %.0fs\n", sec)
 
-	if rl.db != nil && rl.runID != 0 {
+	if rl.daemon != nil {
+		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "timeout_seconds", fmt.Sprintf("%.0f", sec))
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunTimeout(rl.runID, sec); err != nil {
 			rl.t.Logf("warn: RunLog.SetTimeout: DB UpdateRunTimeout: %v", err)
 		}
@@ -500,7 +523,9 @@ func (rl *RunLog) SetCoverage(coveragePct float64, coverageData string) { //noli
 	rl.coverageData = coverageData
 	rl.mu.Unlock()
 	rl.writef("coverage: %.1f%%\n", coveragePct)
-	if rl.db != nil && rl.runID != 0 {
+	if rl.daemon != nil {
+		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "coverage_pct", fmt.Sprintf("%.4f", coveragePct))
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunCoverage(rl.runID, coveragePct, coverageData); err != nil {
 			rl.t.Logf("warn: RunLog.SetCoverage: DB UpdateRunCoverage: %v", err)
 		}
@@ -525,7 +550,9 @@ func (rl *RunLog) SetAppVersion(version string) { //nolint:deadcode
 	rl.writef("app_version: %s\n", version)
 
 	// Persist to the DB run row (best-effort).
-	if rl.db != nil && rl.runID != 0 {
+	if rl.daemon != nil {
+		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "app_version", version)
+	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunAppVersion(rl.runID, version); err != nil {
 			rl.t.Logf("warn: RunLog.SetAppVersion: DB UpdateRunAppVersion: %v", err)
 		}
@@ -952,6 +979,10 @@ func (rl *RunLog) writeLocked(s string) { //nolint:deadcode
 // When a section is active the event is stored as a child of that section;
 // otherwise it is inserted as a top-level row.
 func (rl *RunLog) dbEvent(kind, message string, details any) { //nolint:deadcode
+	if rl.daemon != nil {
+		rl.daemon.addEventNF(rl.t, rl.daemonRunID, kind, message, details, time.Since(rl.StartedAt).Seconds())
+		return
+	}
 	if rl.db == nil || rl.runID == 0 {
 		return
 	}

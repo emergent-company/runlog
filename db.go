@@ -351,6 +351,15 @@ ALTER TABLE test_runs ADD COLUMN test_type TEXT NOT NULL DEFAULT '';
 UPDATE test_runs SET skipped = 1 WHERE passed = 2 AND skipped = 0;
 `,
 	},
+	{
+		version: 24,
+		sql: `
+-- raw_output stores the full stdout/stderr captured by the daemon during
+-- test execution. Displayed in a dedicated "Raw Output" tab on the run
+-- detail page, separate from the structured event timeline.
+ALTER TABLE test_runs ADD COLUMN raw_output TEXT NOT NULL DEFAULT '';
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -657,6 +666,15 @@ func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunO
 	return err
 }
 
+// SaveRawOutput appends the captured stdout/stderr output to the test run's
+// raw_output column. Called by the daemon when a test process finishes.
+func (rdb *RunDB) SaveRawOutput(id int64, output string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(`UPDATE test_runs SET raw_output = raw_output || ? WHERE id = ?`, output, id)
+	return err
+}
+
 // ListStaleRuns returns all runs where finished_at IS NULL — i.e. runs that
 // were never properly closed, typically because the test process was killed.
 func (rdb *RunDB) ListStaleRuns() ([]RunRow, error) {
@@ -844,6 +862,7 @@ type RunRow struct {
 	CoveragePct  *float64          // nil if no coverage data; percentage 0.0-100.0
 	CoverageData *string           // nil if no coverage data; JSON per-function coverage
 	TestType     string            // classification: unit, integration, e2e, component, etc.
+	RawOutput    string            // full stdout/stderr captured during test execution
 }
 
 // ChildEvent is one entry in the `children` JSON array stored on a group event.

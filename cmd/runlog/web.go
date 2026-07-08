@@ -161,6 +161,7 @@ type runDetailData struct {
 	ShowDebug         bool
 	IsActive          bool
 	SSEURL            string
+	RawOutput         string
 }
 
 // ── Time formatting ──────────────────────────────────────────────────────────
@@ -478,23 +479,20 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 	al.LauncherID = id
 	al.RunID = runID
 
-	seq := 0
+	var outputBuf strings.Builder
 	go func() {
 		mr := io.MultiReader(stdout, stderr)
 		scanner := bufio.NewScanner(mr)
 		for scanner.Scan() {
 			line := scanner.Text()
 			al.broadcast(line)
-			if skipLogLine(line) {
-				continue
-			}
-			seq++
-			kind := lineEventKind(line)
-			if al.RunID != 0 && kind != "" {
-				_ = lm.db.InsertEvent(al.RunID, seq, time.Now(), time.Since(al.Started).Seconds(), kind, line, nil)
-			}
+			outputBuf.WriteString(line)
+			outputBuf.WriteString("\n")
 		}
 		err := cmd.Wait()
+		if al.RunID != 0 && outputBuf.Len() > 0 {
+			_ = lm.db.SaveRawOutput(al.RunID, outputBuf.String())
+		}
 		lm.db.FinishLauncher(id, time.Now())
 		al.exitCode = 0
 		if err != nil {
@@ -505,13 +503,18 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 			}
 		}
 		if al.RunID != 0 {
-			outcome := runlog.OutcomePass
-			if al.exitCode != 0 {
-				outcome = runlog.OutcomeFail
-			} else if lm.db.HasSkipEvent(al.RunID) {
-				outcome = runlog.OutcomeSkip
+			// Only set outcome if the structured RunLog hasn't already done so.
+			var finished *string
+			_ = lm.db.RawDB().QueryRow(`SELECT finished_at FROM test_runs WHERE id = ?`, al.RunID).Scan(&finished)
+			if finished == nil || *finished == "" {
+				outcome := runlog.OutcomePass
+				if al.exitCode != 0 {
+					outcome = runlog.OutcomeFail
+				} else if lm.db.HasSkipEvent(al.RunID) {
+					outcome = runlog.OutcomeSkip
+				}
+				_ = lm.db.FinishRun(al.RunID, time.Now(), outcome, "")
 			}
-			lm.db.FinishRun(al.RunID, time.Now(), outcome, "")
 		}
 		close(al.done)
 		lm.mu.Lock()
@@ -1000,40 +1003,4 @@ func (app *WebApp) runTimeoutWorker(ctx context.Context) {
 // reqCtx returns a context with the request context from Echo.
 func reqCtx(c echo.Context) context.Context { //nolint:deadcode
 	return c.Request().Context()
-}
-
-// skipLogLine returns true for lines that should NOT be persisted as run_events.
-// These are lines from go test -v that are already handled by the test's own
-// dbEvent() path (rl.Printf → dbEvent inserts into run_events directly).
-func skipLogLine(line string) bool {
-	// Skip go test framework output noise
-	switch {
-	case strings.HasPrefix(line, "=== RUN "):
-		return true
-	case strings.HasPrefix(line, "--- PASS"):
-		return true
-	case strings.HasPrefix(line, "--- FAIL"):
-		return true
-	case strings.HasPrefix(line, "--- SKIP"):
-		return true
-	case strings.HasPrefix(line, "PASS"):
-		return true
-	case strings.HasPrefix(line, "FAIL"):
-		return true
-	case strings.HasPrefix(line, "ok  "):
-		return true
-	case strings.HasPrefix(line, "?   "):
-		return true
-	case strings.HasPrefix(line, "--- SKIP"):
-		return true
-	case strings.HasPrefix(line, "testing: warning"):
-		return true
-	}
-	return false
-}
-
-// lineEventKind detects the event kind from a go test stdout line.
-// Returns "" for lines that should be skipped entirely (handled by skipLogLine).
-func lineEventKind(line string) string {
-	return "log"
 }

@@ -239,3 +239,85 @@ func (c *DaemonClient) MustGetEvents(t *testing.T, id int64) []map[string]any { 
 	}
 	return result
 }
+
+// addEventNF is the non-fatal variant of AddEvent for use inside RunLog.
+func (c *DaemonClient) addEventNF(t *testing.T, runID string, kind, message string, details any, elapsedSec float64) { //nolint:deadcode
+	t.Helper()
+	body := map[string]any{
+		"kind":      kind,
+		"message":   message,
+		"elapsed_s": elapsedSec,
+	}
+	if details != nil {
+		body["details"] = details
+	}
+	b, _ := json.Marshal(body)
+	resp, err := c.client.Post(c.baseURL+"/runs/"+runID+"/events", "application/json", bytes.NewReader(b))
+	if err != nil {
+		t.Logf("warn: DaemonClient.addEventNF: POST /runs/%s/events: %v", runID, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Logf("warn: DaemonClient.addEventNF: POST /runs/%s/events → %d: %s", runID, resp.StatusCode, string(respBody))
+	}
+}
+
+// markDoneNF is the non-fatal variant of MarkDone for use inside RunLog.Close().
+func (c *DaemonClient) markDoneNF(t *testing.T, runID string, outcome RunOutcome, reason string, inputTokens, outputTokens int64, costUSD float64) {
+	t.Helper()
+	body := map[string]any{}
+	switch outcome {
+	case OutcomePass:
+		body["passed"] = true
+	case OutcomeFail:
+		body["passed"] = false
+	case OutcomeSkip:
+		body["skipped"] = true
+	}
+	if reason != "" {
+		body["reason"] = reason
+	}
+	if inputTokens > 0 {
+		body["input_tokens"] = inputTokens
+	}
+	if outputTokens > 0 {
+		body["output_tokens"] = outputTokens
+	}
+	if costUSD > 0 {
+		body["cost_usd"] = costUSD
+	}
+	b, _ := json.Marshal(body)
+	req, _ := http.NewRequest("PUT", c.baseURL+"/runs/"+runID+"/done", bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		t.Logf("warn: DaemonClient.markDoneNF: PUT /runs/%s/done: %v", runID, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Logf("warn: DaemonClient.markDoneNF: PUT /runs/%s/done → %d: %s", runID, resp.StatusCode, string(respBody))
+	}
+}
+
+// setMetadataNF is the non-fatal variant of SetMetadata for use inside RunLog.
+func (c *DaemonClient) setMetadataNF(t *testing.T, runID, field, value string) { //nolint:deadcode
+	t.Helper()
+	body := map[string]string{"value": value}
+	b, _ := json.Marshal(body)
+	req, _ := http.NewRequest("PUT", c.baseURL+"/runs/"+runID+"/"+field, bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		t.Logf("warn: DaemonClient.setMetadataNF: PUT /runs/%s/%s: %v", runID, field, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Logf("warn: DaemonClient.setMetadataNF: PUT /runs/%s/%s → %d: %s", runID, field, resp.StatusCode, string(respBody))
+	}
+}

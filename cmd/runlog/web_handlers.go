@@ -616,6 +616,10 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 		sseURL = RunStatusSSEURL(id)
 	}
 
+	// Fetch raw stdout/stderr output for the Raw Output tab.
+	var rawOutput string
+	_ = app.db.RawDB().QueryRow(`SELECT raw_output FROM test_runs WHERE id = ?`, id).Scan(&rawOutput)
+
 	data := runDetailData{
 		Run:               *run,
 		TimelineEvents:    timeline,
@@ -624,6 +628,7 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 		ShowDebug:         showDebug,
 		IsActive:          isActive,
 		SSEURL:            sseURL,
+		RawOutput:         run.RawOutput,
 	}
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		RunDetailPage(data), RunDetailContent(data))
@@ -660,6 +665,7 @@ func (app *WebApp) handleRunEventsTable(c echo.Context) error {
 		MetaEvents:        meta,
 		UnwrappedChildren: unwrapped,
 		ShowDebug:         showDebug,
+		RawOutput:         run.RawOutput,
 	}
 	render.RenderPartial(c.Response().Writer, c.Request(), eventsSection(data))
 	return nil
@@ -967,6 +973,7 @@ func (app *WebApp) buildEventsTableHTML(ctx context.Context, runID int64) (strin
 		MetaEvents:        meta,
 		UnwrappedChildren: unwrapped,
 		IsActive:          run.FinishedAt == nil,
+		RawOutput:         run.RawOutput,
 	}
 	var buf strings.Builder
 	if err := eventsSection(data).Render(ctx, &buf); err != nil {
@@ -980,7 +987,8 @@ func queryRunsForTest(rawDB *sql.DB, testName string, limit, offset int, tagFilt
 		SELECT id, test_name, started_at, finished_at, passed, skipped,
 		       description, tags, experiment, runner, reason, env_name,
 		       input_tokens, output_tokens, cost_usd, env_vars,
-		       app_version, test_version, category, test_type
+		       app_version, test_version, category, test_type,
+		       raw_output
 		FROM test_runs
 		WHERE test_name = ?`
 	args := []any{testName}
@@ -1002,7 +1010,8 @@ func fetchRunByID(rawDB *sql.DB, id int64) *runlog.RunRow {
 		SELECT id, test_name, started_at, finished_at, passed, skipped,
 		       description, tags, experiment, runner, reason, env_name,
 		       input_tokens, output_tokens, cost_usd, env_vars,
-		       app_version, test_version, category, test_type
+		       app_version, test_version, category, test_type,
+		       raw_output
 		FROM test_runs WHERE id = ?`, id)
 	if err != nil {
 		return nil
@@ -1036,6 +1045,7 @@ func scanRunRows(rows *sql.Rows) ([]runlog.RunRow, error) {
 			&runner, &reason, &envName,
 			&inputTokens, &outputTokens, &costUSD, &envVarsJSON,
 			&appVersion, &testVersion, &r.Category, &r.TestType,
+			&r.RawOutput,
 		); err != nil {
 			return nil, fmt.Errorf("scan run row: %w", err)
 		}
