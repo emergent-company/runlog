@@ -30,7 +30,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 
 	runlog "github.com/emergent-company/runlog"
@@ -226,15 +225,48 @@ EXAMPLES
 		}
 	}
 
-	// ── Exec go test (replaces the current process) ───────────────────────
+	// ── Run go test with captured output ────────────────────────────────────
 	goPath, err := exec.LookPath("go")
 	if err != nil {
 		return fmt.Errorf("go binary not found on PATH: %w", err)
 	}
 
-	// syscall.Exec replaces the process so the exit code flows naturally
-	// to the caller (CI, shell, etc.) without an extra wrapper.
-	return syscall.Exec(goPath, append([]string{"go"}, goFlags...), os.Environ())
+	cmd := exec.Command(goPath, goFlags...)
+	cmd.Env = os.Environ()
+
+	var outputBuf strings.Builder
+	cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
+
+	err = cmd.Run()
+
+	// Save captured output to the daemon if registered.
+	if rid := os.Getenv("RUNLOG_RUN_ID"); rid != "" {
+		saveRawOutput(rid, outputBuf.String())
+	}
+
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			os.Exit(exitErr.ExitCode())
+		}
+		return fmt.Errorf("go test: %w", err)
+	}
+	return nil
+}
+
+// saveRawOutput PUTs captured stdout/stderr to the daemon's /runs/:rid/output
+// endpoint for storage in test_runs.raw_output.
+func saveRawOutput(runID, output string) {
+	dURL := daemonURL()
+	body, _ := json.Marshal(map[string]string{"output": output})
+	req, _ := http.NewRequest("PUT", dURL+"/runs/"+runID+"/output", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	resp.Body.Close()
 }
 
 // findTestPackages returns the Go package patterns to pass to go test.
@@ -337,7 +369,7 @@ func registerRunWithDaemon(profile string) {
 		return
 	}
 
-	// Inject into current process env so syscall.Exec inherits them
+	// Inject into current process env so the spawned go test process inherits them
 	os.Setenv("RUNLOG_RUN_ID", result.ID)
 	os.Setenv("RUNLOG_DAEMON_URL", dURL)
 }

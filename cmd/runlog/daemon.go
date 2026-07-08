@@ -499,6 +499,13 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 
+	case "output":
+		if r.Method == http.MethodPut {
+			d.handleSaveRawOutput(w, r, runID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
 	default:
 		http.Error(w, "not found", http.StatusNotFound)
 	}
@@ -670,6 +677,29 @@ func (d *DaemonServer) handleUpdateRunField(w http.ResponseWriter, r *http.Reque
 		req.Value, runID,
 	)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// handleSaveRawOutput appends captured stdout/stderr to the test run's
+// raw_output column (PUT /runs/:rid/output). The body is a JSON object with
+// an "output" string field.
+func (d *DaemonServer) handleSaveRawOutput(w http.ResponseWriter, r *http.Request, runID string) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 5<<20)) // 5 MB max
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_, _ = d.db.RawDB().Exec(
+		`UPDATE test_runs SET raw_output = raw_output || ? WHERE daemon_run_id = ?`,
+		req.Output, runID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
 }
 
 // handleUpdateRunTags updates tags on the linked test_runs row (JSON array).
