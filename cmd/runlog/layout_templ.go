@@ -200,6 +200,10 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "   <script>\n\t\t\t\t\t(function() {\n\t\t\t\t\t\tvar m = 'system';\n\t\t\t\t\t\ttry { m = localStorage.getItem('runlog-theme') || m; } catch(e) {}\n\t\t\t\t\t\tif (m === 'system') {\n\t\t\t\t\t\t\tm = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';\n\t\t\t\t\t\t}\n\t\t\t\t\t\tdocument.documentElement.setAttribute('data-theme', m === 'dark' ? 'dracula' : 'nord');\n\t\t\t\t\t})();\n\t\t\t\t</script> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -224,16 +228,16 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = layout.Page(title, "nord").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = layout.Page(title, "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "  <link rel=\"stylesheet\" href=\"/static/css/frappe-gantt.css\"><script src=\"/static/js/hx-head.js\"></script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "  <link rel=\"stylesheet\" href=\"/static/css/frappe-gantt.css\"><script src=\"/static/js/hx-head.js\"></script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

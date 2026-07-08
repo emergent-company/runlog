@@ -238,7 +238,20 @@ templ AppPage(title string, groups []layout.SidebarGroup) {
 				{ children... }
 			}
 		} else {
-			@layout.Page(title, "nord") {
+			@layout.Page(title, "") {
+				// Block the parser before any paint: set data-theme from localStorage
+				// so the correct theme is active from the very first frame, preventing
+				// a flash of the wrong theme (e.g. light → dark).
+				<script>
+					(function() {
+						var m = 'system';
+						try { m = localStorage.getItem('runlog-theme') || m; } catch(e) {}
+						if (m === 'system') {
+							m = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+						}
+						document.documentElement.setAttribute('data-theme', m === 'dark' ? 'dracula' : 'nord');
+					})();
+				</script>
 				@AppShellContent(groups) {
 					{ children... }
 				}
