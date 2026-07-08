@@ -1189,7 +1189,7 @@ func unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow, 
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" class=\"hidden\"><!-- lint:allow-raw --><td colspan=\"4\" class=\"bg-base-200 p-3\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" class=\"hidden\"><!-- lint:allow-raw --><td colspan=\"4\" class=\"bg-base-200 p-3 pl-6 border-l-2 border-base-300\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
