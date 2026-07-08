@@ -183,11 +183,20 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 		rl.testType = deriveTestType(srcFile)
 
 		// If RUNLOG_RUN_ID is set, use the existing row instead of creating a new one.
+		// When the daemon pre-registers a batch run, RUNLOG_RUN_ID is a UUID and
+		// RUNLOG_TEST_RUN_ID carries the numeric test_runs row ID created by the
+		// daemon during registration.
 		if ridStr := os.Getenv("RUNLOG_RUN_ID"); ridStr != "" {
 			if rid, err := strconv.ParseInt(ridStr, 10, 64); err == nil {
 				rl.db = db
 				rl.runID = rid
 				t.Logf("runlog: using existing run ID %d from RUNLOG_RUN_ID", rid)
+			} else if tridStr := os.Getenv("RUNLOG_TEST_RUN_ID"); tridStr != "" {
+				if trid, err := strconv.ParseInt(tridStr, 10, 64); err == nil {
+					rl.db = db
+					rl.runID = trid
+					t.Logf("runlog: using daemon-registered run ID %d from RUNLOG_TEST_RUN_ID", trid)
+				}
 			} else {
 				t.Logf("warn: RunLog: invalid RUNLOG_RUN_ID %q: %v", ridStr, err)
 			}
@@ -204,7 +213,8 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	// SDK mode: prefer HTTP to daemon over direct DB when available.
 	if du := os.Getenv("RUNLOG_DAEMON_URL"); du != "" && rl.runID != 0 {
 		rl.daemon = NewDaemonClient(du)
-		rl.daemonRunID = fmt.Sprintf("%d", rl.runID)
+		// daemonRunID is the UUID used in daemon API routes (/runs/<uuid>/...
+		rl.daemonRunID = os.Getenv("RUNLOG_RUN_ID")
 	}
 
 	// Auto-populate experiment from the EXPERIMENT env var.
