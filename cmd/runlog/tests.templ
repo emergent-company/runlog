@@ -133,6 +133,7 @@ templ flatTestTable(data testListData) {
 				@table.TableHeadCell("Status")
 				@table.TableHeadCell("Category")
 				@table.TableHeadCell("Type")
+				@table.TableHeadCell("Tags")
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-16">Runs</th> <!-- lint:allow-raw -->
 				@table.TableHeadCell("Last Run")
 				<th class="text-xs font-semibold text-base-content/60 uppercase text-center w-16">Action</th> <!-- lint:allow-raw -->
@@ -150,6 +151,9 @@ templ flatTestTable(data testListData) {
 					>
 							@table.TableCell("", nil) {
 								@text(e.Name)
+								if e.Description != nil && e.Description.Summary != "" {
+									<div class="text-xs text-base-content/50 mt-0.5 truncate max-w-md">{ truncateMessage(e.Description.Summary, 100) }</div>
+								}
 							}
 							@table.TableCell("", nil) {
 								@statusBadge(e.LastStatus)
@@ -160,6 +164,15 @@ templ flatTestTable(data testListData) {
 							@table.TableCell("", nil) {
 								if e.TestType != "" {
 									<span class={ testTypeBadge(e.TestType) }>{ e.TestType }</span>
+								}
+							}
+							@table.TableCell("", nil) {
+								if len(e.Tags) > 0 {
+									for _, t := range e.Tags {
+										<span class="badge badge-outline badge-xs mr-0.5">{ t }</span>
+									}
+								} else {
+									<span class="text-base-content/30">—</span>
 								}
 							}
 							@table.TableCell("text-right w-16", nil) {

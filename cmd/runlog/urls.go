@@ -27,10 +27,6 @@ func TestDetailPaginatedURL(name string, offset int, tag string) string {
 	return fmt.Sprintf("/ui/tests/%s?offset=%d&tag=%s", url.PathEscape(name), offset, url.QueryEscape(tag))
 }
 
-// ── Catalog ───────────────────────────────────────────────────────────────────
-
-func CatalogURL() string { return "/ui/catalog" }
-
 // ── Runs ──────────────────────────────────────────────────────────────────────
 
 func AllRunsURL() string { return "/ui/runs" }

@@ -33,7 +33,6 @@ func TestURLs_StaticPaths(t *testing.T) {
 	}{
 		{"HomeURL", HomeURL(), "/ui/"},
 		{"TestsURL", TestsURL(), "/ui/tests"},
-		{"CatalogURL", CatalogURL(), "/ui/catalog"},
 		{"AllRunsURL", AllRunsURL(), "/ui/runs"},
 		{"LintersURL", LintersURL(), "/ui/linters"},
 		{"EnvironmentsURL", EnvironmentsURL(), "/ui/environments"},

@@ -386,11 +386,13 @@ func (app *WebApp) handleTests(c echo.Context) error {
 			lastRunAt = row.LastRunAt.Format("Jan 02 15:04")
 		}
 		entry := testListEntry{
-			Name:       row.TestName,
-			LastStatus: status,
-			LastRunAt:  lastRunAt,
-			RunCount:   row.RunCount,
-			TestType:   row.TestType,
+			Name:        row.TestName,
+			LastStatus:  status,
+			LastRunAt:   lastRunAt,
+			RunCount:    row.RunCount,
+			TestType:    row.TestType,
+			Description: row.Description,
+			Tags:        row.Tags,
 		}
 		catMap[cat] = append(catMap[cat], entry)
 		seen[row.TestName] = true
@@ -457,51 +459,6 @@ func (app *WebApp) handleTests(c echo.Context) error {
 
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		TestsPage(data), TestsContent(data))
-	return nil
-}
-
-func (app *WebApp) handleCatalog(c echo.Context) error {
-	categoryFilter := c.QueryParam("category")
-	testTypeFilter := c.QueryParam("test_type")
-	search := strings.TrimSpace(c.QueryParam("search"))
-
-	catalog, err := app.db.ListTestCatalog()
-	if err != nil {
-		return fmt.Errorf("list test catalog: %w", err)
-	}
-
-	catSet := make(map[string]bool)
-	typeSet := make(map[string]bool)
-	searchLower := strings.ToLower(search)
-	rows := make([]runlog.TestCatalogRow, 0, len(catalog))
-	for _, row := range catalog {
-		cat := displayCategory(row.Category)
-		catSet[cat] = true
-		testType := displayTestType(row.TestType)
-		typeSet[testType] = true
-
-		if categoryFilter != "" && cat != categoryFilter {
-			continue
-		}
-		if testTypeFilter != "" && testType != testTypeFilter {
-			continue
-		}
-		if searchLower != "" && !strings.Contains(strings.ToLower(row.TestName), searchLower) {
-			continue
-		}
-		rows = append(rows, row)
-	}
-
-	data := catalogData{
-		Rows:           rows,
-		CategoryFilter: categoryFilter,
-		TestTypeFilter: testTypeFilter,
-		Search:         search,
-		Categories:     sortedKeys(catSet),
-		TestTypes:      sortedKeys(typeSet),
-	}
-	render.RenderAuto(c.Response().Writer, c.Request(),
-		CatalogPage(data), CatalogContent(data))
 	return nil
 }
 

@@ -31,7 +31,6 @@ var sidebarGroups = []layout.SidebarGroup{
 		Items: []layout.SidebarItem{
 			{Label: "Dashboard", Href: HomeURL(), Icon: "lucide--layout-dashboard"},
 			{Label: "Tests", Href: TestsURL(), Icon: "lucide--flask-conical"},
-			{Label: "Catalog", Href: CatalogURL(), Icon: "lucide--book-open"},
 			{Label: "All Runs", Href: AllRunsURL(), Icon: "lucide--list"},
 			{Label: "Linters", Href: LintersURL(), Icon: "lucide--shield"},
 			{Label: "Environments", Href: EnvironmentsURL(), Icon: "lucide--folder"},
@@ -87,23 +86,14 @@ type testListCategory struct {
 }
 
 type testListEntry struct {
-	Name       string
-	LastStatus string
-	LastRunAt  string
-	RunCount   int
-	NeverRun   bool
-	TestType   string
-}
-
-// catalogData backs the /ui/catalog page: one row per distinct test name,
-// independent of run history windows, with classification/description data.
-type catalogData struct {
-	Rows           []runlog.TestCatalogRow
-	CategoryFilter string
-	TestTypeFilter string
-	Search         string
-	Categories     []string // full option list for the category dropdown
-	TestTypes      []string // full option list for the test_type dropdown
+	Name        string
+	LastStatus  string
+	LastRunAt   string
+	RunCount    int
+	NeverRun    bool
+	TestType    string
+	Description *runlog.RunDescription
+	Tags        []string
 }
 
 type trendPoint struct {
@@ -875,7 +865,6 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 	e.GET("/experiments/:name", app.handleExperimentDetail)
 	e.GET("/tests", app.handleTests)
 	e.GET("/tests/:name", app.handleTestDetail)
-	e.GET("/catalog", app.handleCatalog)
 	e.GET("/runs", app.handleAllRuns)
 	e.GET("/runs/:id", app.handleRunDetail)
 	e.GET("/runs/:id/events/:eventID", app.handleEventChildren)
