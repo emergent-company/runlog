@@ -5,7 +5,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "templ generate && go build -o /tmp/runlog-air-test ./cmd/runlog"
+  cmd = "templ generate && bash scripts/prune-templ-url-imports.sh && go build -o /tmp/runlog-air-test ./cmd/runlog"
   entrypoint = ["/tmp/runlog-air-test"]
   args_bin = ["--daemon", "--db", "/tmp/runlog-test.db", "--port", "17431"]
   include_ext = ["go", "templ"]

@@ -4,7 +4,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "templ generate && go build -o /tmp/runlog-air-memory ./cmd/runlog"
+  cmd = "templ generate && bash scripts/prune-templ-url-imports.sh && go build -o /tmp/runlog-air-memory ./cmd/runlog"
   entrypoint = ["/tmp/runlog-air-memory"]
   args_bin = ["--daemon", "--dev", "--db", "/root/emergent.memory.e2e/.runlog/runs.db", "--port", "17432"]
   include_ext = ["go", "templ"]
