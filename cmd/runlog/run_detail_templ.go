@@ -1189,7 +1189,7 @@ func unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow, 
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" class=\"hidden\"><!-- lint:allow-raw --><td colspan=\"4\" class=\"bg-base-200 p-3 pl-6 border-l-2 border-base-300\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" class=\"hidden\"><!-- lint:allow-raw --><td colspan=\"4\" class=\"bg-base-200 p-3\"><div class=\"ml-4 border-l-2 border-base-300 pl-3\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1197,7 +1197,7 @@ func unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow, 
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</td></tr>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</div></td></tr>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1252,7 +1252,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var47 string
 				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("event-%d", e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 361, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 363, Col: 38}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 				if templ_7745c5c3_Err != nil {
@@ -1265,7 +1265,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var48 string
 				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue("event-" + fmt.Sprintf("%d", e.ID) + "-debug")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 362, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 364, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 				if templ_7745c5c3_Err != nil {
@@ -1278,7 +1278,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var49 string
 				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 364, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 366, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 				if templ_7745c5c3_Err != nil {
@@ -1291,7 +1291,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var50 string
 				templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("#event-detail-%d", e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 365, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 367, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 				if templ_7745c5c3_Err != nil {
@@ -1304,7 +1304,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var51 string
 				templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", e.Seq))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 370, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 372, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 				if templ_7745c5c3_Err != nil {
@@ -1325,7 +1325,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var52 string
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(truncateMessage(e.Message, 80))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 374, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 376, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 				if templ_7745c5c3_Err != nil {
@@ -1338,7 +1338,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var53 string
 				templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(fmtElapsed(e.ElapsedS))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 375, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 377, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 				if templ_7745c5c3_Err != nil {
@@ -1356,7 +1356,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var54 string
 				templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("event-%d", e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 379, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 381, Col: 38}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
 				if templ_7745c5c3_Err != nil {
@@ -1369,7 +1369,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var55 string
 				templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.ResolveAttributeValue("event-" + fmt.Sprintf("%d", e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 380, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 382, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 				if templ_7745c5c3_Err != nil {
@@ -1382,7 +1382,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var56 string
 				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("/ui/runs/%d/events/%d", e.RunID, e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 382, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 384, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 				if templ_7745c5c3_Err != nil {
@@ -1395,7 +1395,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 				var templ_7745c5c3_Var57 string
 				templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("#event-detail-%d", e.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 383, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 385, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
 				if templ_7745c5c3_Err != nil {
@@ -1505,7 +1505,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 			var templ_7745c5c3_Var62 string
 			templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("event-detail-%d", e.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 401, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 403, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var62)
 			if templ_7745c5c3_Err != nil {
@@ -1523,7 +1523,7 @@ func eventRow(e runlog.EventRow, isDebug bool) templ.Component {
 			var templ_7745c5c3_Var63 string
 			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("event-%d", e.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 404, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/run_detail.templ`, Line: 406, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
 			if templ_7745c5c3_Err != nil {

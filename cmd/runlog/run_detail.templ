@@ -333,8 +333,10 @@ templ unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow,
 				<!-- lint:allow-raw -->
 				<tr id={ fmt.Sprintf("unwrapped-detail-%d", i) } class="hidden">
 					<!-- lint:allow-raw -->
-					<td colspan="4" class="bg-base-200 p-3 pl-6 border-l-2 border-base-300">
-						@renderChildDetail(c)
+					<td colspan="4" class="bg-base-200 p-3">
+						<div class="ml-4 border-l-2 border-base-300 pl-3">
+							@renderChildDetail(c)
+						</div>
 					</td>
 				</tr>
 			}
