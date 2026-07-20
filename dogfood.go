@@ -16,7 +16,7 @@ import (
 //	df := NewDogfoodRun(t)
 //	defer df.Done()
 //	df.Event("log", "step 1 complete")
-//	df.HTTPCall("GET", "/api/health", 200, `{"status":"ok"}`)
+//	df.HTTPCall("GET", "/api/health", 200, `{"status":"ok"}`, 0)
 type DogfoodRun struct {
 	t      *testing.T
 	url    string
@@ -185,7 +185,8 @@ func (df *DogfoodRun) RunCLI(commandDesc string, fn func() error) string {
 }
 
 // HTTPCall emits an http_call event with method, url, status code and optional response body.
-func (df *DogfoodRun) HTTPCall(method, url string, statusCode int, responseBody string) {
+// durationMs is the request round-trip time in milliseconds; pass 0 if unknown.
+func (df *DogfoodRun) HTTPCall(method, url string, statusCode int, responseBody string, durationMs float64) {
 	if !df.active {
 		return
 	}
@@ -208,6 +209,9 @@ func (df *DogfoodRun) HTTPCall(method, url string, statusCode int, responseBody 
 		"message":   msg,
 		"elapsed_s": 0.5,
 		"details":   details,
+	}
+	if durationMs > 0 {
+		body["duration_ms"] = durationMs
 	}
 	b, _ := json.Marshal(body)
 	http.Post(fmt.Sprintf("%s/runs/%s/events", df.url, df.runID), "application/json", bytes.NewReader(b))

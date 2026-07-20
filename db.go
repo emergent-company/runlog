@@ -360,6 +360,56 @@ UPDATE test_runs SET skipped = 1 WHERE passed = 2 AND skipped = 0;
 ALTER TABLE test_runs ADD COLUMN raw_output TEXT NOT NULL DEFAULT '';
 `,
 	},
+	{
+		version: 25,
+		sql: `
+-- section is a grouping label for events. Events with the same section
+-- label are rendered as a collapsible group in the run detail UI.
+-- Replaces the old "section" event kind + children JSON pattern.
+ALTER TABLE run_events ADD COLUMN section TEXT NOT NULL DEFAULT '';
+
+-- Migrate existing data: for each parent event of kind "section" with children,
+-- set the section label on every child event, then delete the parent row.
+-- Child events from sections get the parent's message as their section label.
+-- Events without a section parent keep section = ''.
+UPDATE run_events SET section = (
+    SELECT p.message FROM run_events p
+    WHERE p.id = run_events.parent_id AND p.kind = 'section'
+) WHERE parent_id IS NOT NULL AND section = '';
+
+-- Now delete the old section parent rows (they're replaced by the section column).
+DELETE FROM run_events WHERE kind = 'section';
+
+-- Remove parent_id and children columns — no longer used.
+-- (We keep them for backward compat reads, but drop the index.)
+DROP INDEX IF EXISTS idx_run_events_parent_id;
+`,
+	},
+	{
+		version: 27,
+		sql: `
+-- test_definitions stores known test functions from filesystem discovery.
+-- Each test appears once. test_runs references test_name (natural key).
+-- Never-run tests appear via the UNION in ListTestCatalog.
+CREATE TABLE IF NOT EXISTS test_definitions (
+    test_name TEXT PRIMARY KEY,
+    category  TEXT NOT NULL DEFAULT '',
+    test_type TEXT NOT NULL DEFAULT ''
+) WITHOUT ROWID;
+
+-- Clean up old is_placeholder from a previous v26 draft.
+-- We can't DROP COLUMN in older SQLite, so leave it; it's harmless.
+-- Any old placeholder rows were deleted at application startup.
+`,
+	},
+	{
+		version: 28,
+		sql: `
+-- duration_ms records how long a single event took (e.g. HTTP call, CLI
+-- execution). NULL when not applicable (log lines, tags, sections).
+ALTER TABLE run_events ADD COLUMN duration_ms REAL;
+`,
+	},
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -457,6 +507,51 @@ func (rdb *RunDB) applyMigrations() error {
 	return nil
 }
 
+// ListEventsSince returns run_events with id > sinceID, ordered by seq.
+func (rdb *RunDB) ListEventsSince(runID int64, sinceID int64) ([]EventRow, error) {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+
+	rows, err := rdb.db.Query(`
+        SELECT id, run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section, children
+        FROM run_events
+        WHERE run_id = ? AND id > ?
+        ORDER BY seq
+    `, runID, sinceID)
+	if err != nil {
+		return nil, fmt.Errorf("rundb: ListEventsSince: %w", err)
+	}
+	defer rows.Close()
+
+	var result []EventRow
+	for rows.Next() {
+		var row EventRow
+		var occurredStr string
+		var childrenJSON *string
+		if err := rows.Scan(
+			&row.ID,
+			&row.RunID,
+			&row.Seq,
+			&occurredStr,
+			&row.ElapsedS,
+			&row.DurationMs,
+			&row.Kind,
+			&row.Message,
+			&row.Details,
+			&row.Section,
+			&childrenJSON,
+		); err != nil {
+			return nil, fmt.Errorf("rundb: ListEventsSince scan: %w", err)
+		}
+		row.OccurredAt, _ = time.Parse(time.RFC3339Nano, occurredStr)
+		if childrenJSON != nil && *childrenJSON != "" {
+			_ = json.Unmarshal([]byte(*childrenJSON), &row.Children)
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Write helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -491,6 +586,18 @@ func (rdb *RunDB) InsertRun(testName string, startedAt time.Time, runner string,
 		return 0, fmt.Errorf("rundb: InsertRun: %w", err)
 	}
 	return res.LastInsertId()
+}
+
+// UpsertDefinition inserts a test definition row. If the test name already
+// exists (from a previous discovery scan), it is a no-op.
+func (rdb *RunDB) UpsertDefinition(testName, category, testType string) error {
+	rdb.mu.Lock()
+	defer rdb.mu.Unlock()
+	_, err := rdb.db.Exec(`
+		INSERT OR IGNORE INTO test_definitions (test_name, category, test_type)
+		VALUES (?, ?, ?)
+	`, testName, category, testType)
+	return err
 }
 
 // RunDescription is the structured description stored on a test_runs row.
@@ -639,8 +746,8 @@ func (rdb *RunDB) FinishRunWithCost(id int64, finishedAt time.Time, outcome RunO
 		if err := rdb.db.QueryRow(`SELECT started_at FROM test_runs WHERE id = ?`, id).Scan(&startedStr); err == nil {
 			if started, err := time.Parse(time.RFC3339Nano, startedStr); err == nil {
 				elapsed := finishedAt.Sub(started).Seconds()
-				rdb.insertEventLocked(id, 1, started, 0, "state_change", "test started", nil, nil)
-				rdb.insertEventLocked(id, 2, finishedAt, elapsed, "state_change", "test finished", nil, nil)
+			rdb.insertEventLocked(id, 1, started, 0, 0, "state_change", "test started", nil, "")
+			rdb.insertEventLocked(id, 2, finishedAt, elapsed, 0, "state_change", "test finished", nil, "")
 			}
 		}
 	}
@@ -700,9 +807,10 @@ func (rdb *RunDB) ReapStaleRuns(reason string) (int64, error) {
 	return res.RowsAffected()
 }
 
-// InsertEvent appends one run_events row.
+// InsertEvent appends one run_events row without a duration.
 // details may be any JSON-serialisable value (struct, map, nil).
 // If details is already a []byte or string it is stored verbatim as JSON.
+// For events that have a measurable duration, use InsertEventDur instead.
 func (rdb *RunDB) InsertEvent(
 	runID int64,
 	seq int,
@@ -710,8 +818,24 @@ func (rdb *RunDB) InsertEvent(
 	elapsedS float64,
 	kind, message string,
 	details any,
+	section string,
 ) error {
-	return rdb.insertEvent(runID, seq, occurredAt, elapsedS, kind, message, details, nil)
+	return rdb.insertEvent(runID, seq, occurredAt, elapsedS, 0, kind, message, details, section)
+}
+
+// InsertEventDur appends one run_events row with a duration_ms value.
+// durationMs is the event's execution time in milliseconds; pass 0 if not applicable.
+func (rdb *RunDB) InsertEventDur(
+	runID int64,
+	seq int,
+	occurredAt time.Time,
+	elapsedS float64,
+	durationMs float64,
+	kind, message string,
+	details any,
+	section string,
+) error {
+	return rdb.insertEvent(runID, seq, occurredAt, elapsedS, durationMs, kind, message, details, section)
 }
 
 // marshalDetailsJSON converts an arbitrary details value to a *string of JSON.
@@ -737,21 +861,22 @@ func marshalDetailsJSON(details any) *string {
 	return &s
 }
 
-// insertEvent is the internal implementation shared by InsertEvent and
-// InsertChildEvent.  It acquires rdb.mu before inserting.
+// insertEvent is the internal implementation shared by InsertEvent.
+// It acquires rdb.mu before inserting.
 func (rdb *RunDB) insertEvent(
 	runID int64,
 	seq int,
 	occurredAt time.Time,
 	elapsedS float64,
+	durationMs float64,
 	kind, message string,
 	details any,
-	parentID *int64,
+	section string,
 ) error {
 	detailsJSON := marshalDetailsJSON(details)
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
-	return rdb.insertEventLocked(runID, seq, occurredAt, elapsedS, kind, message, detailsJSON, parentID)
+	return rdb.insertEventLocked(runID, seq, occurredAt, elapsedS, durationMs, kind, message, detailsJSON, section)
 }
 
 // insertEventLocked is like insertEvent but assumes rdb.mu is already held.
@@ -762,27 +887,33 @@ func (rdb *RunDB) insertEventLocked(
 	seq int,
 	occurredAt time.Time,
 	elapsedS float64,
+	durationMs float64,
 	kind, message string,
 	detailsJSON *string,
-	parentID *int64,
+	section string,
 ) error {
+	var durationVal any
+	if durationMs > 0 {
+		durationVal = durationMs
+	}
 	_, err := rdb.db.Exec(
-		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message, details, parent_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		runID,
 		seq,
 		occurredAt.UTC().Format(time.RFC3339Nano),
 		elapsedS,
+		durationVal,
 		kind,
 		message,
 		detailsJSON,
-		parentID,
+		section,
 	)
 	return err
 }
 
 // InsertGroupEvent inserts a parent "group" event and returns its row ID.
-// Callers call AppendGroupChildren once all children have been collected.
+// Deprecated: use InsertEvent with a section label instead.
 func (rdb *RunDB) InsertGroupEvent(
 	runID int64,
 	seq int,
@@ -793,11 +924,11 @@ func (rdb *RunDB) InsertGroupEvent(
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 	res, err := rdb.db.Exec(
-		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO run_events(run_id, seq, occurred_at, elapsed_s, kind, message, section)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		runID, seq,
 		occurredAt.UTC().Format(time.RFC3339Nano),
-		elapsedS, kind, message,
+		elapsedS, kind, message, message,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("rundb: InsertGroupEvent: %w", err)
@@ -805,26 +936,27 @@ func (rdb *RunDB) InsertGroupEvent(
 	return res.LastInsertId()
 }
 
-// AppendGroupChildren serialises children as a JSON array into the parent's
-// `children` column.  children is a []ChildEvent value.
+// AppendGroupChildren stores children as individual rows with the parent's
+// section label. Deprecated: use InsertEvent with a section label instead.
 func (rdb *RunDB) AppendGroupChildren(parentID int64, children []ChildEvent) error {
 	if len(children) == 0 {
 		return nil
 	}
-	b, err := json.Marshal(children)
+	var runID int64
+	var section string
+	err := rdb.db.QueryRow(`SELECT run_id, message FROM run_events WHERE id = ?`, parentID).Scan(&runID, &section)
 	if err != nil {
-		return fmt.Errorf("rundb: AppendGroupChildren marshal: %w", err)
+		return fmt.Errorf("rundb: AppendGroupChildren parent lookup: %w", err)
 	}
-	rdb.mu.Lock()
-	defer rdb.mu.Unlock()
-	_, err = rdb.db.Exec(
-		`UPDATE run_events SET children = ? WHERE id = ?`, string(b), parentID,
-	)
-	return err
+	for _, c := range children {
+		var det any
+		if c.Details != "" {
+			det = c.Details
+		}
+		_ = rdb.insertEvent(runID, 0, time.Now(), c.ElapsedS, 0, c.Kind, c.Message, det, section)
+	}
+	return nil
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Read helpers (used by the TUI browser)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // RunTokenSummary holds aggregated token usage for a test run, derived from
@@ -880,11 +1012,13 @@ type EventRow struct {
 	Seq        int
 	OccurredAt time.Time
 	ElapsedS   float64
+	DurationMs *float64     // nil when not applicable; event execution time in ms
 	Kind       string
 	Message    string
 	Details    *string      // raw JSON, nil if absent
-	ParentID   *int64       // non-nil for child events
-	Children   []ChildEvent // populated for group events
+	Section    string       // grouping label (empty = top-level, no group)
+	ParentID   *int64       // legacy; nil for new rows
+	Children   []ChildEvent // legacy; may be populated for old data
 }
 
 // ListRuns returns test_runs rows with started_at >= since, newest first.
@@ -1347,6 +1481,7 @@ type TestCatalogRow struct {
 	Description *RunDescription
 	Tags        []string
 	RunCount    int
+	NeverRun    bool
 	LastRunAt   time.Time
 	LastStatus  string // "pass", "fail", "skip", "timeout", "running"
 }
@@ -1358,15 +1493,33 @@ type TestCatalogRow struct {
 func (rdb *RunDB) ListTestCatalog() ([]TestCatalogRow, error) {
 	rdb.mu.Lock()
 	rows, err := rdb.db.Query(`
-		SELECT t.test_name, t.run_count, t.last_started, t.category, t.test_type,
-		       t.description, t.tags, t.passed, t.skipped, t.reason
+		SELECT test_name, run_count, last_started, category, test_type,
+		       description, tags, passed, skipped, reason, never_run
 		FROM (
-			SELECT test_name,
-			       COUNT(*)        OVER (PARTITION BY test_name) AS run_count,
-			       MAX(started_at) OVER (PARTITION BY test_name) AS last_started,
-			       category, test_type, description, tags, passed, skipped, reason,
-			       ROW_NUMBER()    OVER (PARTITION BY test_name ORDER BY started_at DESC) AS rn
-			FROM test_runs
+			-- Tests with real runs
+			SELECT r.test_name,
+			       COUNT(*) OVER (PARTITION BY r.test_name) AS run_count,
+			       0 AS never_run,
+			       MAX(r.started_at) OVER (PARTITION BY r.test_name) AS last_started,
+			       r.category, r.test_type, r.description, r.tags,
+			       r.passed, r.skipped, r.reason,
+			       ROW_NUMBER() OVER (PARTITION BY r.test_name ORDER BY r.started_at DESC) AS rn
+			FROM test_runs r
+			UNION ALL
+			-- Tests defined but never run
+			SELECT d.test_name,
+			       0 AS run_count,
+			       1 AS never_run,
+			       '' AS last_started,
+			       d.category, d.test_type,
+			       NULL AS description, NULL AS tags,
+			       NULL AS passed, NULL AS skipped, NULL AS reason,
+			       1 AS rn
+			FROM test_definitions d
+			WHERE NOT EXISTS (
+				SELECT 1 FROM test_runs r2
+				WHERE r2.test_name = d.test_name
+			)
 		) t
 		WHERE t.rn = 1
 		ORDER BY t.test_name
@@ -1380,14 +1533,14 @@ func (rdb *RunDB) ListTestCatalog() ([]TestCatalogRow, error) {
 	var result []TestCatalogRow
 	for rows.Next() {
 		var name, lastStarted string
-		var runCount int
+		var runCount, neverRun int
 		var category, testType, descJSON, tagsJSON, reason sql.NullString
 		var passed, skipped sql.NullInt64
 		if err := rows.Scan(&name, &runCount, &lastStarted, &category, &testType,
-			&descJSON, &tagsJSON, &passed, &skipped, &reason); err != nil {
+			&descJSON, &tagsJSON, &passed, &skipped, &reason, &neverRun); err != nil {
 			continue
 		}
-		row := TestCatalogRow{TestName: name, RunCount: runCount}
+		row := TestCatalogRow{TestName: name, RunCount: runCount, NeverRun: neverRun == 1}
 		if category.Valid {
 			row.Category = category.String
 		}
@@ -1409,15 +1562,17 @@ func (rdb *RunDB) ListTestCatalog() ([]TestCatalogRow, error) {
 				row.Tags = tags
 			}
 		}
-		switch {
-		case !passed.Valid:
-			row.LastStatus = "running"
-		case skipped.Valid && skipped.Int64 == 1:
-			row.LastStatus = "skip"
-		case passed.Int64 == 1:
-			row.LastStatus = "pass"
-		case reason.Valid && reason.String == "timed out":
-			row.LastStatus = "timeout"
+	switch {
+	case row.NeverRun:
+		row.LastStatus = "never_run"
+	case !passed.Valid:
+		row.LastStatus = "running"
+	case skipped.Valid && skipped.Int64 == 1:
+		row.LastStatus = "skip"
+	case passed.Int64 == 1:
+		row.LastStatus = "pass"
+	case reason.Valid && reason.String == "timed out":
+		row.LastStatus = "timeout"
 		default:
 			row.LastStatus = "fail"
 		}
@@ -1881,9 +2036,9 @@ func (rdb *RunDB) ListEvents(runID int64) ([]EventRow, error) {
 	defer rdb.mu.Unlock()
 
 	rows, err := rdb.db.Query(`
-        SELECT id, run_id, seq, occurred_at, elapsed_s, kind, message, details, parent_id, children
+        SELECT id, run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section, children
         FROM run_events
-        WHERE run_id = ? AND parent_id IS NULL
+        WHERE run_id = ?
         ORDER BY seq
     `, runID)
 	if err != nil {
@@ -1902,10 +2057,11 @@ func (rdb *RunDB) ListEvents(runID int64) ([]EventRow, error) {
 			&row.Seq,
 			&occurredStr,
 			&row.ElapsedS,
+			&row.DurationMs,
 			&row.Kind,
 			&row.Message,
 			&row.Details,
-			&row.ParentID,
+			&row.Section,
 			&childrenJSON,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListEvents scan: %w", err)

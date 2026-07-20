@@ -18,9 +18,10 @@ type codeExample struct {
 }
 
 func strPtr(s string) *string { return &s }
+func fltPtr(f float64) *float64 { return &f }
 
-// sdkPageJS is the inline JavaScript for expandable detail rows.
-var sdkPageJS = `window.toggleDetail=function(e){var t=document.getElementById(e);t&&t.classList.toggle('hidden')};document.addEventListener('click',function(e){var t=e.target.closest('[data-detail-id]');t&&toggleDetail(t.getAttribute('data-detail-id'))})`
+// sdkPageJS is the inline JavaScript for expandable detail rows and language filter tabs.
+var sdkPageJS = `window.toggleDetail=function(e){var t=document.getElementById(e);t&&t.classList.toggle('hidden')};document.addEventListener('click',function(e){var t=e.target.closest('[data-detail-id]');t&&toggleDetail(t.getAttribute('data-detail-id'));var f=e.target.closest('.sdk-lang-tabs .tab');if(f){var g=f.closest('.sdk-lang-tabs');var l;if(f.classList.contains('tab-active')){f.classList.remove('tab-active');l='all'}else{g.querySelectorAll('.tab').forEach(function(x){x.classList.remove('tab-active')});f.classList.add('tab-active');l=f.getAttribute('data-filter')}g.closest('.sdk-page').querySelectorAll('.sdk-example').forEach(function(x){x.style.display=l==='all'||x.dataset.lang===l?'':'none'})}});setTimeout(function(){var t=document.querySelector('.sdk-lang-tabs .tab-active');if(t){var l=t.getAttribute('data-filter');t.closest('.sdk-page').querySelectorAll('.sdk-example').forEach(function(x){x.style.display=x.dataset.lang===l?'':'none'})}},0)`
 
 // scriptTag returns a templ component that writes a <script> tag with the given content.
 // Use instead of inline <script>{ var }</script> which templ treats as raw text.
@@ -70,14 +71,16 @@ func TestMyFeature(t *testing.T) {
 		Code: `rl := runlog.NewRunLog(t)
 defer rl.Close()
 
+start := time.Now()
 resp, err := http.Get(server.URL + "/api/health")
 body, _ := io.ReadAll(resp.Body)
+resp.Body.Close()
 
 rl.HTTPCall("GET", "/api/health",
-    resp.StatusCode, "", string(body))`,
+    resp.StatusCode, "", string(body), time.Since(start))`,
 		Events: []runlog.EventRow{
 			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
-			{Seq: 2, Kind: "http_call", Message: "GET /api/health → 200", ElapsedS: 0.3, Details: strPtr(`{"method":"GET","url":"/api/health","status_code":200,"response_body":"{\"status\":\"ok\"}"}`)},
+			{Seq: 2, Kind: "http_call", Message: "GET /api/health → 200", ElapsedS: 0.3, DurationMs: fltPtr(45.2), Details: strPtr(`{"method":"GET","url":"/api/health","status_code":200,"response_body":"{\"status\":\"ok\"}"}`)},
 		},
 	},
 	{
@@ -175,13 +178,152 @@ await saveArtifact(runId, page, 'after-login');`,
 defer rl.Close()
 
 out, err := exec.Command("runlog", "runs", "--since", "1h").CombinedOutput()
-rl.CLIErr("runlog runs --since 1h", string(out), err)
+rl.CLIErr("runlog runs --since 1h", string(out), err, 0)
 
-rl.HTTPCall("GET", "/health", 200, "", "ok")`,
+rl.HTTPCall("GET", "/health", 200, "", "ok", 0)`,
 		Events: []runlog.EventRow{
 			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
 			{Seq: 2, Kind: "cli", Message: "$ runlog runs --since 1h", ElapsedS: 0.1, Details: strPtr(`{"command":"runlog runs --since 1h","exit_code":0}`)},
 			{Seq: 3, Kind: "http_call", Message: "GET /health → 200", ElapsedS: 0.3, Details: strPtr(`{"method":"GET","url":"/health","status_code":200}`)},
+		},
+	},
+
+	// ── TypeScript SDK examples ──
+
+	{
+		Title:       "Basic Setup",
+		Description: "Creates a RunLogClient (HTTP client for runlog daemon), registers a test run, adds a section and log event, then marks the run as done.",
+		ID:          "ts-new-client", Lang: "typescript",
+		Code: `import { RunLogClient } from "@emergent-company/runlog-client"
+
+const client = new RunLogClient()
+const { id: runId } = await client.createRun({
+    testName: "Login flow",
+    category: "auth",
+    tags: ["variant:baseline", "browser:chromium"],
+})
+
+await client.section(runId, "Navigate to login")
+await client.log(runId, "page loaded successfully")
+
+await client.markDone(runId, { passed: true })`,
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
+			{Seq: 2, Kind: "section", Message: "Navigate to login", ElapsedS: 0.1, Children: []runlog.ChildEvent{
+				{ElapsedS: 0.2, Kind: "log", Message: "page loaded successfully"},
+			}},
+			{Seq: 3, Kind: "state_change", Message: "test finished", ElapsedS: 0.5},
+		},
+	},
+	{
+		Title:       "CLI Capture",
+		Description: "Records shell command invocations with optional stdout as cli events via the daemon HTTP API.",
+		ID:          "ts-cli-capture", Lang: "typescript",
+		Code: `import { execSync } from "node:child_process"
+
+const output = execSync("npm test -- --coverage").toString()
+await client.cli(runId, "npm test -- --coverage", output)`,
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "cli", Message: "npm test -- --coverage", ElapsedS: 0.1, Details: strPtr(`{"command":"npm test -- --coverage","exit_code":0,"output":"12 tests passed\\n"}`)},
+		},
+	},
+	{
+		Title:       "Error Handling",
+		Description: "Records failures and marks the run as failed. The fail() helper writes a failure event; markDone({ passed: false }) sets the overall outcome.",
+		ID:          "ts-error-handling", Lang: "typescript",
+		Code: `try {
+    const resp = await fetch(apiUrl + "/users")
+    if (!resp.ok) throw new Error("unexpected status " + resp.status)
+} catch (err) {
+    await client.fail(runId, err.message)
+    await client.markDone(runId, { passed: false, reason: err.message })
+    throw err  // re-throw so test runner sees the failure
+}`,
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "failure", Message: "unexpected status 500", ElapsedS: 1.2},
+			{Seq: 2, Kind: "state_change", Message: "test finished", ElapsedS: 1.3},
+		},
+	},
+	{
+		Title:       "Metadata",
+		Description: "Sets category, tags, experiment, and description via per-field PUT endpoints. Tags use key:value convention for cross-run filtering.",
+		ID:          "ts-metadata", Lang: "typescript",
+		Code: `await client.setCategory(runId, "api/payments")
+await client.setTags(runId, ["model:gpt-4o", "variant:canary"])
+await client.setExperiment(runId, "prompt-optimization-v3")
+await client.setDescription(runId, "Verifies payment creation, refund, and idempotency")
+
+await client.addEvent(runId, {
+    kind: "log",
+    message: "experiment:prompt-optimization-v3 model:gpt-4o",
+})`,
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "log", Message: "experiment:prompt-optimization-v3 model:gpt-4o", ElapsedS: 0.1},
+		},
+	},
+	{
+		Title:       "Jest Reporter",
+		Description: "Drop-in Jest custom reporter. Each test file creates a run, each test() emits an assertion event, and the file result calls markDone. Import in jest.config.",
+		ID:          "ts-jest-reporter", Lang: "typescript",
+		Code: `// jest.config.ts
+import type { Config } from "jest"
+
+const config: Config = {
+    reporters: [
+        "default",
+        "@emergent-company/runlog-client/jest",
+    ],
+}
+export default config`,
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
+			{Seq: 2, Kind: "section", Message: "src/auth/login.test.ts", ElapsedS: 0.1, Children: []runlog.ChildEvent{
+				{ElapsedS: 0.2, Kind: "assertion", Message: "redirects to dashboard on success"},
+				{ElapsedS: 0.5, Kind: "assertion", Message: "shows error on invalid credentials"},
+			}},
+			{Seq: 3, Kind: "state_change", Message: "test finished", ElapsedS: 0.6},
+		},
+	},
+	{
+		Title:       "Playwright Fixture",
+		Description: "Auto-fixture applied to every Playwright test. Automatically captures network calls as http_call events, uncaught page errors as log events, and uploads screenshots + traces as artifacts on completion.",
+		ID:          "ts-playwright-fixture", Lang: "typescript",
+		Code: `// playwright.config.ts
+import { defineConfig } from "@playwright/test"
+export default defineConfig({
+    testMatch: "**/*.spec.ts",
+    use: { baseURL: "http://localhost:3000" },
+})
+
+// tests/auth/login.spec.ts
+import { test, expect } from "@emergent-company/runlog-client/playwright"
+
+test("login flow", async ({ page, runlog }) => {
+    await runlog.section("Navigate to login")
+    await page.goto("/login")
+
+    await runlog.section("Submit credentials")
+    await page.fill("[name=email]", "user@example.com")
+    await page.fill("[name=password]", "s3cret")
+    await page.click("[type=submit]")
+
+    await expect(page).toHaveURL("/dashboard")
+    await runlog.log("redirected to /dashboard")
+
+    // screenshot + trace auto-uploaded on test completion
+})`,
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
+			{Seq: 2, Kind: "section", Message: "Navigate to login", ElapsedS: 0.1, Children: []runlog.ChildEvent{
+				{ElapsedS: 0.2, Kind: "http_call", Message: "GET /login → 200"},
+			}},
+			{Seq: 3, Kind: "section", Message: "Submit credentials", ElapsedS: 0.3, Children: []runlog.ChildEvent{
+				{ElapsedS: 0.4, Kind: "http_call", Message: "POST /api/auth/login → 200"},
+				{ElapsedS: 0.5, Kind: "log", Message: "redirected to /dashboard"},
+			}},
+			{Seq: 4, Kind: "artifact", Message: "screenshot", ElapsedS: 0.6, Details: strPtr(`{"type":"screenshot","url":"/artifact/run-abc/screenshot.png","mime":"image/png"}`)},
+			{Seq: 5, Kind: "artifact", Message: "trace", ElapsedS: 0.7, Details: strPtr(`{"type":"trace","url":"/artifact/run-abc/trace.zip","mime":"application/zip"}`)},
+			{Seq: 6, Kind: "state_change", Message: "test finished", ElapsedS: 0.8},
 		},
 	},
 }

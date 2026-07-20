@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fixture is the unexported builder mutated by Option functions before Use
@@ -190,9 +191,11 @@ func (fx *Fixture) CLI(args ...string) *CLIResult { //nolint:deadcode
 	fx.T.Helper()
 	invocation := formatInvocation(fx.Binary, args)
 
+	start := time.Now()
 	out, err := RunBinaryInDirWithHome(fx.T, fx.Binary, "", fx.Home, args...)
+	elapsed := time.Since(start)
 
-	fx.RunLog.CLIStepErr(invocation, invocation, strings.TrimSpace(out), err)
+	fx.RunLog.CLIStepErr(invocation, invocation, strings.TrimSpace(out), err, elapsed)
 
 	if err != nil {
 		fx.RunLog.Failf("CLI command failed: %s\nerror: %v\noutput:\n%s", invocation, err, out)
@@ -208,11 +211,33 @@ func (fx *Fixture) CLIExpectError(args ...string) *CLIResult { //nolint:deadcode
 	fx.T.Helper()
 	invocation := formatInvocation(fx.Binary, args)
 
+	start := time.Now()
 	out, err := RunBinaryInDirWithHome(fx.T, fx.Binary, "", fx.Home, args...)
+	elapsed := time.Since(start)
 
-	fx.RunLog.CLIStepErr(invocation, invocation, strings.TrimSpace(out), err)
+	fx.RunLog.CLIStepErr(invocation, invocation, strings.TrimSpace(out), err, elapsed)
 
 	return newCLIResultFromCombined(fx.RunLog, out, err)
+}
+
+// CLIAssert is like CLI but accepts expects for inline assertions:
+//
+//	fx.CLIAssert([]string{"create", "--name", "x"}, ExpectContains("Created"), ExpectExitCode(0))
+//
+// Does NOT fail on non-zero exit — use ExpectExitCode(0) to assert clean exit.
+func (fx *Fixture) CLIAssert(args []string, expects ...CLIExpect) *CLIResult { //nolint:deadcode
+	fx.T.Helper()
+	invocation := formatInvocation(fx.Binary, args)
+
+	start := time.Now()
+	out, err := RunBinaryInDirWithHome(fx.T, fx.Binary, "", fx.Home, args...)
+	elapsed := time.Since(start)
+
+	fx.RunLog.CLIStepErr(invocation, invocation, strings.TrimSpace(out), err, elapsed)
+
+	result := newCLIResultFromCombined(fx.RunLog, out, err)
+	result.Expect(expects...)
+	return result
 }
 
 // TempFile writes content to a file named name inside a fresh t.TempDir() and

@@ -84,7 +84,15 @@ func printEvent(e runlog.EventRow) {
 	icon := eventIcon(e.Kind)
 	kind := colorKind(e.Kind)
 	msg := truncateStr(e.Message, 80)
-	fmt.Printf("  %s [%6.1fs] %s  %s\n", icon, e.ElapsedS, kind, msg)
+	dur := ""
+	if e.DurationMs != nil && *e.DurationMs > 0 {
+		if *e.DurationMs < 1000 {
+			dur = fmt.Sprintf(" %0.fms", *e.DurationMs)
+		} else {
+			dur = fmt.Sprintf(" %0.1fs", *e.DurationMs/1000)
+		}
+	}
+	fmt.Printf("  %s [%6.1fs]%s %s  %s\n", icon, e.ElapsedS, dur, kind, msg)
 
 	for _, c := range e.Children {
 		cicon := eventIcon(c.Kind)

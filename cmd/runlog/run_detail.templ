@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/emergent-company/go-daisy/components/table"
 	"github.com/emergent-company/go-daisy/components/ui"
@@ -72,7 +71,7 @@ templ runDetailContent(data runDetailData) {
 				<div class="card bg-base-100 border border-base-200 shadow-sm">
 					<div class="card-body p-4">
 						<h2 class="card-title text-sm font-semibold text-base-content mb-1">Experiment</h2>
-						<a data-testid="experiment-link" href={ "/ui/experiments/" + *data.Run.Experiment } class="badge badge-primary badge-sm hover:badge-outline" hx-get={ "/ui/experiments/" + *data.Run.Experiment } hx-target="#main-content" hx-swap="innerHTML" hx-push-url="true" hx-sync="#main-content:replace">{ *data.Run.Experiment }</a>
+						<a data-testid="experiment-link" href={ "/ui/experiments/" + *data.Run.Experiment } class="badge badge-primary badge-sm hover:badge-outline" { NavRowAttrs("/ui/experiments/" + *data.Run.Experiment)... }>{ *data.Run.Experiment }</a>
 					</div>
 				</div>
 			</div>
@@ -174,8 +173,14 @@ templ runDetailContent(data runDetailData) {
 					var url = el.getAttribute('data-sse-url');
 					var es = new EventSource(url);
 					es.addEventListener('events-table', function(e) {
-						var section = document.getElementById('events-section');
-						if (section) section.innerHTML = JSON.parse(e.data).html;
+						var data = JSON.parse(e.data);
+						if (data.full === 'true') {
+							var section = document.getElementById('events-section');
+							if (section) section.innerHTML = data.html;
+						} else {
+							var tbody = document.querySelector('#events-section tbody');
+							if (tbody) tbody.insertAdjacentHTML('beforeend', data.html);
+						}
 					});
 					es.addEventListener('done', function() {
 						es.close();
@@ -190,17 +195,71 @@ templ runDetailContent(data runDetailData) {
 	</div>
 }
 
-// eventsSection renders the events table, always including debug rows (hidden by CSS).
+// eventsSection renders the events table, groups by section label, debug rows at top.
 templ eventsSection(data runDetailData) {
-	if len(data.UnwrappedChildren) > 0 {
-		@unwrappedEventsTable(data.UnwrappedChildren, data.MetaEvents, true, data.Run.ID)
-	} else if len(data.TimelineEvents) > 0 || len(data.MetaEvents) > 0 {
-		@eventsTable(data.TimelineEvents, data.MetaEvents, true, data.Run.ID)
+	if len(data.SectionGroups) > 0 || len(data.MetaEvents) > 0 {
+		@sectionedEventsTable(data)
 	} else if data.IsActive {
 		@emptyState("No events recorded yet. Waiting for test to emit events...")
 	} else {
 		@emptyState("No events recorded for this run. The test passed without emitting any timeline events.")
 	}
+}
+
+templ sectionedEventsTable(data runDetailData) {
+	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
+		@table.TableHead() {
+			@table.TableHeadRow() {
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-12">Seq</th>
+				@table.TableHeadCell("Kind")
+				@table.TableHeadCell("Message")
+				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-20">Elapsed</th>
+			}
+		}
+		@table.TableBody() {
+			if data.ShowDebug {
+				for _, e := range data.MetaEvents {
+					@flatEventRow(e, true)
+				}
+			}
+			for gIdx, g := range data.SectionGroups {
+				if g.Label != "" {
+					<tr class="bg-base-200 cursor-pointer section-header" data-group-idx={ fmt.Sprintf("%d", gIdx) }>
+						@table.TableCell("text-right w-12", nil) {
+							<span class="text-base-content/40 text-xs">—</span>
+						}
+						@table.TableCell("", nil) {
+							@ui.Badge(ui.BadgeProps{Label: "section", Variant: "primary", Size: ui.BadgeSizeSM})
+						}
+						@table.TableCell("", nil) {
+							<span class="text-xs font-semibold text-base-content/70">{ g.Label }</span>
+						}
+						@table.TableCell("text-right w-20", nil) {
+							<span class="text-base-content/40 text-xs">—</span>
+						}
+					</tr>
+				}
+				for _, e := range g.Events {
+					@flatEventRow(e, false)
+				}
+			}
+		}
+	}
+	<script>
+		document.addEventListener('click', function(e) {
+			var row = e.target.closest('tr.evt-row');
+			if (!row) return;
+			var eid = row.getAttribute('data-evt-id');
+			if (!eid) return;
+			var detail = document.getElementById('evt-detail-' + eid);
+			if (!detail) return;
+			detail.classList.toggle('hidden');
+			if (!detail.classList.contains('hidden') && typeof hljs !== 'undefined') {
+				var code = detail.querySelector('code');
+				if (code) hljs.highlightElement(code);
+			}
+		});
+	</script>
 }
 
 templ runDetailTabs(data runDetailData) {
@@ -255,211 +314,131 @@ templ metaStateChangeBadge(e runlog.EventRow) {
 	</div>
 }
 
-// taggedEvent pairs an event row with whether it is a debug (meta) event.
-type taggedEvent struct {
-	Event   runlog.EventRow
-	IsDebug bool
-}
-
-// mergeEventsBySeq merges timeline and meta events into one slice sorted by Seq.
-// Meta events are only included when showDebug is true.
-func mergeEventsBySeq(timeline, meta []runlog.EventRow, showDebug bool) []taggedEvent {
-	total := len(timeline)
-	if showDebug {
-		total += len(meta)
-	}
-	out := make([]taggedEvent, 0, total)
-	for _, e := range timeline {
-		out = append(out, taggedEvent{Event: e, IsDebug: false})
-	}
-	if showDebug {
-		for _, e := range meta {
-			out = append(out, taggedEvent{Event: e, IsDebug: true})
-		}
-	}
-	// insertion sort by Seq (slices are small)
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].Event.Seq < out[j-1].Event.Seq; j-- {
-			out[j], out[j-1] = out[j-1], out[j]
-		}
-	}
-	return out
-}
-
-templ eventsTable(timeline []runlog.EventRow, meta []runlog.EventRow, showDebug bool, runID int64) {
-	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
-		@table.TableHead() {
-			@table.TableHeadRow() {
-				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-12">Seq</th> <!-- lint:allow-raw -->
-				@table.TableHeadCell("Kind")
-				@table.TableHeadCell("Message")
-				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-20">Elapsed</th> <!-- lint:allow-raw -->
-			}
-		}
-		@table.TableBody() {
-			for _, te := range mergeEventsBySeq(timeline, meta, showDebug) {
-				@eventRow(te.Event, te.IsDebug)
-			}
-		}
-	}
-}
-
-// unwrappedEventsTable renders a run whose only timeline event is a single
-// section with no sibling steps to organize against. Rendering that section
-// as its own collapsible header row would add a pointless extra click with
-// zero organizational benefit, so its children are rendered directly as the
-// main table's rows instead. Detail rows are pre-rendered and toggled purely
-// client-side (same mechanism as EventChildrenPartial's nested child rows),
-// so no per-row server round-trip is needed.
-templ unwrappedEventsTable(children []runlog.ChildEvent, meta []runlog.EventRow, showDebug bool, runID int64) {
-	@table.TableWithProps(table.TableProps{Size: "sm", Bordered: true}) {
-		@table.TableHead() {
-			@table.TableHeadRow() {
-				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-12">Seq</th> <!-- lint:allow-raw -->
-				@table.TableHeadCell("Kind")
-				@table.TableHeadCell("Message")
-				<th class="text-xs font-semibold text-base-content/60 uppercase text-right w-20">Elapsed</th> <!-- lint:allow-raw -->
-			}
-		}
-		@table.TableBody() {
-			if showDebug {
-				for _, e := range meta {
-					@eventRow(e, true)
-				}
-			}
-			<!-- lint:allow-raw -->
-			for i, c := range children {
-				<tr
-					id={ fmt.Sprintf("unwrapped-row-%d", i) }
-					data-child-idx={ fmt.Sprintf("%d", i) }
-					class="hover cursor-pointer unwrapped-row"
-				>
-					@table.TableCell("text-right w-12", nil) {
-						@text(fmt.Sprintf("%d", i+1))
-					}
-					@table.TableCell("", nil) {
-						@ui.Badge(ui.BadgeProps{Label: c.Kind, Variant: runBadgeIntent(childKindIntent(c.Kind)), Size: ui.BadgeSizeSM})
-					}
-					@table.TableCell("", nil) {
-						@text(truncateMessage(c.Message, 80))
-					}
-					@table.TableCell("text-right w-20", nil) {
-						@text(fmtElapsed(c.ElapsedS))
-					}
-				</tr>
-				<!-- lint:allow-raw -->
-				<tr id={ fmt.Sprintf("unwrapped-detail-%d", i) } class="hidden">
-					<!-- lint:allow-raw -->
-					<td colspan="4" class="bg-base-200 p-3">
-						<div class="ml-12 border-l-2 border-base-300 pl-3">
-							@renderChildDetail(c)
-						</div>
-					</td>
-				</tr>
-			}
-		}
-	}
-	<script>
-		(function() {
-			var rows = document.querySelectorAll('tr.unwrapped-row');
-			for (var i = 0; i < rows.length; i++) {
-				rows[i].addEventListener('click', function(e) {
-					var idx = this.getAttribute('data-child-idx');
-					var detail = document.getElementById('unwrapped-detail-' + idx);
-					if (!detail) return;
-					detail.classList.toggle('hidden');
-					if (!detail.classList.contains('hidden') && typeof hljs !== 'undefined') {
-						hljs.highlightElement(detail.querySelector('code'));
-					}
-				});
-			}
-		})();
-	</script>
-	<script>
-		if (!window._hljsLoaded) {
-			window._hljsLoaded = true;
-			(function loadHLJS(cb) {
-				if (typeof hljs !== 'undefined') { cb(); return; }
-				var l = document.createElement('link');
-				l.rel = 'stylesheet';
-				l.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
-				document.head.appendChild(l);
-				var s = document.createElement('script');
-				s.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';
-				s.onload = function() { if (typeof hljs !== 'undefined') cb(); };
-				document.head.appendChild(s);
-			})(function() { hljs.highlightAll(); });
-		}
-	</script>
-}
-
-templ eventRow(e runlog.EventRow, isDebug bool) {
-	if eventHasDetails(e) {
-		if isDebug {
-			<tr
-				id={ fmt.Sprintf("event-%d", e.ID) }
-				data-testid={ "event-" + fmt.Sprintf("%d", e.ID) + "-debug" }
-				class="is-debug-event opacity-50 bg-base-200/60 cursor-pointer hover hover:bg-base-300 transition-colors"
-				hx-get={ RunEventURL(e.RunID, e.ID) }
-				hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
-				hx-swap="innerHTML"
-				hx-trigger="click"
-			>
-				<!-- lint:allow-raw -->
-				<td class="text-right w-12 italic">{ fmt.Sprintf("%d", e.Seq) }</td>
-				<td>
-					@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent("neutral"), Size: ui.BadgeSizeSM})
-				</td>
-				<td class="italic">{ truncateMessage(e.Message, 80) }</td>
-				<td class="text-right w-20 italic">{ fmtElapsed(e.ElapsedS) }</td>
-			</tr><!-- lint:allow-raw -->
-		} else {
-			<tr
-				id={ fmt.Sprintf("event-%d", e.ID) }
-				data-testid={ "event-" + fmt.Sprintf("%d", e.ID) }
-				class="hover"
-				hx-get={ RunEventURL(e.RunID, e.ID) }
-				hx-target={ fmt.Sprintf("#event-detail-%d", e.ID) }
-				hx-swap="innerHTML"
-				hx-trigger="click"
-			>
-				@table.TableCell("text-right w-12", nil) {
-					@text(fmt.Sprintf("%d", e.Seq))
-				}
-				@table.TableCell("", nil) {
-					@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent(eventKindIntent(e.Kind)), Size: ui.BadgeSizeSM})
-				}
-				@table.TableCell("", nil) {
-					@text(truncateMessage(e.Message, 80))
-				}
-				@table.TableCell("text-right w-20", nil) {
-					@text(fmtElapsed(e.ElapsedS))
-				}
-			</tr>
-		}
-		<tr id={ fmt.Sprintf("event-detail-%d", e.ID) }></tr> <!-- lint:allow-raw -->
+// flatEventRow renders a single event row with client-side click-to-expand details.
+templ flatEventRow(e runlog.EventRow, isDebug bool) {
+	if isDebug {
+		<tr
+			id={ fmt.Sprintf("event-%d", e.ID) }
+			class="is-debug-event opacity-50 bg-base-200/60 cursor-pointer hover:bg-base-300 transition-colors evt-row"
+			data-testid={ "event-" + fmt.Sprintf("%d", e.ID) }
+		>
+			<td class="text-right w-12 italic">{ fmt.Sprintf("%d", e.Seq) }</td>
+			<td>
+				@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent("neutral"), Size: ui.BadgeSizeSM})
+			</td>
+			<td class="italic">{ truncateMessage(e.Message, 80) }</td>
+			<td class="text-right w-20 italic">{ fmtElapsed(e.ElapsedS) }{ fmtDurationMs(e.DurationMs) }</td>
+		</tr>
 	} else {
 		<tr
 			id={ fmt.Sprintf("event-%d", e.ID) }
-			if isDebug {
-				class="is-debug-event opacity-30 bg-base-200/40"
-			} else {
-				class="text-base-content/50"
-			}
+			class="hover cursor-pointer evt-row"
+			data-evt-id={ fmt.Sprintf("%d", e.ID) }
+			data-testid={ "event-" + fmt.Sprintf("%d", e.ID) }
 		>
 			@table.TableCell("text-right w-12", nil) {
 				@text(fmt.Sprintf("%d", e.Seq))
 			}
 			@table.TableCell("", nil) {
-				@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: ui.BadgeNeutral, Size: ui.BadgeSizeSM, Style: ui.BadgeStyleOutline})
+				@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent(eventKindIntent(e.Kind)), Size: ui.BadgeSizeSM})
 			}
 			@table.TableCell("", nil) {
 				@text(truncateMessage(e.Message, 80))
 			}
-			@table.TableCell("text-right w-20", nil) {
+			@table.TableCell("text-right w-28", nil) {
 				@text(fmtElapsed(e.ElapsedS))
+				@text(fmtDurationMs(e.DurationMs))
 			}
 		</tr>
+	}
+	if e.Details != nil && *e.Details != "" {
+		<tr id={ fmt.Sprintf("evt-detail-%d", e.ID) } class="hidden evt-detail-row">
+			<td colspan="4" class="bg-base-200 p-3">
+				<div class="pl-12 border-l-2 border-base-300">
+					@renderEventDetail(e.Kind, *e.Details)
+				</div>
+			</td>
+		</tr>
+	}
+}
+
+// eventRowOOB renders a single timeline event row as an OOB swap into the events table.
+templ eventRowOOB(e runlog.EventRow) {
+	<tr
+		hx-swap-oob="beforeend:#events-section tbody"
+		id={ fmt.Sprintf("event-%d", e.ID) }
+		class="hover cursor-pointer evt-row"
+		data-evt-id={ fmt.Sprintf("%d", e.ID) }
+		data-testid={ "event-" + fmt.Sprintf("%d", e.ID) }
+	>
+		@table.TableCell("text-right w-12", nil) {
+			@text(fmt.Sprintf("%d", e.Seq))
+		}
+		@table.TableCell("", nil) {
+			@ui.Badge(ui.BadgeProps{Label: e.Kind, Variant: runBadgeIntent(eventKindIntent(e.Kind)), Size: ui.BadgeSizeSM})
+		}
+		@table.TableCell("", nil) {
+			@text(truncateMessage(e.Message, 80))
+		}
+		@table.TableCell("text-right w-28", nil) {
+			@text(fmtElapsed(e.ElapsedS))
+			@text(fmtDurationMs(e.DurationMs))
+		}
+	</tr>
+	if e.Details != nil && *e.Details != "" {
+		<tr hx-swap-oob="beforeend:#events-section tbody" id={ fmt.Sprintf("evt-detail-%d", e.ID) } class="hidden evt-detail-row">
+			<td colspan="4" class="bg-base-200 p-3">
+				<div class="pl-12 border-l-2 border-base-300">
+					@renderEventDetail(e.Kind, *e.Details)
+				</div>
+			</td>
+		</tr>
+	}
+}
+
+// sectionHeaderOOB renders a section header row as an OOB swap into the events table.
+templ sectionHeaderOOB(label string) {
+	<tr hx-swap-oob="beforeend:#events-section tbody" class="bg-base-200 cursor-pointer section-header">
+		@table.TableCell("text-right w-12", nil) {
+			<span class="text-base-content/40 text-xs">—</span>
+		}
+		@table.TableCell("", nil) {
+			@ui.Badge(ui.BadgeProps{Label: "section", Variant: "primary", Size: ui.BadgeSizeSM})
+		}
+		@table.TableCell("", nil) {
+			<span class="text-xs font-semibold text-base-content/70">{ label }</span>
+		}
+		@table.TableCell("text-right w-20", nil) {
+			<span class="text-base-content/40 text-xs">—</span>
+		}
+	</tr>
+}
+
+// renderEventDetail renders the expanded detail panel for an event based on its kind.
+// Replaces the old EventChildrenPartial + renderChildDetail split.
+templ renderEventDetail(kind string, detailsJSON string) {
+	if !isJSON(detailsJSON) {
+		<div class="text-xs text-base-content/60">{ detailsJSON }</div>
+	} else if kind == "gantt" {
+		@renderGanttChart(0, detailsJSON)
+	} else if kind == "http_call" {
+		@renderHttpCall(detailsJSON)
+	} else if kind == "cli" {
+		@renderTopLevelCLI(detailsJSON)
+	} else if kind == "artifact" {
+		@renderArtifact(detailsJSON)
+	} else if kind == "log" {
+		@renderLogDetail(detailsJSON)
+	} else if kind == "assertion" {
+		@renderAssertionDetail(detailsJSON)
+	} else if kind == "coverage" {
+		@renderCoverage(detailsJSON)
+	} else if kind == "pw_action" || kind == "pw_assert" || kind == "pw_step" {
+		@renderPWEventDetail(kind, detailsJSON)
+	} else if kind == "failure" {
+		@renderFailureDetail(detailsJSON)
+	} else {
+		@renderedDetails(detailsJSON)
 	}
 }
 

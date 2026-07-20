@@ -184,8 +184,16 @@ func cmdEvents(db *runlog.RunDB, runID int64) error {
 	fmt.Println(strings.Repeat("─", 80))
 	for _, e := range evs {
 		occurred := e.OccurredAt.Format("15:04:05")
-		fmt.Printf("%-5d  %7.2fs  %-14s  %-10s  %s\n",
-			e.Seq, e.ElapsedS, e.Kind, occurred, e.Message)
+		dur := ""
+		if e.DurationMs != nil && *e.DurationMs > 0 {
+			if *e.DurationMs < 1000 {
+				dur = fmt.Sprintf(" %.0fms", *e.DurationMs)
+			} else {
+				dur = fmt.Sprintf(" %.1fs", *e.DurationMs/1000)
+			}
+		}
+		fmt.Printf("%-5d  %7.2fs%s  %-14s  %-10s  %s\n",
+			e.Seq, e.ElapsedS, dur, e.Kind, occurred, e.Message)
 	}
 	return nil
 }
@@ -275,7 +283,8 @@ func cmdShow(db *runlog.RunDB, runID int64) error {
 	}
 	for _, e := range evs {
 		occurred := e.OccurredAt.Format("15:04:05")
-		fmt.Printf("[%5.2fs] %-14s  %-10s  %s\n", e.ElapsedS, e.Kind, occurred, e.Message)
+		dur := durationSuffix(e.DurationMs)
+		fmt.Printf("[%5.2fs%s] %-14s  %-10s  %s\n", e.ElapsedS, dur, e.Kind, occurred, e.Message)
 		if e.Details != nil && *e.Details != "" && *e.Details != "{}" {
 			lines := prettyJSON(*e.Details)
 			for _, l := range lines {
@@ -2593,8 +2602,8 @@ func (m model) viewEvents() string {
 	visible := m.visibleEventRows()
 
 	// Column header for the left panel — dimmed, aligned with data rows.
-	// Row format: "  elapsed(8)  kind(12)  message"
-	evHeader := styleHeader.Render(fmt.Sprintf("  %-8s  %-12s  %s", "elapsed", "kind", "message"))
+	// Row format: "  elapsed(14)  kind(12)  message"
+	evHeader := styleHeader.Render(fmt.Sprintf("  %-14s  %-12s  %s", "elapsed", "kind", "message"))
 	evHeaderLine := padToWidth(evHeader, lw) +
 		lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render("│") +
 		styleHeader.Render(" inspector")
@@ -2630,6 +2639,13 @@ func (m model) viewEvents() string {
 		} else {
 			// ── Top-level row (depth 0) ──
 			elapsed := fmt.Sprintf("%6.1fs", ev.ElapsedS)
+			if ev.DurationMs != nil && *ev.DurationMs > 0 {
+				if *ev.DurationMs < 1000 {
+					elapsed = fmt.Sprintf("%6.1fs %0.fms", ev.ElapsedS, *ev.DurationMs)
+				} else {
+					elapsed = fmt.Sprintf("%6.1fs %0.1fs", ev.ElapsedS, *ev.DurationMs/1000)
+				}
+			}
 			msg := truncate(ev.Message, lw-32)
 			// collapse/expand indicator
 			indicator := ""
@@ -3254,6 +3270,13 @@ func buildDetailLines(ev runlog.EventRow, child *runlog.ChildEvent, width int) [
 	add("kind", ev.Kind)
 	add("seq", fmt.Sprintf("%d", ev.Seq))
 	add("elapsed", fmt.Sprintf("%.3fs", ev.ElapsedS))
+	if ev.DurationMs != nil && *ev.DurationMs > 0 {
+		if *ev.DurationMs < 1000 {
+			add("duration", fmt.Sprintf("%.0fms", *ev.DurationMs))
+		} else {
+			add("duration", fmt.Sprintf("%.3fs", *ev.DurationMs/1000))
+		}
+	}
 	add("occurred_at", formatTime(ev.OccurredAt, TimeISO))
 	if ev.Message != "" {
 		add("message", ev.Message)
@@ -5243,6 +5266,18 @@ func truncate(s string, n int) string {
 		return string(runes[:n])
 	}
 	return string(runes[:n-1]) + "…"
+}
+
+// durationSuffix returns a compact inline string for an event's duration_ms.
+// Returns "" when duration is nil or zero.
+func durationSuffix(d *float64) string {
+	if d == nil || *d <= 0 {
+		return ""
+	}
+	if *d < 1000 {
+		return fmt.Sprintf(" %0.fms", *d)
+	}
+	return fmt.Sprintf(" %0.1fs", *d/1000)
 }
 
 func prettyJSON(raw string) []string {

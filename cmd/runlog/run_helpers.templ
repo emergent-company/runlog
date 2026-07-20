@@ -140,7 +140,7 @@ templ emptyState(message string) {
 
 // backButton renders a button that navigates back via HTMX.
 templ backButton(href string) {
-	<button data-testid="back-btn" class="btn btn-ghost btn-sm" hx-get={ href } hx-target="#main-content" hx-swap="innerHTML" hx-sync="#main-content:replace">← Back</button>
+	<button data-testid="back-btn" class="btn btn-ghost btn-sm" hx-get={ href } hx-target="#main-content" hx-swap="innerHTML" hx-sync="#main-content:replace" hx-replace-url="true">← Back</button>
 }
 
 // loadMoreButton renders a paginated "Load More" button for tables.
@@ -203,6 +203,9 @@ func displayCategory(cat string) string {
 	if cat == "" {
 		return "Uncategorized"
 	}
+	if idx := strings.IndexByte(cat, '/'); idx > 0 {
+		return cat[:idx]
+	}
 	return cat
 }
 
@@ -261,11 +264,7 @@ templ runsTable(runs []runlog.RunRow, opts runsTableOpts) {
 					id={ fmt.Sprintf("run-%d", r.ID) }
 					data-testid={ fmt.Sprintf("run-row-%d", r.ID) }
 					class="hover"
-					hx-get={ RunDetailURL(r.ID) }
-					hx-target="#main-content"
-					hx-swap="innerHTML"
-					hx-push-url="true"
-					hx-sync="#main-content:replace"
+					{ NavRowAttrs(RunDetailURL(r.ID))... }
 				>
 					if opts.ShowID {
 						@table.TableCell("text-right w-16", nil) {

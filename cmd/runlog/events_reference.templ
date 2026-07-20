@@ -114,7 +114,7 @@ templ exampleEventRow(e runlog.EventRow) {
 			</td>
 			<td>{ truncateMessage(e.Message, 80) }</td>
 			<!-- lint:allow-raw -->
-			<td class="text-right w-20">{ fmtElapsed(e.ElapsedS) }</td>
+			<td class="text-right w-28">{ fmtElapsed(e.ElapsedS) }{ fmtDurationMs(e.DurationMs) }</td>
 			<!-- lint:allow-raw -->
 			<td class="text-center w-8"><span class="text-base-content/30 text-xs">▼</span></td>
 		</tr>
@@ -135,7 +135,7 @@ templ exampleEventRow(e runlog.EventRow) {
 			</td>
 			<td>{ truncateMessage(e.Message, 80) }</td>
 			<!-- lint:allow-raw -->
-			<td class="text-right w-20">{ fmtElapsed(e.ElapsedS) }</td>
+			<td class="text-right w-28">{ fmtElapsed(e.ElapsedS) }{ fmtDurationMs(e.DurationMs) }</td>
 			<!-- lint:allow-raw -->
 			<td class="text-center w-8"></td>
 		</tr>
@@ -172,9 +172,15 @@ templ SDKPage() {
 			}
 			<div>
 				<h1 class="text-2xl font-bold mb-2">SDK Reference</h1>
-				<p class="text-base-content/60 mb-8">Code examples with sample event output. Click ▼ to expand event details.</p>
+				<p class="text-base-content/60 mb-4">Code examples with sample event output. Click ▼ to expand event details.</p>
+				<!-- lint:allow-raw: language filter tabs are plain daisyUI tabs, no component needed -->
+				<div id="sdk-lang-tabs" class="sdk-lang-tabs tabs tabs-lift mb-6">
+					<a class="tab tab-sm tab-active" data-filter="go">Go</a>
+					<a class="tab tab-sm" data-filter="typescript">TypeScript</a>
+				</div>
 				for _, ex := range codeExamples {
-					<div id={ sectionID(ex.ID) } class="mb-8 pb-6 px-4 border-b border-base-200 scroll-mt-4">
+					<!-- lint:allow-raw -->
+					<div id={ sectionID(ex.ID) } class="sdk-example mb-8 pb-6 px-4 border-b border-base-200 scroll-mt-4" data-lang={ ex.Lang }>
 						<div class="mb-3">
 							<h2 class="text-base font-semibold">{ ex.Title }</h2>
 							<p class="text-xs text-base-content/50 mt-0.5">{ ex.Description }</p>
@@ -215,8 +221,14 @@ templ SDKContent() {
 		<div>
 			<h1 class="text-2xl font-bold mb-2">SDK Reference</h1>
 			<p class="text-base-content/60 mb-4">Code examples with sample event output. Click ▼ to expand event details.</p>
+			<!-- lint:allow-raw: language filter tabs are plain daisyUI tabs, no component needed -->
+			<div id="sdk-lang-tabs-inline" class="sdk-lang-tabs tabs tabs-lift mb-6">
+				<a class="tab tab-sm tab-active" data-filter="go">Go</a>
+				<a class="tab tab-sm" data-filter="typescript">TypeScript</a>
+			</div>
 			for _, ex := range codeExamples {
-				<div id={ "sdk-" + ex.ID } class="mb-8 pb-6 px-4 border-b border-base-200 scroll-mt-4">
+				<!-- lint:allow-raw -->
+				<div id={ "sdk-" + ex.ID } class="sdk-example mb-8 pb-6 px-4 border-b border-base-200 scroll-mt-4" data-lang={ ex.Lang }>
 					<div class="mb-3">
 						<h2 class="text-base font-semibold">{ ex.Title }</h2>
 						<p class="text-xs text-base-content/50 mt-0.5">{ ex.Description }</p>

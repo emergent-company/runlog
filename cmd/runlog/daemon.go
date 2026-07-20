@@ -14,6 +14,7 @@ package main
 
 import (
 	"context"
+	"compress/gzip"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
@@ -131,6 +132,55 @@ func (d *DaemonServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	d.mux.ServeHTTP(w, r)
 }
 
+// gzipResponseWriter wraps http.ResponseWriter and transparently compresses
+// responses when the client sends Accept-Encoding: gzip.
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	gz   *gzip.Writer
+	done bool
+}
+
+func (w *gzipResponseWriter) Write(b []byte) (int, error) {
+	if !w.done {
+		w.ResponseWriter.Header().Set("Content-Encoding", "gzip")
+		w.ResponseWriter.Header().Del("Content-Length")
+		w.gz = gzip.NewWriter(w.ResponseWriter)
+		w.done = true
+	}
+	return w.gz.Write(b)
+}
+
+func (w *gzipResponseWriter) WriteHeader(status int) {
+	w.ResponseWriter.Header().Set("Content-Encoding", "gzip")
+	w.ResponseWriter.Header().Del("Content-Length")
+	w.gz = gzip.NewWriter(w.ResponseWriter)
+	w.done = true
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *gzipResponseWriter) Close() error {
+	if w.gz != nil {
+		return w.gz.Close()
+	}
+	return nil
+}
+
+func withGzip(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		skip := strings.HasSuffix(path, "/events") ||
+			strings.HasSuffix(path, "/status") ||
+			strings.HasSuffix(path, "/stream")
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || skip {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gw := &gzipResponseWriter{ResponseWriter: w}
+		defer gw.Close()
+		next.ServeHTTP(gw, r)
+	})
+}
+
 // writeJSON encodes v as JSON and writes it to w with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -234,27 +284,6 @@ func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request)
 		startedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 
-	var tagsJSON *string
-	if len(req.Tags) > 0 {
-		b, _ := json.Marshal(req.Tags)
-		s := string(b)
-		tagsJSON = &s
-	}
-
-	var descJSON *string
-	if req.Description != "" {
-		b, _ := json.Marshal(runlog.RunDescription{Summary: req.Description})
-		s := string(b)
-		descJSON = &s
-	}
-
-	var envVarsJSON *string
-	if len(req.EnvVars) > 0 {
-		b, _ := json.Marshal(req.EnvVars)
-		s := string(b)
-		envVarsJSON = &s
-	}
-
 	_, err = rawDB.Exec(
 		`INSERT INTO daemon_runs (id, pid, env_profile, server_url, token, status, started_at)
 		 VALUES (?, ?, ?, ?, ?, 'active', strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
@@ -265,74 +294,6 @@ func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	testName := req.EnvProfile
-	if testName == "" {
-		testName = "unnamed"
-	}
-
-	q := `INSERT INTO test_runs (test_name, started_at, runner, env_name, daemon_run_id`
-	vals := []any{testName, startedAt, runner, req.ServerURL, id}
-	placeholders := `?, ?, ?, ?, ?`
-
-	if req.Category != "" {
-		q += `, category`
-		vals = append(vals, req.Category)
-		placeholders += `, ?`
-	}
-	if tagsJSON != nil {
-		q += `, tags`
-		vals = append(vals, *tagsJSON)
-		placeholders += `, ?`
-	}
-	if descJSON != nil {
-		q += `, description`
-		vals = append(vals, *descJSON)
-		placeholders += `, ?`
-	}
-	if req.Experiment != "" {
-		q += `, experiment`
-		vals = append(vals, req.Experiment)
-		placeholders += `, ?`
-	}
-	if req.AppVersion != "" {
-		q += `, app_version`
-		vals = append(vals, req.AppVersion)
-		placeholders += `, ?`
-	}
-	if req.TestVersion != "" {
-		q += `, test_version`
-		vals = append(vals, req.TestVersion)
-		placeholders += `, ?`
-	}
-	if envVarsJSON != nil {
-		q += `, env_vars`
-		vals = append(vals, *envVarsJSON)
-		placeholders += `, ?`
-	}
-	if req.TimeoutSeconds > 0 {
-		q += `, timeout_seconds`
-		vals = append(vals, req.TimeoutSeconds)
-		placeholders += `, ?`
-	}
-	if req.CoveragePct != nil {
-		q += `, coverage_pct`
-		vals = append(vals, *req.CoveragePct)
-		placeholders += `, ?`
-	}
-	if req.TestType != "" {
-		q += `, test_type`
-		vals = append(vals, req.TestType)
-		placeholders += `, ?`
-	}
-
-	q += `) VALUES (` + placeholders + `)`
-	res, execErr := rawDB.Exec(q, vals...)
-	if execErr == nil {
-		if testRunID, err := res.LastInsertId(); err == nil {
-			writeJSON(w, http.StatusCreated, map[string]any{"id": id, "test_run_id": testRunID})
-			return
-		}
-	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
 
@@ -898,10 +859,11 @@ func (d *DaemonServer) handleGetEvents(w http.ResponseWriter, r *http.Request, r
 // ─────────────────────────────────────────────────────────────────────────────
 
 type insertEventRequest struct {
-	Kind    string         `json:"kind"`
-	Message string         `json:"message"`
-	Elapsed float64        `json:"elapsed_s"`
-	Details map[string]any `json:"details,omitempty"`
+	Kind       string         `json:"kind"`
+	Message    string         `json:"message"`
+	Elapsed    float64        `json:"elapsed_s"`
+	DurationMs *float64       `json:"duration_ms,omitempty"`
+	Details    map[string]any `json:"details,omitempty"`
 }
 
 // knownEventKinds is the registry of event kinds the daemon/UI knows how to
@@ -980,9 +942,9 @@ func (d *DaemonServer) handleInsertEvent(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	_, err = rawDB.Exec(
-		`INSERT INTO run_events (run_id, seq, occurred_at, elapsed_s, kind, message, details)
-		 VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?)`,
-		testRunID, seq, req.Elapsed, req.Kind, req.Message, detailsJSON,
+		`INSERT INTO run_events (run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details)
+		 VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?, ?)`,
+		testRunID, seq, req.Elapsed, req.DurationMs, req.Kind, req.Message, detailsJSON,
 	)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("db insert: %v", err), http.StatusInternalServerError)
@@ -1480,7 +1442,7 @@ func (d *DaemonServer) ServeOn(ln net.Listener) error {
 	}
 
 	log.Printf("daemon: listening on port %d (pid %d) timeout=%s", d.port, os.Getpid(), d.timeout)
-	d.srv = &http.Server{Handler: d}
+	d.srv = &http.Server{Handler: withGzip(d)}
 	if err := d.srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 		return err
 	}

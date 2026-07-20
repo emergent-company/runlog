@@ -1,7 +1,7 @@
 // Package e2eframework — step_result.go
 //
 // CLIResult and HTTPResult: chainable assertion types returned by Step actions.
-// Each assertion logs its check to RunLog and calls rl.Failf on failure.
+// Each assertion logs to RunLog via AssertionStep and calls rl.Failf on failure.
 package runlog
 
 import (
@@ -27,8 +27,6 @@ type CLIResult struct {
 }
 
 // newCLIResult constructs a CLIResult from a command's combined output and error.
-// If combinedOutput is true, both stdout and stderr are in the stdout field
-// (matching the current MustRunBinaryInDirWithHome which uses CombinedOutput).
 func newCLIResult(rl *RunLog, stdout, stderr string, exitCode int, err error) *CLIResult { //nolint:deadcode
 	return &CLIResult{
 		rl:       rl,
@@ -59,14 +57,25 @@ func newCLIResultFromCombined(rl *RunLog, combined string, err error) *CLIResult
 	}
 }
 
+// Expect runs each CLIExpect against this result. Use for grouped assertions:
+//
+//	r.Expect(runlog.ExpectContains("Created"), runlog.ExpectExitCode(0))
+func (r *CLIResult) Expect(expects ...CLIExpect) *CLIResult { //nolint:deadcode
+	for _, e := range expects {
+		e(r)
+	}
+	return r
+}
+
 // Contains asserts that stdout contains ALL of the given substrings.
-// The first missing substring triggers rl.Failf.
 func (r *CLIResult) Contains(substrs ...string) *CLIResult { //nolint:deadcode
 	for _, sub := range substrs {
-		if strings.Contains(r.stdout, sub) {
-			r.rl.Printf("assert: output contains %q ✓", sub)
-		} else {
-			r.rl.Failf("assert: output does not contain %q\noutput:\n%s", sub, Truncate(r.stdout, 500))
+		found := strings.Contains(r.stdout, sub)
+		r.rl.AssertionStep("output contains", sub, found, map[string]any{
+			"context": Truncate(r.stdout, 200),
+		})
+		if !found {
+			r.rl.Failf("output does not contain %q\noutput:\n%s", sub, Truncate(r.stdout, 500))
 		}
 	}
 	return r
@@ -74,24 +83,32 @@ func (r *CLIResult) Contains(substrs ...string) *CLIResult { //nolint:deadcode
 
 // ContainsAny asserts that stdout contains at least one of the given substrings.
 func (r *CLIResult) ContainsAny(substrs ...string) *CLIResult { //nolint:deadcode
+	matched := ""
 	for _, sub := range substrs {
 		if strings.Contains(r.stdout, sub) {
-			r.rl.Printf("assert: output contains one of %v ✓ (matched %q)", substrs, sub)
-			return r
+			matched = sub
+			break
 		}
 	}
-	r.rl.Failf("assert: output does not contain any of %v\noutput:\n%s", substrs, Truncate(r.stdout, 500))
+	r.rl.AssertionStep("output contains any", fmt.Sprintf("%v", substrs), matched != "",
+		map[string]any{"matched": matched, "context": Truncate(r.stdout, 200)})
+	if matched == "" {
+		r.rl.Failf("output does not contain any of %v\noutput:\n%s", substrs, Truncate(r.stdout, 500))
+	} else {
+		r.rl.Printf("assert: output contains one of %v ✓ (matched %q)", substrs, matched)
+	}
 	return r
 }
 
 // NotContains asserts that stdout does NOT contain any of the given substrings.
 func (r *CLIResult) NotContains(substrs ...string) *CLIResult { //nolint:deadcode
 	for _, sub := range substrs {
-		if strings.Contains(r.stdout, sub) {
-			r.rl.Failf("assert: output should not contain %q but does\noutput:\n%s", sub, Truncate(r.stdout, 500))
+		found := strings.Contains(r.stdout, sub)
+		r.rl.AssertionStep("output not contains", sub, !found, nil)
+		if found {
+			r.rl.Failf("output should not contain %q but does\noutput:\n%s", sub, Truncate(r.stdout, 500))
 		}
 	}
-	r.rl.Printf("assert: output does not contain %v ✓", substrs)
 	return r
 }
 
@@ -99,39 +116,43 @@ func (r *CLIResult) NotContains(substrs ...string) *CLIResult { //nolint:deadcod
 func (r *CLIResult) Matches(pattern string) *CLIResult { //nolint:deadcode
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		r.rl.Failf("assert: invalid regex %q: %v", pattern, err)
+		r.rl.Failf("invalid regex %q: %v", pattern, err)
 		return r
 	}
-	if re.MatchString(r.stdout) {
-		r.rl.Printf("assert: output matches /%s/ ✓", pattern)
-	} else {
-		r.rl.Failf("assert: output does not match /%s/\noutput:\n%s", pattern, Truncate(r.stdout, 500))
+	matched := re.MatchString(r.stdout)
+	r.rl.AssertionStep("output matches", pattern, matched, map[string]any{
+		"context": Truncate(r.stdout, 200),
+	})
+	if !matched {
+		r.rl.Failf("output does not match /%s/\noutput:\n%s", pattern, Truncate(r.stdout, 500))
 	}
 	return r
 }
 
 // Empty asserts that stdout is empty or whitespace-only.
 func (r *CLIResult) Empty() *CLIResult { //nolint:deadcode
-	if strings.TrimSpace(r.stdout) == "" {
-		r.rl.Printf("assert: output is empty ✓")
-	} else {
-		r.rl.Failf("assert: expected empty output, got:\n%s", Truncate(r.stdout, 500))
+	empty := strings.TrimSpace(r.stdout) == ""
+	r.rl.AssertionStep("output empty", true, empty, map[string]any{
+		"actual": Truncate(r.stdout, 200),
+	})
+	if !empty {
+		r.rl.Failf("expected empty output, got:\n%s", Truncate(r.stdout, 500))
 	}
 	return r
 }
 
-// ParseID extracts a UUID (36-char, 4 hyphens) from stdout and stores it in *dst.
-// If no UUID is found, rl.Failf is called.
+// ParseID extracts a UUID from stdout and stores it in *dst.
 func (r *CLIResult) ParseID(dst *string) *CLIResult { //nolint:deadcode
-	// UUID regex: 8-4-4-4-12 hex digits.
 	re := regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
 	match := re.FindString(r.stdout)
+	r.rl.AssertionStep("parse UUID", "non-empty UUID", match != "", map[string]any{
+		"extracted": match, "context": Truncate(r.stdout, 200),
+	})
 	if match == "" {
-		r.rl.Failf("assert: no UUID found in output\noutput:\n%s", Truncate(r.stdout, 500))
+		r.rl.Failf("no UUID found in output\noutput:\n%s", Truncate(r.stdout, 500))
 		return r
 	}
 	*dst = match
-	r.rl.Printf("assert: parsed ID %s ✓", match)
 	return r
 }
 
@@ -139,41 +160,44 @@ func (r *CLIResult) ParseID(dst *string) *CLIResult { //nolint:deadcode
 func (r *CLIResult) JSONField(field string, dst *string) *CLIResult { //nolint:deadcode
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(r.stdout), &m); err != nil {
-		r.rl.Failf("assert: cannot parse output as JSON: %v\noutput:\n%s", err, Truncate(r.stdout, 500))
+		r.rl.AssertionStep("JSON parse", "valid JSON", false, map[string]any{
+			"error": err.Error(), "context": Truncate(r.stdout, 200),
+		})
+		r.rl.Failf("cannot parse output as JSON: %v\noutput:\n%s", err, Truncate(r.stdout, 500))
 		return r
 	}
 	raw, ok := m[field]
+	r.rl.AssertionStep(fmt.Sprintf("JSON field %q", field), "exists", ok, nil)
 	if !ok {
-		r.rl.Failf("assert: JSON field %q not found in output\noutput:\n%s", field, Truncate(r.stdout, 500))
+		r.rl.Failf("JSON field %q not found in output\noutput:\n%s", field, Truncate(r.stdout, 500))
 		return r
 	}
-	// Try to unquote a string value; otherwise use the raw JSON.
 	var s string
 	if err := json.Unmarshal(raw, &s); err != nil {
 		*dst = string(raw)
 	} else {
 		*dst = s
 	}
-	r.rl.Printf("assert: JSON field %q = %q ✓", field, Truncate(*dst, 100))
 	return r
 }
 
 // JSON unmarshals the full stdout into dst.
 func (r *CLIResult) JSON(dst any) *CLIResult { //nolint:deadcode
-	if err := json.Unmarshal([]byte(r.stdout), dst); err != nil {
-		r.rl.Failf("assert: cannot unmarshal output as JSON: %v\noutput:\n%s", err, Truncate(r.stdout, 500))
-	} else {
-		r.rl.Printf("assert: JSON unmarshal ✓")
+	err := json.Unmarshal([]byte(r.stdout), dst)
+	r.rl.AssertionStep("JSON unmarshal", "valid JSON", err == nil, map[string]any{
+		"error": func() string { if err != nil { return err.Error() }; return "" }(),
+	})
+	if err != nil {
+		r.rl.Failf("cannot unmarshal output as JSON: %v\noutput:\n%s", err, Truncate(r.stdout, 500))
 	}
 	return r
 }
 
 // ExitCode asserts that the command exited with the expected code.
 func (r *CLIResult) ExitCode(expected int) *CLIResult { //nolint:deadcode
-	if r.exitCode == expected {
-		r.rl.Printf("assert: exit code %d ✓", expected)
-	} else {
-		r.rl.Failf("assert: expected exit code %d, got %d\noutput:\n%s", expected, r.exitCode, Truncate(r.stdout, 500))
+	r.rl.AssertionStep("exit code", expected, r.exitCode, nil)
+	if r.exitCode != expected {
+		r.rl.Failf("expected exit code %d, got %d\noutput:\n%s", expected, r.exitCode, Truncate(r.stdout, 500))
 	}
 	return r
 }
@@ -183,11 +207,55 @@ func (r *CLIResult) Output() string { //nolint:deadcode
 	return r.stdout
 }
 
-// StderrOutput returns the raw stderr string.  When combined output mode was
-// used (the default for CLI steps), stderr is interleaved in Output() and
-// this returns an empty string.
+// StderrOutput returns the raw stderr string.
 func (r *CLIResult) StderrOutput() string { //nolint:deadcode
 	return r.stderr
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIExpect — inline assertion type for CLI helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// CLIExpect is a function that asserts one property of a CLI execution result.
+// Use constructors like ExpectContains, ExpectExitCode, etc. and pass them to
+// CLIResult.Expect() or Fixture.CLIAssert().
+type CLIExpect func(r *CLIResult)
+
+// ExpectContains returns a CLIExpect that asserts stdout contains all substrings.
+func ExpectContains(substrs ...string) CLIExpect { //nolint:deadcode
+	return func(r *CLIResult) { r.Contains(substrs...) }
+}
+
+// ExpectContainsAny returns a CLIExpect that asserts stdout contains at least one substring.
+func ExpectContainsAny(substrs ...string) CLIExpect { //nolint:deadcode
+	return func(r *CLIResult) { r.ContainsAny(substrs...) }
+}
+
+// ExpectNotContains returns a CLIExpect that asserts stdout does not contain substrings.
+func ExpectNotContains(substrs ...string) CLIExpect { //nolint:deadcode
+	return func(r *CLIResult) { r.NotContains(substrs...) }
+}
+
+// ExpectMatches returns a CLIExpect that asserts stdout matches a regexp.
+func ExpectMatches(pattern string) CLIExpect { //nolint:deadcode
+	return func(r *CLIResult) { r.Matches(pattern) }
+}
+
+// ExpectExitCode returns a CLIExpect that asserts the command exit code.
+func ExpectExitCode(code int) CLIExpect { //nolint:deadcode
+	return func(r *CLIResult) { r.ExitCode(code) }
+}
+
+// ExpectOutputJSONField returns a CLIExpect that asserts a JSON field value in output.
+func ExpectOutputJSONField(key, expected string) CLIExpect { //nolint:deadcode
+	return func(r *CLIResult) {
+		var got string
+		r.JSONField(key, &got)
+		r.rl.AssertionStep(fmt.Sprintf("JSON field %q", key), expected, got, nil)
+		if got != expected {
+			r.rl.Failf("JSON field %q = %q, expected %q", key, got, expected)
+		}
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,12 +281,27 @@ func newHTTPResult(rl *RunLog, statusCode int, body string, headers map[string][
 	}
 }
 
+// NewHTTPResult constructs an HTTPResult for manual assertion use in low-level
+// test code that calls RunLog.HTTPCall directly.
+func NewHTTPResult(rl *RunLog, statusCode int, body string, headers map[string][]string) *HTTPResult { //nolint:deadcode
+	return newHTTPResult(rl, statusCode, body, headers)
+}
+
+// Expect runs each HTTPExpect against this result. Use for grouped assertions:
+//
+//	r.Expect(runlog.ExpectStatus(200), runlog.ExpectBodyContains("ok"))
+func (r *HTTPResult) Expect(expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
+	for _, e := range expects {
+		e(r)
+	}
+	return r
+}
+
 // Status asserts the response status code matches expected.
 func (r *HTTPResult) Status(expected int) *HTTPResult { //nolint:deadcode
-	if r.statusCode == expected {
-		r.rl.Printf("assert: HTTP status %d ✓", expected)
-	} else {
-		r.rl.Failf("assert: expected HTTP status %d, got %d\nbody:\n%s", expected, r.statusCode, Truncate(r.body, 500))
+	r.rl.AssertionStep("HTTP status", expected, r.statusCode, nil)
+	if r.statusCode != expected {
+		r.rl.Failf("expected HTTP status %d, got %d\nbody:\n%s", expected, r.statusCode, Truncate(r.body, 500))
 	}
 	return r
 }
@@ -227,12 +310,16 @@ func (r *HTTPResult) Status(expected int) *HTTPResult { //nolint:deadcode
 func (r *HTTPResult) JSONField(field string, dst *string) *HTTPResult { //nolint:deadcode
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(r.body), &m); err != nil {
-		r.rl.Failf("assert: cannot parse response body as JSON: %v\nbody:\n%s", err, Truncate(r.body, 500))
+		r.rl.AssertionStep("JSON parse", "valid JSON", false, map[string]any{
+			"error": err.Error(), "context": Truncate(r.body, 200),
+		})
+		r.rl.Failf("cannot parse response body as JSON: %v\nbody:\n%s", err, Truncate(r.body, 500))
 		return r
 	}
 	raw, ok := m[field]
+	r.rl.AssertionStep(fmt.Sprintf("JSON field %q", field), "exists", ok, nil)
 	if !ok {
-		r.rl.Failf("assert: JSON field %q not found in response\nbody:\n%s", field, Truncate(r.body, 500))
+		r.rl.Failf("JSON field %q not found in response\nbody:\n%s", field, Truncate(r.body, 500))
 		return r
 	}
 	var s string
@@ -241,7 +328,6 @@ func (r *HTTPResult) JSONField(field string, dst *string) *HTTPResult { //nolint
 	} else {
 		*dst = s
 	}
-	r.rl.Printf("assert: HTTP JSON field %q = %q ✓", field, Truncate(*dst, 100))
 	return r
 }
 
@@ -249,31 +335,33 @@ func (r *HTTPResult) JSONField(field string, dst *string) *HTTPResult { //nolint
 func (r *HTTPResult) JSONContains(field, expected string) *HTTPResult { //nolint:deadcode
 	var got string
 	r.JSONField(field, &got)
-	// JSONField already called Failf if parsing failed; if we get here, check value.
+	r.rl.AssertionStep(fmt.Sprintf("HTTP JSON field %q", field), expected, got, nil)
 	if got != expected {
-		r.rl.Failf("assert: HTTP JSON field %q = %q, expected %q", field, got, expected)
-	} else {
-		r.rl.Printf("assert: HTTP JSON field %q == %q ✓", field, expected)
+		r.rl.Failf("HTTP JSON field %q = %q, expected %q", field, got, expected)
 	}
 	return r
 }
 
 // BodyContains asserts that the response body contains the given substring.
 func (r *HTTPResult) BodyContains(substr string) *HTTPResult { //nolint:deadcode
-	if strings.Contains(r.body, substr) {
-		r.rl.Printf("assert: HTTP body contains %q ✓", substr)
-	} else {
-		r.rl.Failf("assert: HTTP body does not contain %q\nbody:\n%s", substr, Truncate(r.body, 500))
+	found := strings.Contains(r.body, substr)
+	r.rl.AssertionStep("body contains", substr, found, map[string]any{
+		"context": Truncate(r.body, 200),
+	})
+	if !found {
+		r.rl.Failf("HTTP body does not contain %q\nbody:\n%s", substr, Truncate(r.body, 500))
 	}
 	return r
 }
 
 // JSON unmarshals the full response body into dst.
 func (r *HTTPResult) JSON(dst any) *HTTPResult { //nolint:deadcode
-	if err := json.Unmarshal([]byte(r.body), dst); err != nil {
-		r.rl.Failf("assert: cannot unmarshal response body as JSON: %v\nbody:\n%s", err, Truncate(r.body, 500))
-	} else {
-		r.rl.Printf("assert: HTTP JSON unmarshal ✓")
+	err := json.Unmarshal([]byte(r.body), dst)
+	r.rl.AssertionStep("HTTP JSON unmarshal", "valid JSON", err == nil, map[string]any{
+		"error": func() string { if err != nil { return err.Error() }; return "" }(),
+	})
+	if err != nil {
+		r.rl.Failf("cannot unmarshal response body as JSON: %v\nbody:\n%s", err, Truncate(r.body, 500))
 	}
 	return r
 }
@@ -289,7 +377,6 @@ func (r *HTTPResult) Header(name string) string { //nolint:deadcode
 	if len(vals) > 0 {
 		return vals[0]
 	}
-	// Try case-insensitive lookup.
 	lower := strings.ToLower(name)
 	for k, v := range r.headers {
 		if strings.ToLower(k) == lower && len(v) > 0 {
@@ -302,6 +389,52 @@ func (r *HTTPResult) Header(name string) string { //nolint:deadcode
 // StatusCode returns the raw HTTP status code.
 func (r *HTTPResult) StatusCode() int { //nolint:deadcode
 	return r.statusCode
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HTTPExpect — inline assertion type for HTTP helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// HTTPExpect is a function that asserts one property of an HTTP response.
+// Use constructors like ExpectStatus, ExpectBodyContains, etc. and pass them to
+// HTTPResult.Expect() or directly to RunLog.HTTPGet, Step.HTTP, etc.
+type HTTPExpect func(r *HTTPResult)
+
+// ExpectStatus returns an HTTPExpect that asserts the response status code.
+func ExpectStatus(code int) HTTPExpect { //nolint:deadcode
+	return func(r *HTTPResult) { r.Status(code) }
+}
+
+// ExpectBodyContains returns an HTTPExpect that asserts the body contains substr.
+func ExpectBodyContains(substr string) HTTPExpect { //nolint:deadcode
+	return func(r *HTTPResult) { r.BodyContains(substr) }
+}
+
+// ExpectBodyNotContains returns an HTTPExpect that asserts the body does NOT contain substr.
+func ExpectBodyNotContains(substr string) HTTPExpect { //nolint:deadcode
+	return func(r *HTTPResult) {
+		found := strings.Contains(r.body, substr)
+		r.rl.AssertionStep("body not contains", substr, !found, nil)
+		if found {
+			r.rl.Failf("HTTP body should not contain %q\nbody:\n%s", substr, Truncate(r.body, 500))
+		}
+	}
+}
+
+// ExpectJSONField returns an HTTPExpect that asserts a JSON field equals expected.
+func ExpectJSONField(key, expected string) HTTPExpect { //nolint:deadcode
+	return func(r *HTTPResult) { r.JSONContains(key, expected) }
+}
+
+// ExpectHeader returns an HTTPExpect that asserts a response header value.
+func ExpectHeader(name, expected string) HTTPExpect { //nolint:deadcode
+	return func(r *HTTPResult) {
+		got := r.Header(name)
+		r.rl.AssertionStep(fmt.Sprintf("header %q", name), expected, got, nil)
+		if got != expected {
+			r.rl.Failf("expected header %q = %q, got %q", name, expected, got)
+		}
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

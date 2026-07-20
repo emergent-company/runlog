@@ -9,16 +9,18 @@
 package runlog
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -62,11 +64,9 @@ type RunLog struct {
 	daemon      *DaemonClient
 	daemonRunID string
 
-	// Section-as-collapsible-parent tracking.
-	// Every call to Section() starts a new group event; subsequent dbEvent
-	// calls are stored as children of that group until the next Section() or Close().
-	currentSectionID int64
-	sectionChildren  []ChildEvent
+	// Current section label — set by Section(), written onto subsequent events.
+	// Empty string = no active section (events are top-level).
+	currentSection string
 
 	// Variant tagging: "key:value" strings stored as a JSON array in the DB.
 	tags []string
@@ -176,31 +176,21 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	rl.writef("started: %s\n\n", time.Now().UTC().Format(time.RFC3339))
 	t.Logf("run log: %s", rl.path)
 
+	// Daemon mode: all persistence via daemon HTTP API.  Skip local SQLite
+	// (SharedDB would block on the daemon's WAL lock).
+	if du := os.Getenv("RUNLOG_DAEMON_URL"); du != "" {
+		rl.daemon = NewDaemonClient(du)
+		rl.daemonRunID = os.Getenv("RUNLOG_RUN_ID")
+		return rl
+	}
+
 	// Wire up the shared DB (best-effort).
 	if db, err := SharedDB(); err == nil && db != nil {
 		envName := os.Getenv("MEMORY_TEST_ENV")
 		envVars := captureEnvVars()
 		rl.testType = deriveTestType(srcFile)
 
-		// If RUNLOG_RUN_ID is set, use the existing row instead of creating a new one.
-		// When the daemon pre-registers a batch run, RUNLOG_RUN_ID is a UUID and
-		// RUNLOG_TEST_RUN_ID carries the numeric test_runs row ID created by the
-		// daemon during registration.
-		if ridStr := os.Getenv("RUNLOG_RUN_ID"); ridStr != "" {
-			if rid, err := strconv.ParseInt(ridStr, 10, 64); err == nil {
-				rl.db = db
-				rl.runID = rid
-				t.Logf("runlog: using existing run ID %d from RUNLOG_RUN_ID", rid)
-			} else if tridStr := os.Getenv("RUNLOG_TEST_RUN_ID"); tridStr != "" {
-				if trid, err := strconv.ParseInt(tridStr, 10, 64); err == nil {
-					rl.db = db
-					rl.runID = trid
-					t.Logf("runlog: using daemon-registered run ID %d from RUNLOG_TEST_RUN_ID", trid)
-				}
-			} else {
-				t.Logf("warn: RunLog: invalid RUNLOG_RUN_ID %q: %v", ridStr, err)
-			}
-		} else if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars, rl.testType); err == nil {
+		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars, rl.testType); err == nil {
 			rl.db = db
 			rl.runID = id
 		} else {
@@ -208,13 +198,6 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 		}
 	} else if err != nil {
 		t.Logf("warn: RunLog: SharedDB: %v", err)
-	}
-
-	// SDK mode: prefer HTTP to daemon over direct DB when available.
-	if du := os.Getenv("RUNLOG_DAEMON_URL"); du != "" && rl.runID != 0 {
-		rl.daemon = NewDaemonClient(du)
-		// daemonRunID is the UUID used in daemon API routes (/runs/<uuid>/...
-		rl.daemonRunID = os.Getenv("RUNLOG_RUN_ID")
 	}
 
 	// Auto-populate experiment from the EXPERIMENT env var.
@@ -242,7 +225,7 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 					rl.t.Logf("warn: RunLog: DB UpdateRunTestVersion: %v", err)
 				}
 			}
-			rl.dbEvent("test_version", testVer, details)
+			rl.dbEvent("test_version", testVer, details, 0)
 		}
 	}
 
@@ -270,9 +253,6 @@ func (rl *RunLog) Close() { //nolint:deadcode
 	if rl.f == nil {
 		return
 	}
-
-	// Flush any buffered section children to the DB.
-	rl.flushSectionLocked()
 
 	now := time.Now()
 	rl.writeLocked(fmt.Sprintf("\nfinished: %s\n", now.UTC().Format(time.RFC3339)))
@@ -326,7 +306,7 @@ func (rl *RunLog) Failf(format string, args ...any) { //nolint:deadcode
 	rl.t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	rl.lastFailMsg = msg
-	rl.dbEvent("failure", msg, nil)
+	rl.dbEvent("failure", msg, nil, 0)
 	rl.writef("[FAIL] %s\n", msg)
 	rl.t.Fatal(msg)
 }
@@ -342,7 +322,7 @@ func (rl *RunLog) Skipf(format string, args ...any) { //nolint:deadcode
 	rl.t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	rl.skipReason = msg
-	rl.dbEvent("skip", msg, nil)
+	rl.dbEvent("skip", msg, nil, 0)
 	rl.writef("[SKIP] %s\n", msg)
 	rl.t.Skip(msg)
 }
@@ -427,7 +407,7 @@ func (rl *RunLog) Tag(tags ...string) { //nolint:deadcode
 	}
 
 	// Emit a "tag" event so tags appear in the structured event log.
-	rl.dbEvent("tag", strings.Join(tags, ", "), map[string]any{"tags": tags})
+	rl.dbEvent("tag", strings.Join(tags, ", "), map[string]any{"tags": tags}, 0)
 }
 
 // SetExperiment assigns an experiment name or ID to this test run.  It is
@@ -627,33 +607,16 @@ func (rl *RunLog) RecordTokenUsage(inputTokens, outputTokens int64, costUSD floa
 	})
 }
 
-// Section writes a prominent section header to the log file and starts a new
-// collapsible group in the DB.  All subsequent Printf/CLI/Event calls are
-// stored as children of this section until the next Section() or Close().
+// Section writes a prominent section header to the log file and sets the
+// active section label.  All subsequent Printf/CLI/Event calls carry this
+// label until the next Section() call.
 func (rl *RunLog) Section(name string) { //nolint:deadcode
 	rl.t.Helper()
 	rl.t.Log("── " + name + " ──")
 	rl.writef("\n%s\n%s\n", name, strings.Repeat("─", 72))
-
 	rl.mu.Lock()
-	// Flush children from the previous section before starting the new one.
-	rl.flushSectionLocked()
+	rl.currentSection = name
 	rl.mu.Unlock()
-
-	// Insert the new section as a group event and remember its DB id.
-	if rl.db != nil && rl.runID != 0 {
-		seq := int(rl.seq.Add(1))
-		elapsed := time.Since(rl.StartedAt).Seconds()
-		id, err := rl.db.InsertGroupEvent(rl.runID, seq, time.Now(), elapsed, "section", name)
-		if err != nil {
-			rl.t.Logf("warn: RunLog: DB Section InsertGroupEvent: %v", err)
-		} else {
-			rl.mu.Lock()
-			rl.currentSectionID = id
-			rl.sectionChildren = rl.sectionChildren[:0]
-			rl.mu.Unlock()
-		}
-	}
 }
 
 // Printf writes a timestamped line to the log file and also calls t.Log.
@@ -663,7 +626,7 @@ func (rl *RunLog) Printf(format string, args ...any) { //nolint:deadcode
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] %s\n", ts, msg)
 	rl.t.Log(msg)
-	rl.dbEvent("log", msg, nil)
+	rl.dbEvent("log", msg, nil, 0)
 }
 
 // LogStep writes a labelled log event with structured details.
@@ -677,7 +640,7 @@ func (rl *RunLog) LogStep(label string, details map[string]any) { //nolint:deadc
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] %s\n", ts, label)
 	rl.t.Log(label)
-	rl.dbEvent("log", label, details)
+	rl.dbEvent("log", label, details, 0)
 }
 
 // AssertionStep records a test assertion with structured expected/actual values.
@@ -699,7 +662,7 @@ func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[st
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] ASSERT %s\n", ts, label)
 	rl.t.Log(label)
-	rl.dbEvent("assertion", label, details)
+	rl.dbEvent("assertion", label, details, 0)
 }
 
 // CLI writes a CLI invocation header and its full output to the log file
@@ -712,33 +675,54 @@ func (rl *RunLog) AssertionStep(label string, expected, actual any, extra map[st
 // output in the inspector details.
 func (rl *RunLog) CLI(invocation, output string) { //nolint:deadcode
 	rl.t.Helper()
-	rl.CLIStepErr("$ "+invocation, invocation, output, nil)
+	rl.CLIStepErr("$ "+invocation, invocation, output, nil, 0)
 }
 
 // CLIErr is like CLI but also records the command error (exit code) in the
 // event details so the TUI can highlight the row in red on failure.
-func (rl *RunLog) CLIErr(invocation, output string, err error) { //nolint:deadcode
+// duration is the command's execution time; pass 0 for passive logging.
+func (rl *RunLog) CLIErr(invocation, output string, err error, duration time.Duration) { //nolint:deadcode
 	rl.t.Helper()
-	rl.CLIStepErr("$ "+invocation, invocation, output, err)
+	rl.CLIStepErr("$ "+invocation, invocation, output, err, duration)
 }
 
-// MustRunCLI runs `memory <args>` and emits a CLI event with the full
+// MustRunCLIRuns `memory <args>` and emits a CLI event with the full
 // invocation and output. Fails the test on non-zero exit.
+// The execution duration is automatically tracked and stored in the event.
 // Equivalent to calling runlog.MustRunCLI then rl.CLI, but in one step.
 func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string { //nolint:deadcode
 	t.Helper()
+	start := time.Now()
 	out := MustRunCLI(t, args...)
+	elapsed := time.Since(start)
 	invocation := "memory " + strings.Join(args, " ")
-	rl.CLI(invocation, out)
+	rl.CLIErr(invocation, out, nil, elapsed)
 	return out
+}
+
+// MustRunCLIResult is like MustRunCLI but returns a *CLIResult for chainable
+// assertions instead of raw output string:
+//
+//	rl.MustRunCLIResult(t, "create", "--name", "x").Contains("Created").ExitCode(0)
+//	rl.MustRunCLIResult(t, "create", "--name", "x").Expect(ExpectContains("Created"), ExpectExitCode(0))
+func (rl *RunLog) MustRunCLIResult(t *testing.T, args ...string) *CLIResult { //nolint:deadcode
+	t.Helper()
+	start := time.Now()
+	out, err := RunCLIInDirWithHome(t, "", t.TempDir(), args...)
+	elapsed := time.Since(start)
+	invocation := "memory " + strings.Join(args, " ")
+	rl.CLIErr(invocation, out, err, elapsed)
+	return newCLIResultFromCombined(rl, out, err)
 }
 
 // MustRunCLIInDir runs `memory <args>` from dir and emits a CLI event.
 func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) string { //nolint:deadcode
 	t.Helper()
+	start := time.Now()
 	out := MustRunCLIInDir(t, dir, args...)
+	elapsed := time.Since(start)
 	invocation := "memory " + strings.Join(args, " ")
-	rl.CLI(invocation, out)
+	rl.CLIErr(invocation, out, nil, elapsed)
 	return out
 }
 
@@ -750,9 +734,11 @@ func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) stri
 // prefer it over a locally-duplicated per-package wrapper.
 func (rl *RunLog) MustRunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) string { //nolint:deadcode
 	t.Helper()
+	start := time.Now()
 	out := MustRunCLIInDirWithHome(t, dir, home, args...)
+	elapsed := time.Since(start)
 	invocation := "memory " + strings.Join(args, " ")
-	rl.CLI(invocation, out)
+	rl.CLIErr(invocation, out, nil, elapsed)
 	return out
 }
 
@@ -763,9 +749,11 @@ func (rl *RunLog) MustRunCLIInDirWithHome(t *testing.T, dir, home string, args .
 // both double-records the event.
 func (rl *RunLog) RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string, error) { //nolint:deadcode
 	t.Helper()
+	start := time.Now()
 	out, err := RunCLIInDirWithHome(t, dir, home, args...)
+	elapsed := time.Since(start)
 	invocation := "memory " + strings.Join(args, " ")
-	rl.CLIErr(invocation, out, err)
+	rl.CLIErr(invocation, out, err, elapsed)
 	return out, err
 }
 
@@ -774,12 +762,13 @@ func (rl *RunLog) RunCLIInDirWithHome(t *testing.T, dir, home string, args ...st
 // invocation and output are still recorded in the inspector details.
 func (rl *RunLog) CLIStep(desc, invocation, output string) { //nolint:deadcode
 	rl.t.Helper()
-	rl.CLIStepErr(desc, invocation, output, nil)
+	rl.CLIStepErr(desc, invocation, output, nil, 0)
 }
 
 // CLIStepErr is like CLIStep but also records the command error (exit code) in
 // the event details so the TUI can highlight the row in red on failure.
-func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) { //nolint:deadcode
+// duration is the command's execution time; pass 0 for passive logging.
+func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error, duration time.Duration) { //nolint:deadcode
 	rl.t.Helper()
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] $ %s\n%s\n", ts, invocation, strings.TrimRight(output, "\n"))
@@ -797,21 +786,30 @@ func (rl *RunLog) CLIStepErr(desc, invocation, output string, err error) { //nol
 		details["error_msg"] = err.Error()
 		details["exit_code"] = exitCode(err)
 	}
-	rl.dbEvent("cli", desc, details)
+	rl.dbEvent("cli", desc, details, duration)
 }
 
 // HTTPCall emits an http_call event with full request/response details.
 // method, url, and statusCode are required. requestBody and responseBody
 // are optional and truncated to 2048 bytes in the event details.
+// duration is the HTTP call's round-trip time; pass 0 for passive logging.
 //
 // This is the canonical way to record an HTTP request/response pair — the
 // event message is a short one-line summary ("GET /api/health → 200"); the
 // full method/url/status/bodies live in details for the expanded view.
 //
+// Low-level usage:
+//
+//	start := time.Now()
 //	resp, err := http.Get(server.URL + "/api/health")
 //	body, _ := io.ReadAll(resp.Body)
-//	rl.HTTPCall("GET", "/api/health", resp.StatusCode, "", string(body))
-func (rl *RunLog) HTTPCall(method, url string, statusCode int, requestBody, responseBody string) { //nolint:deadcode
+//	resp.Body.Close()
+//	rl.HTTPCall("GET", "/api/health", resp.StatusCode, "", string(body), time.Since(start))
+//
+// High-level wrapper (does the call + logging in one):
+//
+//	rl.HTTPGet(server.URL + "/api/health").Status(200)
+func (rl *RunLog) HTTPCall(method, url string, statusCode int, requestBody, responseBody string, duration time.Duration) { //nolint:deadcode
 	rl.t.Helper()
 	details := map[string]any{
 		"method":      method,
@@ -831,7 +829,135 @@ func (rl *RunLog) HTTPCall(method, url string, statusCode int, requestBody, resp
 		details["response_body"] = responseBody
 	}
 	msg := fmt.Sprintf("%s %s → %d", method, url, statusCode)
-	rl.dbEvent("http_call", msg, details)
+	rl.dbEvent("http_call", msg, details, duration)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// High-level HTTP helpers — make the call, measure duration, log http_call, return result
+// ─────────────────────────────────────────────────────────────────────────────
+
+// HTTPDo makes an HTTP request, measures its round-trip duration, logs an
+// http_call event, and returns an *HTTPResult for chainable assertions.
+// Optional expects run inline after the call; failures call rl.Failf.
+// Use this for full control (custom headers, auth, etc.). For simple requests
+// see HTTPGet, HTTPPost, HTTPPut, HTTPDelete.
+func (rl *RunLog) HTTPDo(method, url string, reqBody []byte, expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
+	rl.t.Helper()
+	var body io.Reader
+	if len(reqBody) > 0 {
+		body = bytes.NewReader(reqBody)
+	}
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		rl.Failf("HTTPDo: cannot build request %s %s: %v", method, url, err)
+		return newHTTPResult(rl, 0, "", nil)
+	}
+	result := rl.doHTTP(req, reqBody)
+	result.Expect(expects...)
+	return result
+}
+
+// HTTPGet makes a GET request to url, times it, logs an http_call event, and
+// returns an *HTTPResult for chainable assertions. Optional expects run inline.
+//
+//	rl.HTTPGet(server.URL + "/api/health").Status(200).BodyContains("ok")
+//	rl.HTTPGet(server.URL + "/api/health", ExpectStatus(200), ExpectBodyContains("ok"))
+func (rl *RunLog) HTTPGet(url string, expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
+	rl.t.Helper()
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		rl.Failf("HTTPGet: cannot build request %s: %v", url, err)
+		return newHTTPResult(rl, 0, "", nil)
+	}
+	result := rl.doHTTP(req, nil)
+	result.Expect(expects...)
+	return result
+}
+
+// HTTPPost makes a POST request to url with an optional JSON body, times it,
+// logs an http_call event, and returns an *HTTPResult.
+func (rl *RunLog) HTTPPost(url string, body []byte, expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
+	rl.t.Helper()
+	var r io.Reader
+	if len(body) > 0 {
+		r = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest("POST", url, r)
+	if err != nil {
+		rl.Failf("HTTPPost: cannot build request %s: %v", url, err)
+		return newHTTPResult(rl, 0, "", nil)
+	}
+	if len(body) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	result := rl.doHTTP(req, body)
+	result.Expect(expects...)
+	return result
+}
+
+// HTTPPut makes a PUT request to url with an optional JSON body, times it,
+// logs an http_call event, and returns an *HTTPResult.
+func (rl *RunLog) HTTPPut(url string, body []byte, expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
+	rl.t.Helper()
+	var r io.Reader
+	if len(body) > 0 {
+		r = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest("PUT", url, r)
+	if err != nil {
+		rl.Failf("HTTPPut: cannot build request %s: %v", url, err)
+		return newHTTPResult(rl, 0, "", nil)
+	}
+	if len(body) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	result := rl.doHTTP(req, body)
+	result.Expect(expects...)
+	return result
+}
+
+// HTTPDelete makes a DELETE request to url, times it, logs an http_call event,
+// and returns an *HTTPResult.
+func (rl *RunLog) HTTPDelete(url string, expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
+	rl.t.Helper()
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		rl.Failf("HTTPDelete: cannot build request %s: %v", url, err)
+		return newHTTPResult(rl, 0, "", nil)
+	}
+	result := rl.doHTTP(req, nil)
+	result.Expect(expects...)
+	return result
+}
+
+// doHTTP is the internal implementation shared by all HTTP helpers.
+func (rl *RunLog) doHTTP(req *http.Request, reqBody []byte) *HTTPResult { //nolint:deadcode
+	rl.t.Helper()
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(req)
+	duration := time.Since(start)
+	if err != nil {
+		rl.HTTPCall(req.Method, req.URL.String(), 0, "", "", duration)
+		rl.Failf("HTTP: request failed %s %s: %v", req.Method, req.URL.String(), err)
+		return newHTTPResult(rl, 0, "", nil)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		rl.HTTPCall(req.Method, req.URL.String(), resp.StatusCode, "", "", duration)
+		rl.Failf("HTTP: cannot read response body %s %s: %v", req.Method, req.URL.String(), err)
+		return newHTTPResult(rl, resp.StatusCode, "", nil)
+	}
+
+	bodyStr := string(respBody)
+	var reqBodyStr string
+	if reqBody != nil {
+		reqBodyStr = string(reqBody)
+	}
+	rl.HTTPCall(req.Method, req.URL.Path, resp.StatusCode, reqBodyStr, bodyStr, duration)
+
+	return newHTTPResult(rl, resp.StatusCode, bodyStr, resp.Header)
 }
 
 // exitCode extracts the integer exit code from a command error.
@@ -860,7 +986,7 @@ func (rl *RunLog) Event(kind, message string, details any) { //nolint:deadcode
 	rl.t.Logf("[%s] %s", kind, message)
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] [%s] %s\n", ts, kind, message)
-	rl.dbEvent(kind, message, details)
+	rl.dbEvent(kind, message, details, 0)
 }
 
 // Group emits a single parent event in the DB whose children are the lines
@@ -884,29 +1010,24 @@ func (rl *RunLog) Group(kind, title string, fn func(g *GroupLogger)) { //nolint:
 	rl.writef("[%s] [%s] %s\n", ts, kind, title)
 	rl.t.Log(title)
 
-	// Insert the parent event row and obtain its DB id.
-	var parentDBID int64
-	if rl.db != nil && rl.runID != 0 {
-		seq := int(rl.seq.Add(1))
-		elapsed := time.Since(rl.StartedAt).Seconds()
-		id, err := rl.db.InsertGroupEvent(rl.runID, seq, time.Now(), elapsed, kind, title)
-		if err != nil {
-			rl.t.Logf("warn: RunLog: DB InsertGroupEvent: %v", err)
-		} else {
-			parentDBID = id
-		}
-	}
+	// Emit the group header as a regular event with the section label set to
+	// its own title so children can be grouped under it in the UI.
+	rl.dbEvent(kind, title, nil, 0)
+
+	// Save current section, set group title as section label for children.
+	rl.mu.Lock()
+	prevSection := rl.currentSection
+	rl.currentSection = title
+	rl.mu.Unlock()
 
 	// Run the caller's function with a GroupLogger.
 	gl := &GroupLogger{rl: rl, ts: ts}
 	fn(gl)
 
-	// Flush child lines to flat log (already written inline) and to DB.
-	if parentDBID != 0 && len(gl.children) > 0 {
-		if err := rl.db.AppendGroupChildren(parentDBID, gl.children); err != nil {
-			rl.t.Logf("warn: RunLog: DB AppendGroupChildren: %v", err)
-		}
-	}
+	// Restore previous section label.
+	rl.mu.Lock()
+	rl.currentSection = prevSection
+	rl.mu.Unlock()
 }
 
 // GroupLogger is passed to the function given to RunLog.Group.
@@ -987,10 +1108,13 @@ func (rl *RunLog) writeLocked(s string) { //nolint:deadcode
 
 // dbEvent persists one event to the DB.  Always best-effort.
 // When a section is active the event is stored as a child of that section;
-// otherwise it is inserted as a top-level row.
-func (rl *RunLog) dbEvent(kind, message string, details any) { //nolint:deadcode
+// dbEvent writes an event to the database. If the daemon client is active it
+// delegates to the daemon HTTP API. Each event carries the current section label.
+// duration is the event's execution time; pass 0 for events without a duration.
+func (rl *RunLog) dbEvent(kind, message string, details any, duration time.Duration) { //nolint:deadcode
+	elapsed := time.Since(rl.StartedAt).Seconds()
 	if rl.daemon != nil {
-		rl.daemon.addEventNF(rl.t, rl.daemonRunID, kind, message, details, time.Since(rl.StartedAt).Seconds())
+		rl.daemon.addEventNF(rl.t, rl.daemonRunID, kind, message, details, elapsed, durationToMs(duration))
 		return
 	}
 	if rl.db == nil || rl.runID == 0 {
@@ -998,61 +1122,21 @@ func (rl *RunLog) dbEvent(kind, message string, details any) { //nolint:deadcode
 	}
 
 	rl.mu.Lock()
-	sectionID := rl.currentSectionID
+	section := rl.currentSection
 	rl.mu.Unlock()
 
-	if sectionID != 0 {
-		// Buffer as a child of the current section.
-		var detJSON string
-		if details != nil {
-			if b, err := json.Marshal(details); err == nil {
-				detJSON = string(b)
-			}
-		}
-		child := ChildEvent{
-			ElapsedS: time.Since(rl.StartedAt).Seconds(),
-			Kind:     kind,
-			Message:  message,
-			Details:  detJSON,
-		}
-		rl.mu.Lock()
-		// Re-check: still the same section (not flushed by a concurrent Section() call).
-		if rl.currentSectionID == sectionID {
-			rl.sectionChildren = append(rl.sectionChildren, child)
-			rl.mu.Unlock()
-			return
-		}
-		rl.mu.Unlock()
-		// Section changed between our check and now — fall through to top-level insert.
-	}
-
 	seq := int(rl.seq.Add(1))
-	elapsed := time.Since(rl.StartedAt).Seconds()
-	if err := rl.db.InsertEvent(rl.runID, seq, time.Now(), elapsed, kind, message, details); err != nil {
+	if err := rl.db.InsertEventDur(rl.runID, seq, time.Now(), elapsed, durationToMs(duration), kind, message, details, section); err != nil {
 		rl.t.Logf("warn: RunLog: DB InsertEvent(%s): %v", kind, err)
 	}
 }
 
-// flushSectionLocked writes the buffered section children to the DB and resets
-// the section tracking state.  Must be called with rl.mu held.
-func (rl *RunLog) flushSectionLocked() { //nolint:deadcode
-	if rl.currentSectionID == 0 || len(rl.sectionChildren) == 0 {
-		rl.currentSectionID = 0
-		rl.sectionChildren = rl.sectionChildren[:0]
-		return
+// durationToMs converts a time.Duration to milliseconds (float64), returning 0 for 0 duration.
+func durationToMs(d time.Duration) float64 {
+	if d <= 0 {
+		return 0
 	}
-	id := rl.currentSectionID
-	children := make([]ChildEvent, len(rl.sectionChildren))
-	copy(children, rl.sectionChildren)
-	rl.currentSectionID = 0
-	rl.sectionChildren = rl.sectionChildren[:0]
-
-	// Release the lock while doing the DB write to avoid holding it too long.
-	rl.mu.Unlock()
-	if err := rl.db.AppendGroupChildren(id, children); err != nil {
-		rl.t.Logf("warn: RunLog: DB flushSection AppendGroupChildren: %v", err)
-	}
-	rl.mu.Lock()
+	return float64(d) / float64(time.Millisecond)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

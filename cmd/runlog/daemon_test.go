@@ -79,7 +79,7 @@ func TestDaemon_Health(t *testing.T) {
 	bodyBuf.ReadFrom(resp.Body)
 	bodyStr := bodyBuf.String()
 
-	df.HTTPCall("GET", "/health", resp.StatusCode, bodyStr)
+	df.HTTPCall("GET", "/health", resp.StatusCode, bodyStr, 0)
 	if resp.StatusCode != 200 {
 		t.Errorf("want 200, got %d", resp.StatusCode)
 	}
@@ -172,7 +172,7 @@ func TestDaemon_RegisterRun_MissingPID(t *testing.T) {
 		t.Fatalf("POST /runs: %v", err)
 	}
 	defer resp.Body.Close()
-	df.HTTPCall("POST", "/runs", resp.StatusCode, "")
+	df.HTTPCall("POST", "/runs", resp.StatusCode, "", 0)
 
 	if resp.StatusCode != 400 {
 		df.Event("assertion", "FAIL: expected 400 for missing pid")
@@ -324,26 +324,20 @@ func TestDaemon_Reap(t *testing.T) {
 	t.Log("Purpose: Verify POST /reap catches unfinished runs older than timeout")
 
 	srv, db := newDaemonTest(t)
-	srv.timeout = 1 * time.Millisecond // very short timeout for testing
+	srv.timeout = 1 * time.Millisecond
 	server := httptest.NewServer(srv.mux)
 	defer server.Close()
 
-	t.Log("Step 1: Creating a stale run via daemon API with started_at = 1 hour ago")
-	oneHourAgo := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
-	body := map[string]any{
-		"pid":         99991,
-		"env_profile": "stale-reap-test",
-		"started_at":  oneHourAgo,
-	}
-	b, _ := json.Marshal(body)
-	resp, err := http.Post(server.URL+"/runs", "application/json", bytes.NewReader(b))
+	t.Log("Step 1: Creating a stale run directly in test_runs with started_at = 1 hour ago")
+	oneHourAgo := time.Now().UTC().Add(-1 * time.Hour)
+	id, err := db.InsertRun("stale-reap-test", oneHourAgo, "dogfood", "env", nil, "")
 	if err != nil {
-		t.Fatalf("POST /runs (stale): %v", err)
+		t.Fatalf("InsertRun: %v", err)
 	}
-	resp.Body.Close()
+	t.Logf("  run id = %d", id)
 
 	t.Log("Step 2: Sending POST /reap")
-	resp, err = http.Post(server.URL+"/reap", "application/json", nil)
+	resp, err := http.Post(server.URL+"/reap", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST /reap: %v", err)
 	}
@@ -354,12 +348,12 @@ func TestDaemon_Reap(t *testing.T) {
 	t.Log("  /reap returned 200 OK")
 
 	t.Log("Step 3: Verifying the stale run now has finished_at, passed=3 (timeout), reason='timed out'")
-	df.Event("log", "Query: SELECT finished_at, passed, reason FROM test_runs WHERE test_name='stale-reap-test'")
+	df.Event("log", "Query: SELECT finished_at, passed, reason FROM test_runs WHERE id = ?")
 	var finishedStr *string
 	var passed *int
 	var reason *string
 	db.RawDB().QueryRow(
-		"SELECT finished_at, passed, reason FROM test_runs WHERE test_name = 'stale-reap-test'",
+		"SELECT finished_at, passed, reason FROM test_runs WHERE id = ?", id,
 	).Scan(&finishedStr, &passed, &reason)
 
 	if finishedStr == nil || *finishedStr == "" {

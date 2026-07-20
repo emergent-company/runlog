@@ -109,7 +109,20 @@ func AppShellContent(groups []layout.SidebarGroup) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main><footer class=\"hidden sm:flex border-t border-base-200 bg-base-100 shrink-0\"><div class=\"flex w-full items-center justify-between gap-3 px-4 py-1.5\"><div id=\"footer-status\" class=\"flex items-center gap-2 text-xs\"><div class=\"status status-neutral status-sm\"></div><span class=\"text-base-content/50\">Loading...</span></div><span class=\"text-base-content/40 text-xs\">runlog</span></div></footer><script type=\"text/javascript\">\n\t\t\t(function() {\n\t\t\t\tvar es = new EventSource({ SSEStreamURL(\"footer\") });\n\t\t\t\tes.addEventListener('footer-status', function(e) {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = JSON.parse(e.data).html;\n\t\t\t\t});\n\t\t\t\tes.onerror = function() {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = '<div class=\"status status-error status-sm\"></div><span class=\"text-base-content/50\">Disconnected</span>';\n\t\t\t\t};\n\t\t\t})();\n\t\t</script></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</main><footer class=\"hidden sm:flex border-t border-base-200 bg-base-100 shrink-0\"><div class=\"flex w-full items-center justify-between gap-3 px-4 py-1.5\"><div id=\"footer-status\" class=\"flex items-center gap-2 text-xs\"><div class=\"status status-neutral status-sm\"></div><span class=\"text-base-content/50\">Loading...</span></div><span class=\"text-base-content/40 text-xs\">runlog</span></div></footer><div id=\"footer-sse-url\" data-sse-url=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var4 string
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(SSEStreamURL("footer"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `cmd/runlog/layout.templ`, Line: 72, Col: 65}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" style=\"display:none\"></div><script type=\"text/javascript\">\n\t\t\t(function() {\n\t\t\t\tvar url = document.getElementById('footer-sse-url').getAttribute('data-sse-url');\n\t\t\t\tvar es = new EventSource(url);\n\t\t\t\tes.addEventListener('cmd', function(e) {\n\t\t\t\t\tdispatchSSECmd(JSON.parse(e.data));\n\t\t\t\t});\n\t\t\t\tes.onerror = function() {\n\t\t\t\t\tvar el = document.getElementById('footer-status');\n\t\t\t\t\tif (el) el.innerHTML = '<div class=\"status status-error status-sm\"></div><span class=\"text-base-content/50\">Disconnected</span>';\n\t\t\t\t};\n\t\t\t})();\n\t\t</script></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -123,7 +136,7 @@ func AppShellContent(groups []layout.SidebarGroup) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<script>\n\t\t(function() {\n\t\t\tfunction applyTheme(mode) {\n\t\t\t\tvar themes = { light: 'nord', dark: 'dracula' };\n\t\t\t\tvar html = document.documentElement;\n\t\t\t\tif (mode === 'system') {\n\t\t\t\t\tvar prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\t\thtml.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);\n\t\t\t\t} else {\n\t\t\t\t\thtml.setAttribute('data-theme', themes[mode] || themes.light);\n\t\t\t\t}\n\t\t\t\t['light','dark','system'].forEach(function(m) {\n\t\t\t\t\tvar el = document.getElementById('theme-icon-' + m);\n\t\t\t\t\tif (el) el.style.display = m === mode ? '' : 'none';\n\t\t\t\t\tvar ck = document.getElementById('check-' + m);\n\t\t\t\t\tif (ck) ck.style.display = m === mode ? '' : 'none';\n\t\t\t\t});\n\t\t\t\ttry { localStorage.setItem('runlog-theme', mode); } catch(e) {}\n\t\t\t}\n\t\t\tvar saved = null;\n\t\t\ttry { saved = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\tif (!saved) {\n\t\t\t\ttry {\n\t\t\t\t\tvar legacy = localStorage.getItem('go-daisy-theme');\n\t\t\t\t\tif (legacy) {\n\t\t\t\t\t\tsaved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';\n\t\t\t\t\t\tlocalStorage.removeItem('go-daisy-theme');\n\t\t\t\t\t}\n\t\t\t\t} catch(e) {}\n\t\t\t}\n\t\t\tif (!saved) saved = 'system';\n\t\t\tapplyTheme(saved);\n\t\t\tvar mq = window.matchMedia('(prefers-color-scheme: dark)');\n\t\t\tmq.addEventListener('change', function() {\n\t\t\t\tvar cur = null;\n\t\t\t\ttry { cur = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\t\tif (cur === 'system') applyTheme('system');\n\t\t\t});\n\t\t\tdocument.addEventListener('htmx:before:history:restore', function() {\n\t\t\t\tvar restored = null;\n\t\t\t\ttry { restored = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\t\tif (restored) applyTheme(restored);\n\t\t\t});\n\t\t\tdocument.addEventListener('mousedown', function(e) {\n\t\t\t\tvar option = e.target.closest('[data-theme-option]');\n\t\t\t\tif (option) { applyTheme(option.getAttribute('data-theme-option')); return; }\n\t\t\t});\n\t\t})();\n\t</script><script>\n\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\tif ((e.ctrlKey || e.metaKey) && e.key === 'k') {\n\t\t\t\te.preventDefault();\n\t\t\t\tvar modal = document.getElementById('search-modal');\n\t\t\t\tif (modal && modal.open) { modal.close(); return; }\n\t\t\t\tif (modal) { modal.showModal(); return; }\n\t\t\t}\n\t\t\tif (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {\n\t\t\t\tvar tag = e.target.tagName;\n\t\t\t\tif (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;\n\t\t\t\te.preventDefault();\n\t\t\t\tvar modal = document.getElementById('search-modal');\n\t\t\t\tif (modal) modal.showModal();\n\t\t\t}\n\t\t});\n\t\tdocument.addEventListener('htmx:after:swap', function(e) {\n\t\t\tif (e.detail?.target?.id === 'search-results') {\n\t\t\t\tvar input = document.getElementById('search-input');\n\t\t\t\tif (input) input.focus();\n\t\t\t}\n\t\t});\n\t</script><script>\n\t\t(function() {\n\t\t\tvar bar = document.getElementById('global-loading-bar');\n\t\t\tvar showTimer;\n\n\t\tdocument.addEventListener('htmx:before:request', function() {\n\t\t\tclearTimeout(window.__hideTimer);\n\t\t\tshowTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);\n\t\t});\n\t\tdocument.addEventListener('htmx:after:request', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) bar.style.opacity = '0';\n\t\t});\n\t\tdocument.addEventListener('htmx:error', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) {\n\t\t\t\tbar.style.background = 'var(--color-error, #ef4444)';\n\t\t\t\tbar.style.opacity = '1';\n\t\t\t\tsetTimeout(function() { bar.style.opacity = '0'; }, 1500);\n\t\t\t\tsetTimeout(function() { bar.style.background = ''; }, 2000);\n\t\t\t}\n\t\t\t// Recover: reload page so user doesn't see stale state\n\t\t\tsetTimeout(function() { location.reload(); }, 2000);\n\t\t});\n\t\t})();\n\t</script><script>\n\t\tdocument.addEventListener('htmx:before:request', function(evt) {\n\t\t\tvar elt = evt.detail?.ctx?.sourceElement || evt.target;\n\t\t\tif (!elt || !elt.getAttribute) return;\n\t\t\tvar targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');\n\t\t\tif (!targetId || !targetId.startsWith('#event-detail-')) return;\n\t\t\tvar det = document.querySelector(targetId);\n\t\t\tif (det && det.children.length > 0) {\n\t\t\t\tdet.innerHTML = '';\n\t\t\t\tevt.preventDefault();\n\t\t\t}\n\t\t});\n\t\t// Feedback overlay — loaded after HTMX so the script tag is inside <body>.\n\t\t(function() {\n\t\t\tvar s = document.createElement('script');\n\t\t\ts.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';\n\t\t\ts.setAttribute('data-api', 'https://feedback.emergent-company.ai');\n\t\t\ts.setAttribute('data-repo', 'emergent-company/runlog');\n\t\t\ts.setAttribute('data-label', 'feedback');\n\t\t\ts.async = true;\n\t\t\tdocument.body.appendChild(s);\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<script>\n\t// ── Shared helpers ──────────────────────────────────────────────────────\n\tfunction initSSE(elId, events) {\n\t\tvar el = document.getElementById(elId);\n\t\tif (!el) return;\n\t\tvar url = el.getAttribute('data-sse-url');\n\t\tif (!url) return;\n\t\tvar es = new EventSource(url);\n\t\tObject.keys(events).forEach(function(k) {\n\t\t\tif (k === 'error') es.onerror = events[k];\n\t\t\telse es.addEventListener(k, events[k]);\n\t\t});\n\t\tes.onerror = function() { es.close(); };\n\t\treturn es;\n\t}\n\tfunction dispatchSSECmd(cmd) {\n\t\tswitch (cmd.cmd) {\n\t\t\tcase 'replace-html': {\n\t\t\t\tvar el = document.querySelector(cmd.target);\n\t\t\t\tif (el) el.innerHTML = cmd.html;\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'refresh': {\n\t\t\t\tlocation.reload();\n\t\t\t\tbreak;\n\t\t\t}\n\t\t\tcase 'linter-done': {\n\t\t\t\tdocument.body.dispatchEvent(new CustomEvent('refresh-linters'));\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t}\n\n\t// ── Theme init ──────────────────────────────────────────────────────────\n\t(function() {\n\t\tfunction applyTheme(mode) {\n\t\t\tvar themes = { light: 'nord', dark: 'dracula' };\n\t\t\tvar html = document.documentElement;\n\t\t\tif (mode === 'system') {\n\t\t\t\tvar prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;\n\t\t\t\thtml.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);\n\t\t\t} else {\n\t\t\t\thtml.setAttribute('data-theme', themes[mode] || themes.light);\n\t\t\t}\n\t\t\t['light','dark','system'].forEach(function(m) {\n\t\t\t\tvar el = document.getElementById('theme-icon-' + m);\n\t\t\t\tif (el) el.style.display = m === mode ? '' : 'none';\n\t\t\t\tvar ck = document.getElementById('check-' + m);\n\t\t\t\tif (ck) ck.style.display = m === mode ? '' : 'none';\n\t\t\t});\n\t\t\ttry { localStorage.setItem('runlog-theme', mode); } catch(e) {}\n\t\t}\n\t\tvar saved = null;\n\t\ttry { saved = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\tif (!saved) {\n\t\t\ttry {\n\t\t\t\tvar legacy = localStorage.getItem('go-daisy-theme');\n\t\t\t\tif (legacy) {\n\t\t\t\t\tsaved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';\n\t\t\t\t\tlocalStorage.removeItem('go-daisy-theme');\n\t\t\t\t}\n\t\t\t} catch(e) {}\n\t\t}\n\t\tif (!saved) saved = 'system';\n\t\tapplyTheme(saved);\n\t\tvar mq = window.matchMedia('(prefers-color-scheme: dark)');\n\t\tmq.addEventListener('change', function() {\n\t\t\tvar cur = null;\n\t\t\ttry { cur = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\tif (cur === 'system') applyTheme('system');\n\t\t});\n\t\tdocument.addEventListener('htmx:before:history:restore', function() {\n\t\t\tvar restored = null;\n\t\t\ttry { restored = localStorage.getItem('runlog-theme'); } catch(e) {}\n\t\t\tif (restored) applyTheme(restored);\n\t\t});\n\t\tdocument.addEventListener('mousedown', function(e) {\n\t\t\tvar option = e.target.closest('[data-theme-option]');\n\t\t\tif (option) { applyTheme(option.getAttribute('data-theme-option')); return; }\n\t\t});\n\t})();\n\n\t// ── Keyboard shortcuts ──────────────────────────────────────────────────\n\tdocument.addEventListener('keydown', function(e) {\n\t\tif ((e.ctrlKey || e.metaKey) && e.key === 'k') {\n\t\t\te.preventDefault();\n\t\t\tvar modal = document.getElementById('search-modal');\n\t\t\tif (modal && modal.open) { modal.close(); return; }\n\t\t\tif (modal) { modal.showModal(); return; }\n\t\t}\n\t\tif (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {\n\t\t\tvar tag = e.target.tagName;\n\t\t\tif (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;\n\t\t\te.preventDefault();\n\t\t\tvar modal = document.getElementById('search-modal');\n\t\t\tif (modal) modal.showModal();\n\t\t}\n\t});\n\tdocument.addEventListener('htmx:after:swap', function(e) {\n\t\tif (e.detail?.target?.id === 'search-results') {\n\t\t\tvar input = document.getElementById('search-input');\n\t\t\tif (input) input.focus();\n\t\t}\n\t});\n\n\t// ── Global loading indicator + error recovery ───────────────────────────\n\t(function() {\n\t\tvar bar = document.getElementById('global-loading-bar');\n\t\tvar showTimer;\n\n\t\tdocument.addEventListener('htmx:before:request', function() {\n\t\t\tclearTimeout(window.__hideTimer);\n\t\t\tshowTimer = setTimeout(function() { if (bar) bar.style.opacity = '1'; }, 200);\n\t\t});\n\t\tdocument.addEventListener('htmx:after:request', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) bar.style.opacity = '0';\n\t\t});\n\t\tdocument.addEventListener('htmx:error', function() {\n\t\t\tclearTimeout(showTimer);\n\t\t\tif (bar) {\n\t\t\t\tbar.style.background = 'var(--color-error, #ef4444)';\n\t\t\t\tbar.style.opacity = '1';\n\t\t\t\tsetTimeout(function() { bar.style.opacity = '0'; }, 1500);\n\t\t\t\tsetTimeout(function() { bar.style.background = ''; }, 2000);\n\t\t\t}\n\t\t\tsetTimeout(function() { location.reload(); }, 2000);\n\t\t});\n\t})();\n\n\t// ── Event-detail toggle: collapse expanded detail on second click ──────\n\tdocument.addEventListener('htmx:before:request', function(evt) {\n\t\tvar elt = evt.detail?.ctx?.sourceElement || evt.target;\n\t\tif (!elt || !elt.getAttribute) return;\n\t\tvar targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');\n\t\tif (!targetId || !targetId.startsWith('#event-detail-')) return;\n\t\tvar det = document.querySelector(targetId);\n\t\tif (det && det.children.length > 0) {\n\t\t\tdet.innerHTML = '';\n\t\t\tevt.preventDefault();\n\t\t}\n\t});\n\n\t// ── Feedback overlay ───────────────────────────────────────────────────\n\t(function() {\n\t\tvar s = document.createElement('script');\n\t\ts.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';\n\t\ts.setAttribute('data-api', 'https://feedback.emergent-company.ai');\n\t\ts.setAttribute('data-repo', 'emergent-company/runlog');\n\t\ts.setAttribute('data-label', 'feedback');\n\t\ts.async = true;\n\t\tdocument.body.appendChild(s);\n\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -151,43 +164,20 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<style>\n\t\ttr.hover { cursor: pointer; }\n\t\ttr.hover:hover { background-color: color-mix(in oklab, var(--color-base-200) 80%, transparent); }\n\t\t[data-component=\"ui/Badge\"] { min-width: 5rem; text-align: center; }\n\t\t.htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }\n\t\t.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }\n\t\t#events-section .is-debug-event { display: none; }\n\t\t#events-section.debug-visible .is-debug-event { display: table-row; }\n\t</style><div data-testid=\"app-page\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<style>\n\t\ttr.hover { cursor: pointer; }\n\t\ttr.hover:hover { background-color: color-mix(in oklab, var(--color-base-200) 80%, transparent); }\n\t\t[data-component=\"ui/Badge\"] { min-width: 5rem; text-align: center; }\n\t\t.htmx-indicator { opacity: 0; transition: opacity 200ms ease-in; }\n\t\t.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }\n\t\t#events-section .is-debug-event { display: none; }\n\t\t#events-section.debug-visible .is-debug-event { display: table-row; }\n\t</style><div data-testid=\"app-page\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if render.IsHistoryRestoreFromContext(ctx) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<link rel=\"stylesheet\" href=\"/static/css/app.css\"><div id=\"modal-container\"></div><div id=\"toast-container\" class=\"toast toast-top toast-end z-70\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<link rel=\"stylesheet\" href=\"/static/css/app.css\"><div id=\"modal-container\"></div><div id=\"toast-container\" class=\"toast toast-top toast-end z-70\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-				if !templ_7745c5c3_IsBuffer {
-					defer func() {
-						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-						if templ_7745c5c3_Err == nil {
-							templ_7745c5c3_Err = templ_7745c5c3_BufErr
-						}
-					}()
-				}
-				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templ_7745c5c3_Var4.Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				return nil
-			})
-			templ_7745c5c3_Err = AppShellContent(groups).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
 			templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -200,11 +190,34 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "   <script>\n\t\t\t\t\t(function() {\n\t\t\t\t\t\tvar m = 'system';\n\t\t\t\t\t\ttry { m = localStorage.getItem('runlog-theme') || m; } catch(e) {}\n\t\t\t\t\t\tif (m === 'system') {\n\t\t\t\t\t\t\tm = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';\n\t\t\t\t\t\t}\n\t\t\t\t\t\tdocument.documentElement.setAttribute('data-theme', m === 'dark' ? 'dracula' : 'nord');\n\t\t\t\t\t})();\n\t\t\t\t</script> ")
+				templ_7745c5c3_Err = templ_7745c5c3_Var5.Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				return nil
+			})
+			templ_7745c5c3_Err = AppShellContent(groups).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "   <script>\n\t\t\t\t\t(function() {\n\t\t\t\t\t\tvar m = 'system';\n\t\t\t\t\t\ttry { m = localStorage.getItem('runlog-theme') || m; } catch(e) {}\n\t\t\t\t\t\tif (m === 'system') {\n\t\t\t\t\t\t\tm = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';\n\t\t\t\t\t\t}\n\t\t\t\t\t\tdocument.documentElement.setAttribute('data-theme', m === 'dark' ? 'dracula' : 'nord');\n\t\t\t\t\t})();\n\t\t\t\t</script> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 					templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 					templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 					if !templ_7745c5c3_IsBuffer {
@@ -216,28 +229,28 @@ func AppPage(title string, groups []layout.SidebarGroup) templ.Component {
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templ_7745c5c3_Var4.Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = templ_7745c5c3_Var5.Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					return nil
 				})
-				templ_7745c5c3_Err = AppShellContent(groups).Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = AppShellContent(groups).Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = layout.Page(title, "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = layout.Page(title, "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "  <link rel=\"stylesheet\" href=\"/static/css/frappe-gantt.css\"><script src=\"/static/js/hx-head.js\"></script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "  <link rel=\"stylesheet\" href=\"/static/css/frappe-gantt.css\"><script src=\"/static/js/hx-head.js\"></script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

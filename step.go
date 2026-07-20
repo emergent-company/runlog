@@ -8,7 +8,6 @@ package runlog
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -28,7 +27,8 @@ type Step struct {
 
 // CLI executes the configured binary (tc.Binary) with the given args, using
 // the TestContext's Home directory and environment.  The invocation and output
-// are automatically logged to RunLog as a "cli" event.
+// are automatically logged to RunLog as a "cli" event with the execution
+// duration tracked.
 //
 // If the command exits non-zero, the test fails via rl.Failf.
 // Returns a *CLIResult for chainable assertions.
@@ -37,10 +37,12 @@ func (s *Step) CLI(args ...string) *CLIResult { //nolint:deadcode
 	binary := s.tc.Binary
 	invocation := formatInvocation(binary, args)
 
+	start := time.Now()
 	out, err := RunBinaryInDirWithHome(s.tc.T, binary, "", s.tc.Home, args...)
+	elapsed := time.Since(start)
 
-	// Log to RunLog regardless of outcome.
-	s.tc.RunLog.CLIStepErr(s.name+": "+invocation, invocation, strings.TrimSpace(out), err)
+	// Log to RunLog regardless of outcome — with measured duration.
+	s.tc.RunLog.CLIStepErr(s.name+": "+invocation, invocation, strings.TrimSpace(out), err, elapsed)
 
 	if err != nil {
 		s.tc.RunLog.Failf("CLI command failed: %s\nerror: %v\noutput:\n%s", invocation, err, out)
@@ -57,10 +59,12 @@ func (s *Step) CLIExpectError(args ...string) *CLIResult { //nolint:deadcode
 	binary := s.tc.Binary
 	invocation := formatInvocation(binary, args)
 
+	start := time.Now()
 	out, err := RunBinaryInDirWithHome(s.tc.T, binary, "", s.tc.Home, args...)
+	elapsed := time.Since(start)
 
 	// Log to RunLog — include error info if present.
-	s.tc.RunLog.CLIStepErr(s.name+": "+invocation, invocation, strings.TrimSpace(out), err)
+	s.tc.RunLog.CLIStepErr(s.name+": "+invocation, invocation, strings.TrimSpace(out), err, elapsed)
 
 	return newCLIResultFromCombined(s.tc.RunLog, out, err)
 }
@@ -69,15 +73,22 @@ func (s *Step) CLIExpectError(args ...string) *CLIResult { //nolint:deadcode
 // an *HTTPResult for chainable assertions.  The request uses the auth token
 // from tc.Token and the project ID from tc.ProjectID.
 //
-// An optional body may be provided (at most one); if present, Content-Type
-// is set to application/json.
-func (s *Step) HTTP(method, path string, body ...[]byte) *HTTPResult { //nolint:deadcode
+// The request round-trip duration is measured, and the result is logged as an
+// http_call event (not a cli event). Pass nil for body on GET/DELETE requests.
+// If body is non-nil, Content-Type is set to application/json.
+//
+// Optional expects run inline after the call; failures call rl.Failf.
+//
+//	s.HTTP("GET", "/api/health", nil, ExpectStatus(200), ExpectBodyContains("ok"))
+func (s *Step) HTTP(method, path string, body []byte, expects ...HTTPExpect) *HTTPResult { //nolint:deadcode
 	s.tc.T.Helper()
 	url := s.tc.Server + path
 
 	var reqBody io.Reader
-	if len(body) > 0 && body[0] != nil {
-		reqBody = bytes.NewReader(body[0])
+	var reqBodyBytes []byte
+	if body != nil {
+		reqBodyBytes = body
+		reqBody = bytes.NewReader(reqBodyBytes)
 	}
 
 	req, err := http.NewRequest(method, url, reqBody)
@@ -85,7 +96,7 @@ func (s *Step) HTTP(method, path string, body ...[]byte) *HTTPResult { //nolint:
 		s.tc.RunLog.Failf("HTTP: cannot build request %s %s: %v", method, url, err)
 		return newHTTPResult(s.tc.RunLog, 0, "", nil)
 	}
-	if len(body) > 0 && body[0] != nil {
+	if len(reqBodyBytes) > 0 {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	SetAuthHeader(req, s.tc.Token)
@@ -93,27 +104,33 @@ func (s *Step) HTTP(method, path string, body ...[]byte) *HTTPResult { //nolint:
 		req.Header.Set("X-Project-ID", s.tc.ProjectID)
 	}
 
+	start := time.Now()
 	resp, err := http.DefaultClient.Do(req)
+	duration := time.Since(start)
 	if err != nil {
+		s.tc.RunLog.HTTPCall(method, path, 0, string(reqBodyBytes), "", duration)
 		s.tc.RunLog.Failf("HTTP: request failed %s %s: %v", method, url, err)
-		return newHTTPResult(s.tc.RunLog, 0, "", nil)
+		result := newHTTPResult(s.tc.RunLog, 0, "", nil)
+		result.Expect(expects...)
+		return result
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		s.tc.RunLog.HTTPCall(method, path, resp.StatusCode, string(reqBodyBytes), "", duration)
 		s.tc.RunLog.Failf("HTTP: cannot read response body %s %s: %v", method, url, err)
-		return newHTTPResult(s.tc.RunLog, resp.StatusCode, "", nil)
+		result := newHTTPResult(s.tc.RunLog, resp.StatusCode, "", nil)
+		result.Expect(expects...)
+		return result
 	}
 
 	bodyStr := string(respBody)
+	s.tc.RunLog.HTTPCall(method, path, resp.StatusCode, string(reqBodyBytes), bodyStr, duration)
 
-	// Log to RunLog.
-	desc := fmt.Sprintf("%s: %s %s → %d", s.name, method, path, resp.StatusCode)
-	details := fmt.Sprintf("%s %s\nStatus: %d\nBody: %s", method, url, resp.StatusCode, Truncate(bodyStr, 500))
-	s.tc.RunLog.CLIStep(desc, fmt.Sprintf("%s %s", method, url), details)
-
-	return newHTTPResult(s.tc.RunLog, resp.StatusCode, bodyStr, resp.Header)
+	result := newHTTPResult(s.tc.RunLog, resp.StatusCode, bodyStr, resp.Header)
+	result.Expect(expects...)
+	return result
 }
 
 // Log writes a scoped log message to RunLog under the current step's section.

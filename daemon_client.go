@@ -241,7 +241,7 @@ func (c *DaemonClient) MustGetEvents(t *testing.T, id int64) []map[string]any { 
 }
 
 // addEventNF is the non-fatal variant of AddEvent for use inside RunLog.
-func (c *DaemonClient) addEventNF(t *testing.T, runID string, kind, message string, details any, elapsedSec float64) { //nolint:deadcode
+func (c *DaemonClient) addEventNF(t *testing.T, runID string, kind, message string, details any, elapsedSec float64, durationMs float64) { //nolint:deadcode
 	t.Helper()
 	body := map[string]any{
 		"kind":      kind,
@@ -250,6 +250,9 @@ func (c *DaemonClient) addEventNF(t *testing.T, runID string, kind, message stri
 	}
 	if details != nil {
 		body["details"] = details
+	}
+	if durationMs > 0 {
+		body["duration_ms"] = durationMs
 	}
 	b, _ := json.Marshal(body)
 	resp, err := c.client.Post(c.baseURL+"/runs/"+runID+"/events", "application/json", bytes.NewReader(b))

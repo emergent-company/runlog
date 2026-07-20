@@ -108,7 +108,7 @@ func logCLIFailureIfActive(t *testing.T, invocation, output string, err error) {
 	if !ok || rl == nil {
 		return
 	}
-	rl.CLIStepErr("$ "+invocation, invocation, output, err)
+	rl.CLIStepErr("$ "+invocation, invocation, output, err, 0)
 }
 
 // logCLISuccessIfActive records a "cli" event for the active RunLog of this
