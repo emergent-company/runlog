@@ -27,14 +27,14 @@ type eventKindDoc struct {
 
 var eventKinds = []eventKindDoc{
 	{Kind: "section", Description: "Logical grouping of child events. Children rendered as expandable sub-table on click.", Usage: "rl.Section()", IsMeta: false},
-	{Kind: "cli", Description: "Command-line invocation output. Recorded by RunLog.CLI / RunLog.CLIErr.", Usage: "RunLog.CLI()", IsMeta: false},
+	{Kind: "cli", Description: "Command-line invocation with output and exit code. Auto-timed via MustRunCLI/Step.CLI/Fixture.CLI.", Usage: "RunLog.CLI() / MustRunCLIResult()", IsMeta: false},
 	{Kind: "log", Description: "Free-form log messages from the test run. Produced by rl.Printf().", Usage: "rl.Printf()", IsMeta: false},
 	{Kind: "failure", Description: "Test assertion failure with structured details. Produced by rl.Failf().", Usage: "rl.Failf()", IsMeta: false},
 	{Kind: "skip", Description: "Test was skipped via rl.Skipf().", Usage: "rl.Skipf()", IsMeta: false},
 	{Kind: "gantt", Description: "Agent/step timeline as a gantt chart.", Usage: "rl.Gantt()", IsMeta: false},
-	{Kind: "http_call", Description: "HTTP request/response with method, url, status, and body.", Usage: "RunLog.HTTPCall()", IsMeta: false},
+	{Kind: "http_call", Description: "HTTP request/response with method, URL, status, and body. Auto-timed via HTTPGet/Post/Put/Delete/Do.", Usage: "RunLog.HTTPCall() / HTTPGet()", IsMeta: false},
 	{Kind: "artifact", Description: "Test artifact (screenshot, trace) rendered inline in UI.", Usage: "rl.Event(\"artifact\", ...)", IsMeta: false},
-	{Kind: "assertion", Description: "Single assertion/test-case result with expected/actual comparison.", Usage: "rl.AssertionStep()", IsMeta: false},
+	{Kind: "assertion", Description: "Structured assertion with expected/actual comparison. Emitted by chainable methods (Status, Contains, ExitCode) and inline expects.", Usage: "rl.AssertionStep() + chainable methods", IsMeta: false},
 	{Kind: "state_change", Description: "Run state transitions (test started/finished).", Usage: "Auto by NewRunLog / Close", IsMeta: true},
 	{Kind: "tag", Description: "Run-level tags. Set via rl.Tag().", Usage: "rl.Tag()", IsMeta: true},
 	{Kind: "token_usage", Description: "Per-call LLM token usage. Aggregated into run totals.", Usage: "rl.RecordTokenUsage()", IsMeta: true},

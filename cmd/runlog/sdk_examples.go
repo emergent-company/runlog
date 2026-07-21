@@ -187,6 +187,55 @@ rl.HTTPCall("GET", "/health", 200, "", "ok", 0)`,
 			{Seq: 3, Kind: "http_call", Message: "GET /health → 200", ElapsedS: 0.3, Details: strPtr(`{"method":"GET","url":"/health","status_code":200}`)},
 		},
 	},
+	{
+		Title:       "High-Level HTTP",
+		Description: "HTTPGet/Post/Put/Delete/Do execute the call, measure duration, log an http_call event and return an HTTPResult. Optional Expect* arguments run inline assertions.",
+		ID:          "http-high-level", Lang: "go",
+		Code: "rl := runlog.NewRunLog(t)\n" +
+			"defer rl.Close()\n" +
+			"\n" +
+			"rl.HTTPGet(srv + \"/api/health\",\n" +
+			"    runlog.ExpectStatus(200),\n" +
+			"    runlog.ExpectBodyContains(\"ok\"),\n" +
+			")\n" +
+			"\n" +
+			"rl.HTTPPost(srv+\"/users\", payload).Expect(\n" +
+			"    runlog.ExpectStatus(201),\n" +
+			"    runlog.ExpectJSONField(\"name\", \"Alice\"),\n" +
+			")",
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
+			{Seq: 2, Kind: "http_call", Message: "GET /api/health → 200", ElapsedS: 1.2, DurationMs: fltPtr(234.5), Details: strPtr(`{"method":"GET","url":"/api/health","status_code":200}`)},
+			{Seq: 3, Kind: "assertion", Message: "HTTP status", ElapsedS: 1.2, Details: strPtr(`{"expected":200,"actual":200}`)},
+			{Seq: 4, Kind: "assertion", Message: "body contains", ElapsedS: 1.2, Details: strPtr(`{"expected":"ok","actual":true}`)},
+			{Seq: 5, Kind: "http_call", Message: "POST /users → 201", ElapsedS: 3.5, DurationMs: fltPtr(156.7), Details: strPtr(`{"method":"POST","url":"/users","status_code":201}`)},
+			{Seq: 6, Kind: "assertion", Message: "HTTP status", ElapsedS: 3.5, Details: strPtr(`{"expected":201,"actual":201}`)},
+			{Seq: 7, Kind: "assertion", Message: "HTTP JSON field \"name\"", ElapsedS: 3.5, Details: strPtr(`{"expected":"Alice","actual":"Alice"}`)},
+		},
+	},
+	{
+		Title:       "High-Level CLI",
+		Description: "MustRunCLIResult runs the command, measures duration, logs a cli event, returns CLIResult. Chainable assertions emit assertion events. Fixture.CLIAssert does the same without failing.",
+		ID:          "cli-high-level", Lang: "go",
+		Code: "rl := runlog.NewRunLog(t)\n" +
+			"defer rl.Close()\n" +
+			"\n" +
+			"rl.MustRunCLIResult(t, \"agents\", \"create\", \"--name\", \"bot\").\n" +
+			"    Expect(runlog.ExpectContains(\"Created agent\")).\n" +
+			"    Expect(runlog.ExpectExitCode(0))\n" +
+			"\n" +
+			"fx := runlog.Use(t, runlog.WithProject(\"e2e\"))\n" +
+			"fx.CLIAssert([]string{\"docs\", \"list\"},\n" +
+			"    runlog.ExpectContainsAny(\"doc-42\", \"doc-99\"),\n" +
+			"    runlog.ExpectExitCode(0),\n" +
+			")",
+		Events: []runlog.EventRow{
+			{Seq: 1, Kind: "state_change", Message: "test started", ElapsedS: 0.0},
+			{Seq: 2, Kind: "cli", Message: "$ memory agents create --name bot", ElapsedS: 2.1, DurationMs: fltPtr(1250.0), Details: strPtr(`{"invocation":"memory agents create --name bot","output":"Created agent abc-123\n"}`)},
+			{Seq: 3, Kind: "assertion", Message: "contains", ElapsedS: 2.1, Details: strPtr(`{"expected":"Created agent","actual":true}`)},
+			{Seq: 4, Kind: "assertion", Message: "exit code", ElapsedS: 2.1, Details: strPtr(`{"expected":0,"actual":0}`)},
+		},
+	},
 
 	// ── TypeScript SDK examples ──
 
