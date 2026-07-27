@@ -14,41 +14,50 @@ import (
 	"time"
 )
 
-// ServerURL returns the Emergent server URL from the MEMORY_TEST_SERVER
+// ServerURL returns the server URL from the MEMORY_TEST_SERVER or RUNLOG_TEST_SERVER
 // environment variable, falling back to an empty string.  An empty value
 // causes SkipIfServerDown to skip server-dependent tests rather than hitting
 // a wrong address.
 func ServerURL() string { //nolint:deadcode
-	return os.Getenv("MEMORY_TEST_SERVER")
+	if v := os.Getenv("MEMORY_TEST_SERVER"); v != "" {
+		return v
+	}
+	return os.Getenv("RUNLOG_TEST_SERVER")
 }
 
 // E2ETestToken returns the static API key for the test server.
-// It reads MEMORY_TEST_TOKEN from the environment, falling back to the
+// Reads MEMORY_TEST_TOKEN or RUNLOG_TEST_TOKEN; falls back to the
 // default value used by the Docker Compose stack.
 func E2ETestToken() string { //nolint:deadcode
 	if v := os.Getenv("MEMORY_TEST_TOKEN"); v != "" {
+		return v
+	}
+	if v := os.Getenv("RUNLOG_TEST_TOKEN"); v != "" {
 		return v
 	}
 	return "e2e-test-user"
 }
 
 // AuthMode returns the authentication mode for the current test environment.
-// Reads MEMORY_AUTH_MODE; defaults to "standalone".
-//
-//	standalone — plain API key sent as X-API-Key (Docker Compose / local dev standalone)
-//	account    — Bearer token from credentials.json only (mcj-emergent, local Zitadel-backed dev)
-//	             api_key must NOT be set in this mode — see SetupCLIAuth for details.
+// Reads MEMORY_AUTH_MODE or RUNLOG_AUTH_MODE; defaults to "standalone".
 func AuthMode() string { //nolint:deadcode
 	if v := os.Getenv("MEMORY_AUTH_MODE"); v != "" {
+		return v
+	}
+	if v := os.Getenv("RUNLOG_AUTH_MODE"); v != "" {
 		return v
 	}
 	return "standalone"
 }
 
 // SetToken returns the Bearer token to write into credentials.json when
-// MEMORY_AUTH_MODE=account.  Reads MEMORY_SET_TOKEN; defaults to "all-scopes".
+// MEMORY_AUTH_MODE=account.  Reads MEMORY_SET_TOKEN or RUNLOG_SET_TOKEN;
+// defaults to "all-scopes".
 func SetToken() string { //nolint:deadcode
 	if v := os.Getenv("MEMORY_SET_TOKEN"); v != "" {
+		return v
+	}
+	if v := os.Getenv("RUNLOG_SET_TOKEN"); v != "" {
 		return v
 	}
 	return "all-scopes"
@@ -64,7 +73,7 @@ var (
 )
 
 // OrgID returns the organization ID for the test server.
-// Checks MEMORY_ORG_ID first (set by parent `runlog test` process).
+// Checks MEMORY_ORG_ID first, then RUNLOG_ORG_ID (set by parent process).
 // If not set, lazily discovers it from the server with retry (cached via
 // sync.Once so each test binary queries the server at most once).
 //
@@ -72,6 +81,9 @@ var (
 // should handle the empty case gracefully.
 func OrgID() string { //nolint:deadcode
 	if id := os.Getenv("MEMORY_ORG_ID"); id != "" {
+		return id
+	}
+	if id := os.Getenv("RUNLOG_ORG_ID"); id != "" {
 		return id
 	}
 	orgIDOnce.Do(func() {

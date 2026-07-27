@@ -220,6 +220,22 @@ func (fx *Fixture) CLIExpectError(args ...string) *CLIResult { //nolint:deadcode
 	return newCLIResultFromCombined(fx.RunLog, out, err)
 }
 
+// CLICheck runs fx.Binary with the given args without failing on non-zero exit.
+// Use Check() for non-fatal assertions and Errors()/Assert() to collect and
+// report all failures at the end.
+func (fx *Fixture) CLICheck(args ...string) *CLIResult { //nolint:deadcode
+	fx.T.Helper()
+	invocation := formatInvocation(fx.Binary, args)
+
+	start := time.Now()
+	out, err := RunBinaryInDirWithHome(fx.T, fx.Binary, "", fx.Home, args...)
+	elapsed := time.Since(start)
+
+	fx.RunLog.CLIStepErr(invocation, invocation, strings.TrimSpace(out), err, elapsed)
+
+	return newCLIResultFromCombined(fx.RunLog, out, err)
+}
+
 // CLIAssert is like CLI but accepts expects for inline assertions:
 //
 //	fx.CLIAssert([]string{"create", "--name", "x"}, ExpectContains("Created"), ExpectExitCode(0))

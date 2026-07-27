@@ -23,7 +23,7 @@ import (
 // Variables already set in the environment are not overwritten (the shell
 // always wins).
 //
-// If MEMORY_TEST_ENV is set (e.g. "mcj-emergent"), the file
+// If MEMORY_TEST_ENV (or RUNLOG_TEST_ENV) is set (e.g. "mcj-emergent"), the file
 // .env.<MEMORY_TEST_ENV> is loaded after .env so its values take precedence
 // over the base file — but shell variables still win over both.
 //
@@ -67,7 +67,7 @@ func checkRawGoTest() { //nolint:deadcode
 	// If MEMORY_TEST_ENV is not set AND we're in the e2e tests, this is likely
 	// a raw 'go test' invocation. The runlog wrapper always sets MEMORY_TEST_ENV
 	// (even if empty for the base .env).
-	if os.Getenv("MEMORY_TEST_ENV") == "" && os.Getenv("TEST_RUNNER") == "" {
+	if os.Getenv("MEMORY_TEST_ENV") == "" && os.Getenv("RUNLOG_TEST_ENV") == "" && os.Getenv("TEST_RUNNER") == "" {
 		// Only flag if we can detect we're in the e2e repository
 		if wd, err := os.Getwd(); err == nil && strings.Contains(wd, "emergent.memory.e2e") {
 			printRawGoTestWarning()
@@ -114,10 +114,13 @@ func loadDotEnvDir(dir string) {
 	// Load base .env first.
 	loadEnvFile(filepath.Join(dir, ".env"), false)
 
-	// If MEMORY_TEST_ENV names a profile, load the overlay.
+	// If MEMORY_TEST_ENV or RUNLOG_TEST_ENV names a profile, load the overlay.
 	// The overlay is allowed to overwrite values from the base file (but
 	// shell variables still win over both).
 	if profile := os.Getenv("MEMORY_TEST_ENV"); profile != "" {
+		loadEnvFile(filepath.Join(dir, ".env."+profile), true)
+	}
+	if profile := os.Getenv("RUNLOG_TEST_ENV"); profile != "" {
 		loadEnvFile(filepath.Join(dir, ".env."+profile), true)
 	}
 }

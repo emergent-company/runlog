@@ -42,7 +42,7 @@ type CredentialsInfo struct {
 func VerifyCredentialsWritten(t *testing.T, rl *RunLog, home string) CredentialsInfo { //nolint:deadcode
 	t.Helper()
 
-	credsPath := filepath.Join(home, ".memory", "credentials.json")
+	credsPath := filepath.Join(home, "."+DefaultBinaryName, "credentials.json")
 
 	data, err := os.ReadFile(credsPath)
 	if err != nil {

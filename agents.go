@@ -88,6 +88,44 @@ func PollUntilSuccess( //nolint:deadcode
 	return false
 }
 
+// WaitFor runs condition repeatedly at interval until it returns done=true or
+// timeout elapses. Returns true if condition returned done=true before timeout.
+// Logs a progress event on each state transition when the description text
+// returned by condition changes.
+func WaitFor(rl *RunLog, timeout, interval time.Duration, desc string, condition func() (done bool, ok bool)) bool {
+	rl.t.Helper()
+	deadline := time.Now().Add(timeout)
+	lastDesc := ""
+
+	for time.Now().Before(deadline) {
+		done, ok := condition()
+		currentDesc := desc
+		if !ok {
+			currentDesc = desc + " (retrying)"
+		}
+
+		if currentDesc != lastDesc {
+			if lastDesc == "" {
+				rl.Printf("wait %s: %s", desc, currentDesc)
+			} else {
+				rl.Event("state_change",
+					fmt.Sprintf("wait %s: %s → %s", desc, lastDesc, currentDesc),
+					map[string]any{"description": desc, "from": lastDesc, "to": currentDesc})
+			}
+			lastDesc = currentDesc
+		}
+
+		if done && ok {
+			return true
+		}
+
+		time.Sleep(interval)
+	}
+
+	rl.Printf("wait %s: timed out after %s (last state: %s)", desc, timeout, lastDesc)
+	return false
+}
+
 // extractStatus parses the current status from compact or raw runs output.
 // Returns an empty string if no status can be determined.
 func extractStatus(compact, raw string) string { //nolint:deadcode

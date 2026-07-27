@@ -69,6 +69,23 @@ func (s *Step) CLIExpectError(args ...string) *CLIResult { //nolint:deadcode
 	return newCLIResultFromCombined(s.tc.RunLog, out, err)
 }
 
+// CLICheck is a non-fatal variant of CLI that does NOT fail the test on a
+// non-zero exit. Use Check() for non-fatal assertions and Errors()/Assert()
+// to collect and report all failures at the end of the test step.
+func (s *Step) CLICheck(args ...string) *CLIResult { //nolint:deadcode
+	s.tc.T.Helper()
+	binary := s.tc.Binary
+	invocation := formatInvocation(binary, args)
+
+	start := time.Now()
+	out, err := RunBinaryInDirWithHome(s.tc.T, binary, "", s.tc.Home, args...)
+	elapsed := time.Since(start)
+
+	s.tc.RunLog.CLIStepErr(s.name+": "+invocation, invocation, strings.TrimSpace(out), err, elapsed)
+
+	return newCLIResultFromCombined(s.tc.RunLog, out, err)
+}
+
 // HTTP makes an authenticated HTTP request to tc.Server + path and returns
 // an *HTTPResult for chainable assertions.  The request uses the auth token
 // from tc.Token and the project ID from tc.ProjectID.

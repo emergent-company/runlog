@@ -41,14 +41,14 @@ func MustRunCLIInDir(t *testing.T, dir string, args ...string) string { //nolint
 // Use this when you need to inspect the credentials written to a specific home.
 func MustRunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) string { //nolint:deadcode
 	t.Helper()
-	return MustRunBinaryInDirWithHome(t, "memory", dir, home, args...)
+	return MustRunBinaryInDirWithHome(t, DefaultBinaryName, dir, home, args...)
 }
 
 // RunCLIInDirWithHome is like MustRunCLIInDirWithHome but returns an error
 // instead of failing the test — used for polling where transient failures are OK.
 func RunCLIInDirWithHome(t *testing.T, dir, home string, args ...string) (string, error) { //nolint:deadcode
 	t.Helper()
-	return RunBinaryInDirWithHome(t, "memory", dir, home, args...)
+	return RunBinaryInDirWithHome(t, DefaultBinaryName, dir, home, args...)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ func MustRunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...
 
 	env := FilteredEnv()
 	env = append(env, "HOME="+home)
-	env = append(env, "PATH="+home+"/.memory/bin:"+os.Getenv("PATH"))
+	env = append(env, "PATH="+home+"/"+DefaultBinaryPath+":"+os.Getenv("PATH"))
 	cmd.Env = env
 
 	var buf bytes.Buffer
@@ -145,7 +145,7 @@ func RunBinaryInDirWithHome(t *testing.T, binary, dir, home string, args ...stri
 	}
 	env := FilteredEnv()
 	env = append(env, "HOME="+home)
-	env = append(env, "PATH="+home+"/.memory/bin:"+os.Getenv("PATH"))
+	env = append(env, "PATH="+home+"/"+DefaultBinaryPath+":"+os.Getenv("PATH"))
 	cmd.Env = env
 
 	out, err := cmd.CombinedOutput()
@@ -182,21 +182,21 @@ func SetupCLIAuth(t *testing.T, home string) { //nolint:deadcode
 		// Write credentials.json so the CLI considers itself authenticated.
 		// Do NOT set api_key — that would make the CLI skip credentials.json.
 		out := MustRunCLIInDirWithHome(t, "", home, "set-token", SetToken(), "--server", srv)
-		logCLISuccessIfActive(t, "memory set-token <token> --server "+srv, out)
+		logCLISuccessIfActive(t, DefaultBinaryName+" set-token <token> --server "+srv, out)
 		out = MustRunCLIInDirWithHome(t, "", home, "config", "set", "server_url", srv)
-		logCLISuccessIfActive(t, "memory config set server_url "+srv, out)
+		logCLISuccessIfActive(t, DefaultBinaryName+" config set server_url "+srv, out)
 		// Some servers don't expose the org-list endpoint for synthetic tokens,
 		// so auto-detection fails.  Set org_id explicitly when provided.
 		if id := OrgID(); id != "" {
 			out = MustRunCLIInDirWithHome(t, "", home, "config", "set", "org_id", id)
-			logCLISuccessIfActive(t, "memory config set org_id "+id, out)
+			logCLISuccessIfActive(t, DefaultBinaryName+" config set org_id "+id, out)
 		}
 	} else {
 		// Standalone: server accepts a plain API key via X-API-Key header.
 		out := MustRunCLIInDirWithHome(t, "", home, "config", "set", "server_url", srv)
-		logCLISuccessIfActive(t, "memory config set server_url "+srv, out)
+		logCLISuccessIfActive(t, DefaultBinaryName+" config set server_url "+srv, out)
 		out = MustRunCLIInDirWithHome(t, "", home, "config", "set", "api_key", E2ETestToken())
-		logCLISuccessIfActive(t, "memory config set api_key ***", out)
+		logCLISuccessIfActive(t, DefaultBinaryName+" config set api_key ***", out)
 	}
 }
 
@@ -221,10 +221,10 @@ func LogStatusPreamble(t *testing.T, home ...string) { //nolint:deadcode
 	}
 
 	args := []string{"status", "--server", ServerURL()}
-	cmd := exec.CommandContext(ctx, "memory", args...)
+	cmd := exec.CommandContext(ctx, DefaultBinaryName, args...)
 	env := FilteredEnv()
 	env = append(env, "HOME="+h)
-	env = append(env, "PATH="+h+"/.memory/bin:"+os.Getenv("PATH"))
+	env = append(env, "PATH="+h+"/"+DefaultBinaryPath+":"+os.Getenv("PATH"))
 	cmd.Env = env
 
 	var buf bytes.Buffer

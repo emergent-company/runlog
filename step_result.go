@@ -18,12 +18,15 @@ import (
 
 // CLIResult holds the output of a CLI invocation and provides chainable
 // assertion methods.  Each assertion logs to RunLog; failures call rl.Failf.
+// For non-fatal check mode (CLICheck), call Errors() and Assert(t) to
+// aggregate failures at the end of a test step.
 type CLIResult struct {
-	rl       *RunLog
-	stdout   string
-	stderr   string
-	exitCode int
-	err      error
+	rl         *RunLog
+	stdout     string
+	stderr     string
+	exitCode   int
+	err        error
+	assertions []string // accumulated non-fatal assertion errors
 }
 
 // newCLIResult constructs a CLIResult from a command's combined output and error.
@@ -79,6 +82,34 @@ func (r *CLIResult) Contains(substrs ...string) *CLIResult { //nolint:deadcode
 		}
 	}
 	return r
+}
+
+// Check is a non-fatal variant of Contains: assertions are accumulated
+// instead of immediately calling rl.Failf. Use Errors() and Assert(t) to
+// collect and report all failures at once.
+func (r *CLIResult) Check(substrs ...string) *CLIResult { //nolint:deadcode
+	for _, sub := range substrs {
+		found := strings.Contains(r.stdout, sub)
+		r.rl.AssertionStep("output contains", sub, found, map[string]any{
+			"context": Truncate(r.stdout, 200),
+		})
+		if !found {
+			r.assertions = append(r.assertions, fmt.Sprintf("output does not contain %q", sub))
+		}
+	}
+	return r
+}
+
+// Errors returns all accumulated non-fatal assertion error messages.
+// Empty when all checks passed.
+func (r *CLIResult) Errors() []string { return r.assertions }
+
+// Assert calls rl.Failf with all accumulated errors if any checks failed.
+// No-op when all checks passed.
+func (r *CLIResult) Assert() {
+	if len(r.assertions) > 0 {
+		r.rl.Failf("%d assertion(s) failed:\n%s", len(r.assertions), strings.Join(r.assertions, "\n"))
+	}
 }
 
 // ContainsAny asserts that stdout contains at least one of the given substrings.

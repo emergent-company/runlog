@@ -427,3 +427,25 @@ tasks:
     deps: [sdk:build]
     cmds:
       - npm publish
+
+  # ── Graphify ────────────────────────────────────────────────────────────────
+
+  graphify:build:
+    desc: Build knowledge graph of the codebase (code-only, no LLM needed)
+    cmds:
+      - graphify . --no-viz
+
+  graphify:update:
+    desc: Incrementally update knowledge graph (only changed files)
+    cmds:
+      - graphify . --update --no-viz
+
+  graphify:query:
+    desc: "Query the knowledge graph. Usage: task graphify:query -- 'how does auth work?'"
+    cmds:
+      - graphify query "{{.CLI_ARGS}}"
+
+  graphify:serve:
+    desc: Start Graphify MCP server (http://localhost:8080)
+    cmds:
+      - python3 -m graphify.serve graphify-out/graph.json --transport http --port 8080

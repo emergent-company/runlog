@@ -28,6 +28,15 @@ import (
 	"time"
 )
 
+// DefaultBinaryName is the CLI binary used by test helpers (MustRunCLI,
+// CreateProject, SetupCLIAuth, etc). Default "memory". Set via TestOpts.Binary
+// or directly before creating tests.
+var DefaultBinaryName = "memory"
+
+// DefaultBinaryPath is the subdirectory appended to HOME in PATH for CLI
+// helpers. Default ".memory/bin". Override for non-Memory binaries.
+var DefaultBinaryPath = ".memory/bin"
+
 // RunLog writes a chronological, timestamped record of every significant event
 // in a test run to a folder that is always created regardless of whether the
 // test passes or is run with -v.
@@ -67,6 +76,11 @@ type RunLog struct {
 	// Auth headers injected into all rl.HTTP* calls when non-empty.
 	httpToken   string
 	httpProject string
+
+	// CLI configuration set once per test via SetCLIPrefix.
+	cliPrefix string // binary name, e.g. "memory"
+	cliDir    string // working directory for CLI commands
+	cliHome   string // HOME directory for CLI commands
 
 	// Current section label — set by Section(), written onto subsequent events.
 	// Empty string = no active section (events are top-level).
@@ -111,29 +125,6 @@ type RunLog struct {
 // ActiveRunLogs maps t.Name() → *RunLog for tests that have an active run log.
 var ActiveRunLogs sync.Map
 
-// deriveTestType classifies a test file by its path suffix.
-func deriveTestType(srcFile string) string {
-	if strings.Contains(srcFile, "/tests/e2e/") || strings.Contains(srcFile, "tests/cli/") || strings.Contains(srcFile, "tests/blueprints/") || strings.Contains(srcFile, "tests/tools/") {
-		return "e2e"
-	}
-	if strings.Contains(srcFile, "tests/api/") || strings.Contains(srcFile, "tests/production/") {
-		return "e2e"
-	}
-	if strings.Contains(srcFile, "tests/integration/") || strings.Contains(srcFile, ".integration.") || strings.Contains(srcFile, "/tests-integration/") {
-		return "integration"
-	}
-	if strings.Contains(srcFile, "tests/experiments/") || strings.Contains(srcFile, "tests/experiments/") {
-		return "benchmark"
-	}
-	if strings.Contains(srcFile, "tests/docs/") {
-		return "docs"
-	}
-	if strings.Contains(srcFile, ".spec.") || strings.Contains(srcFile, "_test.") {
-		return "unit"
-	}
-	return "other"
-}
-
 // NewRunLog creates a per-test log folder and opens run.log inside it.
 // The folder is placed under the logs/ directory used by LogSession.
 // It is safe to call even if the directory cannot be created — all writes
@@ -151,7 +142,7 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 		} else if _, err := os.Stat("/test-logs"); err == nil {
 			logDir = "/test-logs"
 		} else {
-			logDir = filepath.Join(os.TempDir(), "memory-cli-docker-tests")
+			logDir = filepath.Join(os.TempDir(), "runlog-test-logs")
 		}
 	}
 
@@ -185,7 +176,6 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	if du := os.Getenv("RUNLOG_DAEMON_URL"); du != "" {
 		rl.daemon = NewDaemonClient(du)
 
-		rl.testType = deriveTestType(srcFile)
 		if exp := os.Getenv("EXPERIMENT"); exp != "" {
 			rl.experiment = exp
 		}
@@ -235,7 +225,6 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	if db, err := SharedDB(); err == nil && db != nil {
 		envName := os.Getenv("MEMORY_TEST_ENV")
 		envVars := captureEnvVars()
-		rl.testType = deriveTestType(srcFile)
 
 		if id, err := db.InsertRun(t.Name(), rl.StartedAt, Runner(), envName, envVars, rl.testType); err == nil {
 			rl.db = db
@@ -748,7 +737,7 @@ func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string { //nolint:dea
 	start := time.Now()
 	out := MustRunCLI(t, args...)
 	elapsed := time.Since(start)
-	invocation := "memory " + strings.Join(args, " ")
+	invocation := DefaultBinaryName + " " + strings.Join(args, " ")
 	rl.CLIErr(invocation, out, nil, elapsed)
 	return out
 }
@@ -759,11 +748,25 @@ func (rl *RunLog) MustRunCLI(t *testing.T, args ...string) string { //nolint:dea
 //	rl.MustRunCLIResult(t, "create", "--name", "x").Contains("Created").ExitCode(0)
 //	rl.MustRunCLIResult(t, "create", "--name", "x").Expect(ExpectContains("Created"), ExpectExitCode(0))
 func (rl *RunLog) MustRunCLIResult(t *testing.T, args ...string) *CLIResult { //nolint:deadcode
+	return rl.MustRunCLIResultHome(t, DefaultBinaryName, "", "", args...)
+}
+
+// MustRunCLIResultHome is like MustRunCLIResult but accepts explicit prefix, dir,
+// and home parameters for the CLI invocation. The prefix is prepended to the
+// invocation string in the CLI event (e.g., "memory args...").
+func (rl *RunLog) MustRunCLIResultHome(t *testing.T, prefix, dir, home string, args ...string) *CLIResult { //nolint:deadcode
 	t.Helper()
 	start := time.Now()
-	out, err := RunCLIInDirWithHome(t, "", t.TempDir(), args...)
+	if home == "" {
+		home = t.TempDir()
+	}
+	out, err := RunCLIInDirWithHome(t, dir, home, args...)
 	elapsed := time.Since(start)
-	invocation := "memory " + strings.Join(args, " ")
+	invocation := prefix
+	if invocation == "" {
+		invocation = DefaultBinaryName
+	}
+	invocation += " " + strings.Join(args, " ")
 	rl.CLIErr(invocation, out, err, elapsed)
 	return newCLIResultFromCombined(rl, out, err)
 }
@@ -774,7 +777,7 @@ func (rl *RunLog) MustRunCLIInDir(t *testing.T, dir string, args ...string) stri
 	start := time.Now()
 	out := MustRunCLIInDir(t, dir, args...)
 	elapsed := time.Since(start)
-	invocation := "memory " + strings.Join(args, " ")
+	invocation := DefaultBinaryName + " " + strings.Join(args, " ")
 	rl.CLIErr(invocation, out, nil, elapsed)
 	return out
 }
@@ -790,7 +793,7 @@ func (rl *RunLog) MustRunCLIInDirWithHome(t *testing.T, dir, home string, args .
 	start := time.Now()
 	out := MustRunCLIInDirWithHome(t, dir, home, args...)
 	elapsed := time.Since(start)
-	invocation := "memory " + strings.Join(args, " ")
+	invocation := DefaultBinaryName + " " + strings.Join(args, " ")
 	rl.CLIErr(invocation, out, nil, elapsed)
 	return out
 }
@@ -805,9 +808,40 @@ func (rl *RunLog) RunCLIInDirWithHome(t *testing.T, dir, home string, args ...st
 	start := time.Now()
 	out, err := RunCLIInDirWithHome(t, dir, home, args...)
 	elapsed := time.Since(start)
-	invocation := "memory " + strings.Join(args, " ")
+	invocation := DefaultBinaryName + " " + strings.Join(args, " ")
 	rl.CLIErr(invocation, out, err, elapsed)
 	return out, err
+}
+
+// SetCLIPrefix stores the binary name, working directory, and home directory
+// used by all subsequent RunCLI and RunCLIErr calls. Call once per test.
+func (rl *RunLog) SetCLIPrefix(prefix, dir, home string) { //nolint:deadcode
+	rl.cliPrefix = prefix
+	rl.cliDir = dir
+	rl.cliHome = home
+}
+
+// RunCLI runs the binary configured via SetCLIPrefix with the given arguments,
+// logs a CLI event, and returns a *CLIResult for chainable assertions.
+// Fails the test on non-zero exit (logged before t.Fatalf).
+func (rl *RunLog) RunCLI(args ...string) *CLIResult { //nolint:deadcode
+	rl.t.Helper()
+	prefix := rl.cliPrefix
+	if prefix == "" {
+		prefix = DefaultBinaryName
+	}
+	return rl.MustRunCLIResultHome(rl.t, prefix, rl.cliDir, rl.cliHome, args...)
+}
+
+// RunCLIErr is like RunCLI but returns (output, error) instead of failing the test.
+// Useful for polling loops where transient errors are expected.
+func (rl *RunLog) RunCLIErr(args ...string) (string, error) { //nolint:deadcode
+	rl.t.Helper()
+	prefix := rl.cliPrefix
+	if prefix == "" {
+		prefix = DefaultBinaryName
+	}
+	return rl.RunCLIInDirWithHome(rl.t, rl.cliDir, rl.cliHome, args...)
 }
 
 // CLIStep is like CLI but uses desc as the short message shown in the run list
@@ -1633,10 +1667,10 @@ func isSensitiveKey(key string) bool {
 func captureEnvVars() map[string]string { //nolint:deadcode
 	trackedVars := []string{
 		"GOOGLE_AI_API_KEY",
-		"MEMORY_TEST_SERVER",
-		"MEMORY_TEST_TOKEN",
-		"MEMORY_AUTH_MODE",
-		"MEMORY_ORG_ID",
+		"MEMORY_TEST_SERVER", "RUNLOG_TEST_SERVER",
+		"MEMORY_TEST_TOKEN", "RUNLOG_TEST_TOKEN",
+		"MEMORY_AUTH_MODE", "RUNLOG_AUTH_MODE",
+		"MEMORY_ORG_ID", "RUNLOG_ORG_ID",
 		"BRAVE_SEARCH_API_KEY",
 		"OPENAI_API_KEY",
 		"ANTHROPIC_API_KEY",

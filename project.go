@@ -26,7 +26,7 @@ func CreateProject(t *testing.T, home, srv, name string) string { //nolint:deadc
 	t.Helper()
 	args := append([]string{"projects", "create", "--name", name}, ProjectCreateOrgArgs()...)
 	out := MustRunCLIInDirWithHome(t, "", home, args...)
-	logCLISuccessIfActive(t, "memory "+strings.Join(args, " "), out)
+	logCLISuccessIfActive(t, DefaultBinaryName+" "+strings.Join(args, " "), out)
 	t.Logf("projects create:\n%s", out)
 
 	projectID := ParseProjectID(out)
@@ -67,8 +67,8 @@ func DeleteProjectOnCleanup(t *testing.T, home, projectID string) { //nolint:dea
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "memory", "projects", "delete", projectID)
-		cmd.Env = append(FilteredEnv(), "HOME="+home, "PATH="+home+"/.memory/bin:"+os.Getenv("PATH"))
+		cmd := exec.CommandContext(ctx, DefaultBinaryName, "projects", "delete", projectID)
+		cmd.Env = append(FilteredEnv(), "HOME="+home, "PATH="+home+"/"+DefaultBinaryPath+":"+os.Getenv("PATH"))
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Logf("warn: failed to delete project %s: %v\n%s", projectID, err, out)
 		} else {
@@ -355,7 +355,63 @@ func stringContains(s, substr string) bool { //nolint:deadcode
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Daemon integration helpers (best-effort, fail-open)
+// ProjectHandle — records project lifecycle events, auto-auth, provider config
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ProjectHandle wraps a created project with its metadata and a logger that
+// records lifecycle events (create, configure, delete) to the run log.
+type ProjectHandle struct {
+	ID    string
+	Name  string
+	Home  string
+	Srv   string
+	Token string
+	rl    *RunLog
+	t     *testing.T
+}
 
+// SetupTestProject creates an ephemeral project, configures the LLM provider
+// from environment variables (when available), sets project_id in the CLI config,
+// registers the project with the daemon (when running), sets HTTP auth on rl,
+// stores the CLI prefix for subsequent RunCLI calls, and registers a t.Cleanup
+// that deletes the project.
+//
+// This is the one-stop project setup for most e2e tests. Returns a *ProjectHandle
+// whose ID and Name are available for subsequent CLI and HTTP calls.
+//
+// Caller must still call requireServerReady / skipIfServerDown separately.
+func (rl *RunLog) SetupTestProject(name, home, srv, token string) *ProjectHandle {
+	rl.t.Helper()
+	rl.Section("Create project")
+
+	id := CreateProject(rl.t, home, srv, name)
+	p := &ProjectHandle{ID: id, Name: name, Home: home, Srv: srv, Token: token, rl: rl, t: rl.t}
+
+	rl.Printf("project: %s (%s)", name, id)
+	rl.SetCLIPrefix(DefaultBinaryName, "", home)
+	rl.SetHTTPAuth(token, id)
+
+	DeleteProjectOnCleanup(rl.t, home, id)
+
+	p.configureProvider()
+	return p
+}
+
+// configureProvider reads the LLM provider from env vars and configures it
+// for the project via the CLI. Skips silently if no provider is configured.
+func (p *ProjectHandle) configureProvider() { //nolint:deadcode
+	SetupTestProvider(p.t, p.rl, p.Home, p.ID)
+}
+
+// Delete cleans up the project immediately (for manual cleanup outside t.Cleanup).
+func (p *ProjectHandle) Delete() { //nolint:deadcode
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, DefaultBinaryName, "projects", "delete", p.ID)
+	cmd.Env = append(FilteredEnv(), "HOME="+p.Home, "PATH="+p.Home+"/"+DefaultBinaryPath+":"+os.Getenv("PATH"))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		p.rl.Printf("warn: delete project %s failed: %v\n%s", p.Name, err, out)
+	} else {
+		p.rl.Printf("deleted project %s (%s)", p.Name, p.ID)
+	}
+}

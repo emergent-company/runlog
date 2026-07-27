@@ -2433,5 +2433,5 @@ func dbPath() string { //nolint:deadcode
 		return filepath.Join(runlogDir, "runs.db")
 	}
 
-	return filepath.Join(os.TempDir(), "memory-cli-docker-tests", "runs.db")
+	return filepath.Join(os.TempDir(), "runlog-test-logs", "runs.db")
 }

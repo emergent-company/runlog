@@ -39,3 +39,5 @@ coverage.out
 Thumbs.db
 .vscode/
 .env.local
+# Graphify knowledge graph output
+graphify-out/
