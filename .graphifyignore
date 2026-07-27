@@ -1,0 +1,8 @@
+vendor/
+tmp/
+dist/
+tests/web/node_modules/
+sdk/typescript/node_modules/
+.opencode/node_modules/
+graphify-out/
+logs/

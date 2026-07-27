@@ -3,6 +3,7 @@ version: "3"
 
 dotenv:
   - .env
+  - .env.local
 
 vars:
   DAEMON_PID_FILE: /tmp/runlog-daemon.pid
@@ -247,11 +248,6 @@ tasks:
       - task: dogfood:stop
       - task: dogfood:start
 
-  dogfood:status:
-    desc: Check dogfood daemon status
-    cmds:
-      - curl -s http://localhost:{{.DOGFOOD_PORT}}/status | python3 -m json.tool || echo "Not running"
-
   dogfood:server:
     desc: "Run dogfood daemon in foreground with hot-reload (preserves existing DB, Ctrl+C to stop)"
     env:
@@ -431,14 +427,14 @@ tasks:
   # ── Graphify ────────────────────────────────────────────────────────────────
 
   graphify:build:
-    desc: Build knowledge graph of the codebase (code-only, no LLM needed)
+    desc: Build knowledge graph (AST + DeepSeek for docs/labels)
     cmds:
-      - graphify . --no-viz
+      - graphify . --no-viz --backend deepseek
 
   graphify:update:
     desc: Incrementally update knowledge graph (only changed files)
     cmds:
-      - graphify . --update --no-viz
+      - graphify . --update --no-viz --backend deepseek
 
   graphify:query:
     desc: "Query the knowledge graph. Usage: task graphify:query -- 'how does auth work?'"
