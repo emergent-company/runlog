@@ -1,0 +1,129 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+	"github.com/emergent-company/go-daisy/staticfs"
+)
+
+// PopoverTriggerType controls how the popover is triggered.
+type PopoverTriggerType string
+
+const (
+	PopoverTriggerClick PopoverTriggerType = "click"
+	PopoverTriggerHover PopoverTriggerType = "hover"
+)
+
+// PopoverPlacement controls where the popover appears relative to the trigger.
+type PopoverPlacement string
+
+const (
+	PopoverTop    PopoverPlacement = "top"
+	PopoverBottom PopoverPlacement = "bottom"
+	PopoverLeft   PopoverPlacement = "left"
+	PopoverRight  PopoverPlacement = "right"
+)
+
+// PopoverRootProps configures the root container for a popover.
+type PopoverRootProps struct {
+	Class string
+	Attrs templ.Attributes
+}
+
+// PopoverTriggerProps configures the trigger element that opens the popover.
+type PopoverTriggerProps struct {
+	TriggerType PopoverTriggerType
+	Class       string
+	Attrs       templ.Attributes
+}
+
+// PopoverContentProps configures the floating content panel.
+type PopoverContentProps struct {
+	Placement        PopoverPlacement
+	Offset           int // px from trigger, default 8
+	ShowArrow        bool
+	DisableClickaway bool
+	Exclusive        bool // close sibling popovers on open
+	Class            string
+	Attrs            templ.Attributes
+}
+
+// Popover renders a popover root container that scopes the trigger
+// and content for JS event delegation.
+templ Popover(props ...PopoverRootProps) {
+	{{ var p PopoverRootProps
+	if len(props) > 0 { p = props[0] } }}
+	<div
+		data-gd-popover-root
+		class={ "contents", p.Class }
+		{ devmode.Attrs(ctx, "ui/Popover")... }
+		{ p.Attrs... }
+	>
+		{ children... }
+	</div>
+}
+
+// PopoverTrigger renders the element that opens the popover on click or hover.
+templ PopoverTrigger(props ...PopoverTriggerProps) {
+	{{ var p PopoverTriggerProps
+	if len(props) > 0 { p = props[0] }
+	if p.TriggerType == "" { p.TriggerType = PopoverTriggerClick } }}
+	<button
+		type="button"
+		data-gd-popover-trigger
+		data-gd-popover-type={ string(p.TriggerType) }
+		class={ p.Class }
+		{ devmode.Attrs(ctx, "ui/PopoverTrigger")... }
+		{ p.Attrs... }
+	>
+		{ children... }
+	</button>
+}
+
+// PopoverContent renders the floating popover panel using the native
+// popover attribute. JS handles positioning and open/close logic.
+templ PopoverContent(props ...PopoverContentProps) {
+	{{ var p PopoverContentProps
+	if len(props) > 0 { p = props[0] }
+	if p.Placement == "" { p.Placement = PopoverBottom }
+	if p.Offset == 0 { p.Offset = 8 } }}
+	<div
+		popover="manual"
+		data-gd-popover-content
+		data-gd-popover-open="false"
+		data-gd-popover-placement={ string(p.Placement) }
+		data-gd-popover-offset={ strconv.Itoa(p.Offset) }
+		class={
+			"z-50 rounded-box bg-base-100 border border-base-200 shadow-lg p-0",
+			"m-0 [&:popover-open]:opacity-100 opacity-0 transition-opacity duration-150",
+			p.Class,
+		}
+		if p.DisableClickaway {
+			data-gd-popover-disable-clickaway="true"
+		}
+		if p.Exclusive {
+			data-gd-popover-exclusive="true"
+		}
+		{ devmode.Attrs(ctx, "ui/PopoverContent")... }
+		{ p.Attrs... }
+	>
+		{ children... }
+		if p.ShowArrow {
+			<div
+				data-gd-popover-arrow
+				class="absolute size-2 rotate-45 bg-inherit border-b border-r border-base-200 [&:popover-open]:opacity-100 opacity-0"
+			></div>
+		}
+	</div>
+}
+
+var popoverScriptOnce = templ.NewOnceHandle()
+
+// PopoverScript loads the go-daisy-popover.js runtime once per page.
+// Include wherever popovers are used; deduplicated via OnceHandle.
+templ PopoverScript() {
+	@popoverScriptOnce.Once() {
+		@templ.Raw(staticfs.Script("/js/go-daisy-popover.js"))
+	}
+}

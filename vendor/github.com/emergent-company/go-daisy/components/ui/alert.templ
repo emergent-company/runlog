@@ -2,24 +2,25 @@ package ui
 
 import "github.com/emergent-company/go-daisy/devmode"
 
-// AlertType maps to a DaisyUI alert modifier class.
-type AlertType string
-
-const (
-	AlertSuccess AlertType = "alert-success"
-	AlertError   AlertType = "alert-error"
-	AlertWarning AlertType = "alert-warning"
-	AlertInfo    AlertType = "alert-info"
-)
-
 // Alert renders a DaisyUI alert banner.
+// style controls the visual variant (solid/soft/outline/dash).
 // Set icon to a Lucide icon suffix (e.g. "lucide--circle-check") to show an icon.
 // Leave icon empty for a text-only alert.
 // attrs is optional; pass nil when not needed.
 templ Alert(typ AlertType, icon string, message string, attrs templ.Attributes) {
-	<div role="alert" class={ "alert", string(typ) } { devmode.Attrs(ctx, "ui/Alert")... } { attrs... }>
+	<div role="alert" class={ "alert", templ.KV(string(typ), typ != "") } { devmode.Attrs(ctx, "ui/Alert")... } { attrs... }>
 		if icon != "" {
-			<span class={ "iconify size-5 " + icon }></span>
+			@IconSpan(icon, "size-5")
+		}
+		<span>{ message }</span>
+	</div>
+}
+
+// AlertStyled renders a DaisyUI alert with both type and style.
+templ AlertStyled(typ AlertType, style AlertStyle, icon string, message string, attrs templ.Attributes) {
+	<div role="alert" class={ "alert", templ.KV(string(typ), typ != ""), templ.KV(string(style), style != "") } { devmode.Attrs(ctx, "ui/AlertStyled")... } { attrs... }>
+		if icon != "" {
+			@IconSpan(icon, "size-5")
 		}
 		<span>{ message }</span>
 	</div>

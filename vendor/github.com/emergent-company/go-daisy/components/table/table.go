@@ -1,12 +1,8 @@
 package table
 
-// ternary returns a if cond is true, else b.
-func ternary(cond bool, a, b string) string {
-	if cond {
-		return a
-	}
-	return b
-}
+import "github.com/emergent-company/go-daisy/shared"
+
+func ternary(cond bool, a, b string) string { return shared.Ternary(cond, a, b) }
 
 // dataTablePageSize returns the page size with default fallback.
 func dataTablePageSize(n int) int {

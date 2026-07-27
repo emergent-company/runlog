@@ -20,17 +20,13 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	runlog "github.com/emergent-company/runlog"
 )
@@ -124,32 +120,36 @@ EXAMPLES
 		return fmt.Errorf("getwd: %w", err)
 	}
 
-	// snapshot which keys were already in the environment before loading files
-	// so we can report what was loaded without re-implementing LoadDotEnvFrom.
-	runlog.LoadDotEnvFrom(wd)
-
-	// Ensure MEMORY_TEST_ENV is exported so the Go test framework picks it up.
+	// Set MEMORY_TEST_ENV before LoadDotEnvFrom so the profile overlay
+	// (.env.<profile>) is picked up during env loading.
 	if profile != "" {
 		os.Setenv("MEMORY_TEST_ENV", profile)
 	}
+
+	// snapshot which keys were already in the environment before loading files
+	// so we can report what was loaded without re-implementing LoadDotEnvFrom.
+	runlog.LoadDotEnvFrom(wd)
 
 	// Ensure EXPERIMENT is exported so RunLog.NewRunLog picks it up in tests.
 	if experiment != "" {
 		os.Setenv("EXPERIMENT", experiment)
 	}
 
-	// ── Register with daemon (fail-open) ──────────────────────────────────
-	registerRunWithDaemon(profile)
+	// Discover org ID now so all child test binaries inherit it.
+	// Avoids concurrent server requests from parallel go test packages.
+	if org := runlog.DiscoverOrgIDForce(); org != "" {
+		os.Setenv("MEMORY_ORG_ID", org)
+	}
 
 	// ── Build go test flags ────────────────────────────────────────────────
-	goFlags := []string{"test", "-timeout", "10m"}
+	goFlags := []string{"test", "-count=1", "-timeout", "10m"}
 	// Determine which package(s) to test.
 	// When a filter is set, find the package containing the test to avoid
 	// "[no tests to run]" noise from unrelated packages.
 	testPkgs := findTestPackages(wd, runFilter)
 	if runFilter != "" {
-		// Single-test mode: verbose + skip cache so output is always shown.
-		goFlags = append(goFlags, "-v", "-count=1", "-run", runFilter)
+		// Single-test mode: verbose so output is always shown.
+		goFlags = append(goFlags, "-v", "-run", runFilter)
 	}
 	goFlags = append(goFlags, extraFlags...)
 	goFlags = append(goFlags, testPkgs...)
@@ -232,19 +232,11 @@ EXAMPLES
 	}
 
 	cmd := exec.Command(goPath, goFlags...)
-	cmd.Env = os.Environ()
-
-	var outputBuf strings.Builder
-	cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
-	cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err = cmd.Run()
-
-	// Save captured output to the daemon if registered.
-	if rid := os.Getenv("RUNLOG_RUN_ID"); rid != "" {
-		saveRawOutput(rid, outputBuf.String())
-	}
-
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			os.Exit(exitErr.ExitCode())
@@ -252,21 +244,6 @@ EXAMPLES
 		return fmt.Errorf("go test: %w", err)
 	}
 	return nil
-}
-
-// saveRawOutput PUTs captured stdout/stderr to the daemon's /runs/:rid/output
-// endpoint for storage in test_runs.raw_output.
-func saveRawOutput(runID, output string) {
-	dURL := daemonURL()
-	body, _ := json.Marshal(map[string]string{"output": output})
-	req, _ := http.NewRequest("PUT", dURL+"/runs/"+runID+"/output", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	resp.Body.Close()
 }
 
 // findTestPackages returns the Go package patterns to pass to go test.
@@ -325,53 +302,6 @@ func envNames(cfg *runlog.Config) string {
 		return "(none)"
 	}
 	return strings.Join(names, ", ")
-}
-
-// registerRunWithDaemon attempts to register the current run with the local
-// daemon. On success, RUNLOG_RUN_ID and RUNLOG_DAEMON_URL are set in the
-// process environment so the exec'd go test process inherits them.
-// Any error is silently ignored (fail-open).
-func registerRunWithDaemon(profile string) {
-	dURL := daemonURL()
-
-	// Quick reachability check with a short timeout
-	client := &http.Client{Timeout: 500 * time.Millisecond}
-	healthResp, err := client.Get(dURL + "/health")
-	if err != nil {
-		return // daemon not running — proceed normally
-	}
-	_ = healthResp.Body.Close()
-	if healthResp.StatusCode != http.StatusOK {
-		return
-	}
-
-	body, _ := json.Marshal(map[string]any{
-		"pid":         os.Getpid(),
-		"env_profile": profile,
-		"server_url":  os.Getenv("MEMORY_TEST_SERVER"),
-		"token":       os.Getenv("MEMORY_TEST_TOKEN"),
-	})
-
-	resp, err := client.Post(dURL+"/runs", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusCreated {
-		return
-	}
-
-	respBody, _ := io.ReadAll(resp.Body)
-	var result struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(respBody, &result); err != nil || result.ID == "" {
-		return
-	}
-
-	// Inject into current process env so the spawned go test process inherits them
-	os.Setenv("RUNLOG_RUN_ID", result.ID)
-	os.Setenv("RUNLOG_DAEMON_URL", dURL)
 }
 
 // testFuncRe matches Go test function declarations: func TestXxx(t *testing.T) or (tb testing.TB).

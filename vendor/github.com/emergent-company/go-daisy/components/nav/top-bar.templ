@@ -2,13 +2,72 @@ package nav
 
 import "github.com/emergent-company/go-daisy/devmode"
 
-// TopBar renders the page title + primary action button row at the top of a content area.
-// attrs is optional; pass nil when not needed.
-templ TopBar(title string, attrs templ.Attributes) {
-	<div class="flex items-center justify-between px-4 py-4 bg-base-100 border-b border-base-200" { devmode.Attrs(ctx, "nav/TopBar")... } { attrs... }>
-		<h1 class="text-xl font-semibold text-base-content">{ title }</h1>
+var topbarScrollOnce = templ.NewOnceHandle()
+
+type TopBarProps struct {
+	Title       string
+	ScrollAware bool
+	Class       string
+	Attrs       templ.Attributes
+}
+
+templ TopBar(props TopBarProps) {
+	<div
+		if props.ScrollAware {
+			id="_scroll-topbar"
+			data-scroll-topbar
+		}
+		class={
+			"flex items-center justify-between border-b border-base-200",
+			templ.KV("px-4 py-4 bg-base-100", !props.ScrollAware),
+			templ.KV("px-4 py-3 bg-base-100/80 backdrop-blur-sm sticky top-0 z-10 transition-transform duration-300", props.ScrollAware),
+			props.Class,
+		}
+		{ devmode.Attrs(ctx, "nav/TopBar")... }
+		{ props.Attrs... }
+	>
+		<h1 class="text-xl font-semibold text-base-content">{ props.Title }</h1>
 		<div class="flex items-center gap-2">
 			{ children... }
 		</div>
 	</div>
+	if props.ScrollAware {
+		@topbarScrollScript()
+	}
+}
+
+templ topbarScrollScript() {
+	@topbarScrollOnce.Once() {
+		<script>
+	if (!window._topbarScrollInit) {
+	  window._topbarScrollInit = true;
+
+	  var topbar = document.getElementById('_scroll-topbar');
+	  if (!topbar || !topbar.dataset.scrollTopbar) return;
+
+	  var lastScrollY = window.scrollY;
+	  var ticking = false;
+
+	  window.addEventListener('scroll', function() {
+	    if (!ticking) {
+	      window.requestAnimationFrame(function() {
+	        var currentScrollY = window.scrollY;
+	        if (currentScrollY > 100) {
+	          if (currentScrollY > lastScrollY) {
+	            topbar.style.transform = 'translateY(-100%)';
+	          } else {
+	            topbar.style.transform = 'translateY(0)';
+	          }
+	        } else {
+	          topbar.style.transform = 'translateY(0)';
+	        }
+	        lastScrollY = currentScrollY;
+	        ticking = false;
+	      });
+	      ticking = true;
+	    }
+	  });
+	}
+	</script>
+	}
 }

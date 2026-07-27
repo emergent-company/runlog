@@ -15,16 +15,16 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(passRun1, 1, startBase, 0, "state_change", "test started", nil)
+	db.InsertEvent(passRun1, 1, startBase, 0, "state_change", "test started", nil, "")
 	sectionID, _ := db.InsertGroupEvent(passRun1, 2, startBase.Add(2*time.Second), 2, "section", "setup phase")
 	db.AppendGroupChildren(sectionID, []runlog.ChildEvent{
 		{ElapsedS: 2, Kind: "cli", Message: "go build ./..."},
 		{ElapsedS: 3, Kind: "log", Message: "build succeeded (3 packages)"},
 	})
-	db.InsertEvent(passRun1, 3, startBase.Add(5*time.Second), 5, "cli", "go test -v -run TestPass ./...", nil)
-	db.InsertEvent(passRun1, 4, startBase.Add(6*time.Second), 6, "log", "=== RUN   TestPass", nil)
-	db.InsertEvent(passRun1, 5, startBase.Add(7*time.Second), 7, "log", "--- PASS: TestPass (0.01s)", nil)
-	db.InsertEvent(passRun1, 6, startBase.Add(8*time.Second), 8, "state_change", "test finished", nil)
+	db.InsertEvent(passRun1, 3, startBase.Add(5*time.Second), 5, "cli", "go test -v -run TestPass ./...", nil, "")
+	db.InsertEvent(passRun1, 4, startBase.Add(6*time.Second), 6, "log", "=== RUN   TestPass", nil, "")
+	db.InsertEvent(passRun1, 5, startBase.Add(7*time.Second), 7, "log", "--- PASS: TestPass (0.01s)", nil, "")
+	db.InsertEvent(passRun1, 6, startBase.Add(8*time.Second), 8, "state_change", "test finished", nil, "")
 	finish := startBase.Add(8 * time.Second)
 	db.FinishRun(passRun1, finish, runlog.OutcomePass, "")
 
@@ -34,17 +34,17 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(failRun1, 1, failStart, 0, "state_change", "test started", nil)
-	db.InsertEvent(failRun1, 2, failStart.Add(1*time.Second), 1, "cli", "go test -v -run TestFail ./...", nil)
-	db.InsertEvent(failRun1, 3, failStart.Add(2*time.Second), 2, "log", "=== RUN   TestFail", nil)
-	db.InsertEvent(failRun1, 4, failStart.Add(3*time.Second), 3, "log", "    fail_test.go:20: expected 42, got 0", nil)
+	db.InsertEvent(failRun1, 1, failStart, 0, "state_change", "test started", nil, "")
+	db.InsertEvent(failRun1, 2, failStart.Add(1*time.Second), 1, "cli", "go test -v -run TestFail ./...", nil, "")
+	db.InsertEvent(failRun1, 3, failStart.Add(2*time.Second), 2, "log", "=== RUN   TestFail", nil, "")
+	db.InsertEvent(failRun1, 4, failStart.Add(3*time.Second), 3, "log", "    fail_test.go:20: expected 42, got 0", nil, "")
 	db.InsertEvent(failRun1, 5, failStart.Add(5*time.Second), 5, "failure", "assertion failed at fail_test.go:20", map[string]any{
 		"expected": 42,
 		"actual":   0,
 		"file":     "fail_test.go",
 		"line":     20,
-	})
-	db.InsertEvent(failRun1, 6, failStart.Add(6*time.Second), 6, "log", "--- FAIL: TestFail (0.02s)", nil)
+	}, "")
+	db.InsertEvent(failRun1, 6, failStart.Add(6*time.Second), 6, "log", "--- FAIL: TestFail (0.02s)", nil, "")
 	db.FinishRun(failRun1, failStart.Add(6*time.Second), runlog.OutcomeFail, "expected 42, got 0")
 
 	// second run of TestFail — passes
@@ -52,11 +52,11 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(failRun2, 1, failStart.Add(1*time.Hour), 0, "state_change", "test started", nil)
-	db.InsertEvent(failRun2, 2, failStart.Add(1*time.Hour).Add(1*time.Second), 1, "cli", "go test -v -run TestFail ./...", nil)
-	db.InsertEvent(failRun2, 3, failStart.Add(1*time.Hour).Add(2*time.Second), 2, "log", "=== RUN   TestFail", nil)
-	db.InsertEvent(failRun2, 4, failStart.Add(1*time.Hour).Add(3*time.Second), 3, "log", "--- PASS: TestFail (0.01s)", nil)
-	db.InsertEvent(failRun2, 5, failStart.Add(1*time.Hour).Add(4*time.Second), 4, "state_change", "test finished", nil)
+	db.InsertEvent(failRun2, 1, failStart.Add(1*time.Hour), 0, "state_change", "test started", nil, "")
+	db.InsertEvent(failRun2, 2, failStart.Add(1*time.Hour).Add(1*time.Second), 1, "cli", "go test -v -run TestFail ./...", nil, "")
+	db.InsertEvent(failRun2, 3, failStart.Add(1*time.Hour).Add(2*time.Second), 2, "log", "=== RUN   TestFail", nil, "")
+	db.InsertEvent(failRun2, 4, failStart.Add(1*time.Hour).Add(3*time.Second), 3, "log", "--- PASS: TestFail (0.01s)", nil, "")
+	db.InsertEvent(failRun2, 5, failStart.Add(1*time.Hour).Add(4*time.Second), 4, "state_change", "test finished", nil, "")
 	db.FinishRun(failRun2, failStart.Add(1*time.Hour).Add(4*time.Second), runlog.OutcomePass, "")
 
 	// --- TestSkip: one skipped run ---
@@ -65,11 +65,11 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(skipRun1, 1, skipStart, 0, "state_change", "test started", nil)
-	db.InsertEvent(skipRun1, 2, skipStart.Add(1*time.Second), 1, "cli", "go test -v -run TestSkip ./...", nil)
-	db.InsertEvent(skipRun1, 3, skipStart.Add(2*time.Second), 2, "log", "=== RUN   TestSkip", nil)
-	db.InsertEvent(skipRun1, 4, skipStart.Add(3*time.Second), 3, "skip", "TestSkip requires Redis", nil)
-	db.InsertEvent(skipRun1, 5, skipStart.Add(4*time.Second), 4, "log", "--- SKIP: TestSkip (0.01s)", nil)
+	db.InsertEvent(skipRun1, 1, skipStart, 0, "state_change", "test started", nil, "")
+	db.InsertEvent(skipRun1, 2, skipStart.Add(1*time.Second), 1, "cli", "go test -v -run TestSkip ./...", nil, "")
+	db.InsertEvent(skipRun1, 3, skipStart.Add(2*time.Second), 2, "log", "=== RUN   TestSkip", nil, "")
+	db.InsertEvent(skipRun1, 4, skipStart.Add(3*time.Second), 3, "skip", "TestSkip requires Redis", nil, "")
+	db.InsertEvent(skipRun1, 5, skipStart.Add(4*time.Second), 4, "log", "--- SKIP: TestSkip (0.01s)", nil, "")
 	db.FinishRun(skipRun1, skipStart.Add(4*time.Second), runlog.OutcomeSkip, "TestSkip requires Redis")
 
 	// --- TestMetrics: one pass run with token usage, cost, env_vars ---
@@ -79,7 +79,7 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(metricsRun1, 1, metricsStart, 0, "state_change", "test started", nil)
+	db.InsertEvent(metricsRun1, 1, metricsStart, 0, "state_change", "test started", nil, "")
 	agentSection, _ := db.InsertGroupEvent(metricsRun1, 2, metricsStart.Add(2*time.Second), 2, "section", "agent: researcher")
 	db.AppendGroupChildren(agentSection, []runlog.ChildEvent{
 		{ElapsedS: 2, Kind: "metric", Message: "researcher completed in 2.5s (in: 450, out: 1200, cost: $0.003)"},
@@ -89,7 +89,7 @@ func seed(db *runlog.RunDB) error {
 		"input_tokens":  800,
 		"output_tokens": 2400,
 		"cost_usd":      0.006,
-	})
+	}, "")
 	db.InsertEvent(metricsRun1, 4, metricsStart.Add(6*time.Second), 6, "token_summary", "total: input=1250 output=3600 cost=$0.009", map[string]any{
 		"total_runs":    1,
 		"input_tokens":  1250,
@@ -102,14 +102,14 @@ func seed(db *runlog.RunDB) error {
 				"cost_usd":      0.003,
 			},
 		},
-	})
+	}, "")
 	db.InsertEvent(metricsRun1, 5, metricsStart.Add(7*time.Second), 7, "gantt", "agent timeline", map[string]any{
 		"total_s": 7,
 		"rows": []map[string]any{
 			{"agent_name": "researcher", "start_s": 0, "end_s": 2.5, "duration_ms": 2500},
 			{"agent_name": "planner", "start_s": 2.5, "end_s": 5.0, "duration_ms": 2500},
 		},
-	})
+	}, "")
 	db.FinishRunWithCost(metricsRun1, metricsStart.Add(7*time.Second), runlog.OutcomePass, "",
 		1250, 3600, 0.009)
 
@@ -119,7 +119,7 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(tagsRun1, 1, tagsStart, 0, "state_change", "test started", nil)
+	db.InsertEvent(tagsRun1, 1, tagsStart, 0, "state_change", "test started", nil, "")
 	sectionID2, _ := db.InsertGroupEvent(tagsRun1, 2, tagsStart.Add(1*time.Second), 1, "section", "validation")
 	db.AppendGroupChildren(sectionID2, []runlog.ChildEvent{
 		{ElapsedS: 1, Kind: "cli", Message: "go vet ./..."},
@@ -127,8 +127,8 @@ func seed(db *runlog.RunDB) error {
 	})
 	db.InsertEvent(tagsRun1, 3, tagsStart.Add(3*time.Second), 3, "tag", "variant: baseline", map[string]any{
 		"tags": []string{"variant:baseline", "run:1"},
-	})
-	db.InsertEvent(tagsRun1, 4, tagsStart.Add(4*time.Second), 4, "log", "--- PASS: TestWithTags (0.02s)", nil)
+	}, "")
+	db.InsertEvent(tagsRun1, 4, tagsStart.Add(4*time.Second), 4, "log", "--- PASS: TestWithTags (0.02s)", nil, "")
 	db.FinishRun(tagsRun1, tagsStart.Add(4*time.Second), runlog.OutcomePass, "")
 	db.UpdateRunTags(tagsRun1, []string{"variant:baseline", "run:1"})
 	db.UpdateRunExperiment(tagsRun1, "exp-tag-demo")
@@ -143,9 +143,9 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(passRun2, 1, startBase.Add(115*time.Minute), 0, "state_change", "test started", nil)
-	db.InsertEvent(passRun2, 2, startBase.Add(115*time.Minute).Add(1*time.Second), 1, "cli", "go test -v -run TestPass ./...", nil)
-	db.InsertEvent(passRun2, 3, startBase.Add(115*time.Minute).Add(2*time.Second), 2, "log", "=== RUN   TestPass\n--- PASS: TestPass (0.01s)", nil)
+	db.InsertEvent(passRun2, 1, startBase.Add(115*time.Minute), 0, "state_change", "test started", nil, "")
+	db.InsertEvent(passRun2, 2, startBase.Add(115*time.Minute).Add(1*time.Second), 1, "cli", "go test -v -run TestPass ./...", nil, "")
+	db.InsertEvent(passRun2, 3, startBase.Add(115*time.Minute).Add(2*time.Second), 2, "log", "=== RUN   TestPass\n--- PASS: TestPass (0.01s)", nil, "")
 	db.FinishRun(passRun2, startBase.Add(115*time.Minute).Add(3*time.Second), runlog.OutcomePass, "")
 
 	// Add a skipped run for TestPass
@@ -153,9 +153,9 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(passRun3, 1, startBase.Add(125*time.Minute), 0, "state_change", "test started", nil)
-	db.InsertEvent(passRun3, 2, startBase.Add(125*time.Minute).Add(1*time.Second), 1, "cli", "go test -v -run TestPass ./...", nil)
-	db.InsertEvent(passRun3, 3, startBase.Add(125*time.Minute).Add(2*time.Second), 2, "skip", "Redis not available in staging", nil)
+	db.InsertEvent(passRun3, 1, startBase.Add(125*time.Minute), 0, "state_change", "test started", nil, "")
+	db.InsertEvent(passRun3, 2, startBase.Add(125*time.Minute).Add(1*time.Second), 1, "cli", "go test -v -run TestPass ./...", nil, "")
+	db.InsertEvent(passRun3, 3, startBase.Add(125*time.Minute).Add(2*time.Second), 2, "skip", "Redis not available in staging", nil, "")
 	db.FinishRun(passRun3, startBase.Add(125*time.Minute).Add(3*time.Second), runlog.OutcomeSkip, "Redis not available in staging")
 
 	// one more failing run for TestFail — with trace_span event
@@ -164,18 +164,18 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(failRun3, 1, startBase.Add(135*time.Minute), 0, "state_change", "test started", nil)
+	db.InsertEvent(failRun3, 1, startBase.Add(135*time.Minute), 0, "state_change", "test started", nil, "")
 	db.InsertEvent(failRun3, 2, startBase.Add(135*time.Minute).Add(1*time.Second), 1, "trace_span", "redis connect (3ms)", map[string]any{
 		"trace_id":    "abc123",
 		"span_id":     "span-1",
 		"duration_ms": 3,
 		"service":     "redis",
-	})
+	}, "")
 	db.InsertEvent(failRun3, 3, startBase.Add(135*time.Minute).Add(4*time.Second), 4, "failure", "connection pool exhausted", map[string]any{
 		"error":        "pool exhausted",
 		"active_conns": 32,
 		"max_conns":    32,
-	})
+	}, "")
 	db.FinishRun(failRun3, startBase.Add(135*time.Minute).Add(5*time.Second), runlog.OutcomeFail,
 		"connection pool exhausted (max=32)")
 
@@ -186,8 +186,8 @@ func seed(db *runlog.RunDB) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(staleRun1, 1, staleStart, 0, "state_change", "test started", nil)
-	db.InsertEvent(staleRun1, 2, staleStart.Add(1*time.Second), 1, "log", "stale — never finished", nil)
+	db.InsertEvent(staleRun1, 1, staleStart, 0, "state_change", "test started", nil, "")
+	db.InsertEvent(staleRun1, 2, staleStart.Add(1*time.Second), 1, "log", "stale — never finished", nil, "")
 
 	return nil
 }

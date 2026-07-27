@@ -4,17 +4,22 @@
 # Run after `templ generate` to keep air builds clean.
 set -euo pipefail
 
+RUNLOG_DIR="cmd/runlog"
+
 FILES=(
-  cmd/runlog/catalog_templ.go
-  cmd/runlog/environments_templ.go
-  cmd/runlog/launch_templ.go
-  cmd/runlog/linters_templ.go
-  cmd/runlog/run_detail_templ.go
-  cmd/runlog/test_detail_templ.go
+  environments_templ.go
+  launch_templ.go
+  linters_templ.go
+  run_detail_templ.go
+  test_detail_templ.go
 )
 
 for f in "${FILES[@]}"; do
-  [ -f "$f" ] || continue
-  sed -i '/^import "net\/url"$/d; /^\t"net\/url"$/d' "$f"
+  pf="$RUNLOG_DIR/$f"
+  if [[ -f "$pf" ]]; then
+    if grep -q 'import "net/url"' "$pf" 2>/dev/null || grep -q $'\t"net/url"' "$pf" 2>/dev/null; then
+      sed -i '/^import "net\/url"$/d; /^\t"net\/url"$/d' "$pf"
+      gofmt -w "$pf" 2>/dev/null || true
+    fi
+  fi
 done
-gofmt -w "${FILES[@]}" 2>/dev/null

@@ -15,17 +15,17 @@ func TestCostTracking_EndToEnd(t *testing.T) {
 
 	_, dc := StartTestDaemon(t)
 
-	r := dc.CreateRun(t, CreateRunOpts{
+	r := dc.CreateTestRun(t, CreateRunOpts{
 		EnvProfile:  t.Name(),
 		Category:    "cost",
 		Description: "Full cost tracking workflow end-to-end",
-	})
+	}, t.Name())
 
-	dc.AddEvent(t, r.DaemonID, "token_usage", "1,000 in / 500 out  $0.050000")
-	dc.AddEvent(t, r.DaemonID, "token_usage", "2,000 in / 1,000 out  $0.100000")
-	dc.AddEvent(t, r.DaemonID, "token_usage", "1,500 in / 750 out  $0.075000")
+	dc.AddEvent(t, r.TestRunID, "token_usage", "1,000 in / 500 out  $0.050000")
+	dc.AddEvent(t, r.TestRunID, "token_usage", "2,000 in / 1,000 out  $0.100000")
+	dc.AddEvent(t, r.TestRunID, "token_usage", "1,500 in / 750 out  $0.075000")
 
-	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{
+	dc.MarkDone(t, r.TestRunID, MarkDoneOpts{
 		Passed:       boolPtr(true),
 		InputTokens:  int64Ptr(4500),
 		OutputTokens: int64Ptr(2250),

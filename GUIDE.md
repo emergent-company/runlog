@@ -38,8 +38,8 @@ func TestParseConfig(t *testing.T) {
 ```
 
 **Key patterns:**
-- `rl.Describe(summary, bullets...)` — top-level test description shown in TUI
-- `rl.Section(name)` — creates a collapsible group in TUI
+- `rl.Describe(summary, bullets...)` — top-level test description shown in web UI
+- `rl.Section(name)` — creates a collapsible group in web UI
 - `rl.Printf(format, args...)` — log a timestamped message
 - `rl.Failf(format, args...)` — log a failure and fail the test
 - `rl.Event(kind, message, details)` — custom structured event (any JSON-serializable details)
@@ -197,7 +197,7 @@ func TestFullWorkflow(t *testing.T) {
 
 ### 2. Shared setup via `TestOpts`
 
-Prefer `TestOpts.Describe` + `Bullets` over inline comments. They render in the TUI.
+Prefer `TestOpts.Describe` + `Bullets` over inline comments. They render in the web UI.
 
 ```go
 tc := runlog.NewTest(t, runlog.TestOpts{
@@ -275,7 +275,7 @@ rl.RecordTokenUsage(inputTok, outputTok, costUSD)
 rl.PrintTokenSummary(intervals)
 ```
 
-Totals are auto-persisted to the database on `rl.Close()` and displayed in the TUI run inspector.
+Totals are auto-persisted to the database on `rl.Close()` and displayed in the run inspector.
 
 ## Gantt charts for multi-agent tests
 
@@ -284,7 +284,7 @@ intervals := buildAgentRunIntervals(t, rl, srv, token, projectID, agents)
 rl.PrintGantt(intervals)
 ```
 
-The Gantt chart shows each agent's execution timeline as a horizontal bar with token usage annotated. Emitted as a `gantt` event that the TUI renders interactively.
+The Gantt chart shows each agent's execution timeline as a horizontal bar with token usage annotated. Emitted as a `gantt` event that the web UI renders interactively.
 
 ## Version tracking
 
@@ -309,7 +309,7 @@ tc := runlog.NewTest(t, runlog.TestOpts{
 })
 ```
 
-Both versions appear in the TUI run inspector panel and are persisted to the database.
+Both versions appear in the run inspector panel and are persisted to the database.
 
 ## Environment variables
 

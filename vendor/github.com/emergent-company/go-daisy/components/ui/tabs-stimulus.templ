@@ -1,0 +1,70 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/components/stimulus"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StimulusTabs renders tab panels with Stimulus controller — instant
+// client-side switching without server roundtrips.
+templ StimulusTabs(props TabsProps) {
+	{{
+		defaultTab := ""
+		for _, item := range props.Items {
+			if item.Active { defaultTab = item.Label; break }
+		}
+		if defaultTab == "" && len(props.Items) > 0 {
+			defaultTab = props.Items[0].Label
+		}
+	}}
+	<div
+		{ stimulus.Controller("tabs")... }
+		{ stimulus.Value("tabs", "active", defaultTab)... }
+		{ devmode.Attrs(ctx, "ui/StimulusTabs")... }
+	>
+		<div
+			role="tablist"
+			class={
+				"tabs",
+				templ.KV(string(props.Style), props.Style != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV("tabs-bottom", props.Bottom),
+				templ.KV(props.ExtraClass, props.ExtraClass != ""),
+			}
+		>
+			for _, item := range props.Items {
+				<button
+					type="button"
+					role="tab"
+					data-tabs-target="tab"
+					data-tab={ item.Label }
+					{ stimulus.Action("click", "tabs", "select")... }
+					class={
+						"tab",
+						templ.KV("gap-2", item.Icon != ""),
+						templ.KV("tab-active", item.Active),
+						templ.KV(item.ColorCSS, item.ColorCSS != ""),
+					}
+					disabled?={ item.Disabled }
+					aria-selected={ strconv.FormatBool(item.Active) }
+				>
+					if item.Icon != "" {
+						@IconSpan(item.Icon, "size-4")
+					}
+					{ item.Label }
+				</button>
+			}
+		</div>
+		for _, item := range props.Items {
+			if item.Content != nil {
+				<div data-tabs-target="panel" data-tab={ item.Label } role="tabpanel"
+				     class="tab-content border-base-300 bg-base-100 p-6"
+				     style={ templ.KV("display:none", !item.Active) }>
+					@item.Content
+				</div>
+			}
+		}
+	</div>
+}

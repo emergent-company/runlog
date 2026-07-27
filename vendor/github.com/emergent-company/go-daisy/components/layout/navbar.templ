@@ -18,14 +18,17 @@ templ Navbar(appName string, logo ...templ.Component) {
 	>
 		<!-- LEFT: sidebar toggle + app name or logo -->
 		<div class="flex items-center gap-3">
-			<label
-				for="_layout-sidebar-toggle-trigger"
-				class="btn btn-square btn-ghost btn-sm"
-				aria-label="Toggle sidebar"
-			>
-				<span id="_topbar-menu-icon" class="iconify lucide--menu size-5"></span>
-				<span id="_topbar-close-icon" class="iconify lucide--panel-left-close size-5"></span>
-			</label>
+		@ui.Button(ui.ButtonProps{
+			Type:      ui.ButtonTypeLabel,
+			Variant:   ui.ButtonGhost,
+			Size:      ui.ButtonSM,
+			Shape:     ui.ButtonShapeSquare,
+			AriaLabel: "Toggle sidebar",
+			Attrs:     templ.Attributes{"for": "_layout-sidebar-toggle-trigger"},
+		}) {
+			<span id="_topbar-menu-icon" class="iconify lucide--menu size-5"></span>
+			<span id="_topbar-close-icon" class="iconify lucide--panel-left-close size-5"></span>
+		}
 			if len(logo) > 0 && logo[0] != nil {
 				@logo[0]
 			} else {
@@ -69,17 +72,23 @@ type NavbarDropdownItem struct {
 templ NavbarDropdown(currentLabel string, placeholder string, icon string, hxTarget string, items []NavbarDropdownItem) {
 	if len(items) > 0 {
 		<div class="dropdown dropdown-end" { devmode.Attrs(ctx, "layout/NavbarDropdown")... }>
-			<label tabindex="0" class="btn btn-sm btn-ghost gap-1.5 font-normal">
-				if icon != "" {
-					<span class={ "iconify size-4 text-base-content/60 " + icon }></span>
-				}
-				if currentLabel != "" {
-					<span class="max-w-[120px] truncate text-sm">{ currentLabel }</span>
-				} else {
-					<span class="text-sm text-base-content/60">{ placeholder }</span>
-				}
-				@ui.IconSpan("lucide--chevron-down", "size-3.5 text-base-content/40")
-			</label>
+			@ui.Button(ui.ButtonProps{
+			Type:       ui.ButtonTypeLabel,
+			Variant:    ui.ButtonGhost,
+			Size:       ui.ButtonSM,
+			ExtraClass: "gap-1.5 font-normal",
+			Attrs:      templ.Attributes{"tabindex": "0"},
+		}) {
+			if icon != "" {
+				@ui.IconSpan(icon, "size-4 text-base-content/60")
+			}
+			if currentLabel != "" {
+				<span class="max-w-[120px] truncate text-sm">{ currentLabel }</span>
+			} else {
+				<span class="text-sm text-base-content/60">{ placeholder }</span>
+			}
+			@ui.IconSpan("lucide--chevron-down", "size-3.5 text-base-content/40")
+		}
 			<ul
 				tabindex="0"
 				class="dropdown-content menu menu-sm bg-base-100 rounded-box shadow-lg z-50 w-52 p-1 border border-base-content/10 mt-1"

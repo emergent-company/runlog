@@ -19,7 +19,7 @@ After making changes to the e2e test suite, always compile and smoke-test using 
 ### 1. Build all packages
 
 ```bash
-cd /root/emergent.memory.e2e
+cd <project-root>
 go build ./...
 ```
 
@@ -99,7 +99,7 @@ runlog test TestCLI_Auth
 
 The `runlog test` command:
 - Loads `.env` from the test directory
-- Overlays `.env.<profile>` if a profile is specified (via `MEMORY_TEST_ENV`)
+- Overlays `.env.<profile>` if a profile is specified (via `RUNLOG_TEST_ENV`)
 - Tracks which environment was used for each run (visible in `runlog runs` and `runlog inspect`)
 - Execs `go test` with the enriched environment
 

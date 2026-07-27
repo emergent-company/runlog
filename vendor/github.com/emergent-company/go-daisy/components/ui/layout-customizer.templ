@@ -1,0 +1,224 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// LayoutTheme configures a theme option in the LayoutCustomizer.
+type LayoutTheme struct {
+	Key   string // "light", "dark", "dim", "contrast", "material", "system"
+	Label string // human-readable name
+}
+
+// DefaultThemes returns the standard DaisyUI theme set.
+func DefaultThemes() []LayoutTheme {
+	return []LayoutTheme{
+		{Key: "light", Label: "Light"},
+		{Key: "contrast", Label: "Contrast"},
+		{Key: "material", Label: "Material"},
+		{Key: "dark", Label: "Dark"},
+		{Key: "dim", Label: "Dim"},
+		{Key: "system", Label: "System"},
+	}
+}
+
+// LayoutCustomizer renders a right-side settings drawer for theme, direction,
+// fullscreen, and sidebar appearance. Drop it into any page body once.
+templ LayoutCustomizer() {
+	<div { devmode.Attrs(ctx, "ui/LayoutCustomizer")... }>
+		<input type="checkbox" id="layout-customizer-toggle" class="hidden"/>
+		<label for="layout-customizer-toggle" class="fixed top-4 right-4 z-80 btn btn-sm btn-circle btn-ghost" aria-label="Layout settings">
+      @IconSpan("lucide--settings", "size-4.5")
+		</label>
+		<label for="layout-customizer-toggle" id="layout-customizer-backdrop" class="fixed inset-0 bg-black/30 z-80 hidden"></label>
+		<div id="layout-customizer-drawer" class="fixed top-0 right-0 h-full w-72 bg-base-100 border-l border-base-200 z-90 p-5 overflow-y-auto transform translate-x-full transition-transform duration-200">
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="font-semibold text-base-content">Layout Settings</h3>
+				<label for="layout-customizer-toggle" class="btn btn-sm btn-circle btn-ghost" aria-label="Close settings">
+					@IconSpan("lucide--x", "size-4")
+				</label>
+			</div>
+
+			<div class="mb-5">
+				<label class="text-sm font-medium text-base-content/70 block mb-2">Theme</label>
+				<div class="grid grid-cols-2 gap-2" id="customizer-theme-options">
+				</div>
+			</div>
+
+			<div class="mb-5">
+				<label class="text-sm font-medium text-base-content/70 block mb-2">Sidebar Theme</label>
+				<div class="flex gap-2">
+					<button data-customizer-sidebar="light" class="btn btn-sm flex-1">Light</button>
+					<button data-customizer-sidebar="dark" class="btn btn-sm flex-1">Dark</button>
+				</div>
+			</div>
+
+			<div class="mb-5">
+				<label class="text-sm font-medium text-base-content/70 block mb-2">Direction</label>
+				<div class="flex gap-2">
+					<button data-customizer-dir="ltr" class="btn btn-sm flex-1">LTR</button>
+					<button data-customizer-dir="rtl" class="btn btn-sm flex-1">RTL</button>
+				</div>
+			</div>
+
+			<div class="mb-5">
+				<button data-customizer-fullscreen class="btn btn-sm w-full">
+					@IconSpan("lucide--maximize", "size-4")
+					<span>Toggle Fullscreen</span>
+				</button>
+			</div>
+
+			<div>
+				<button data-customizer-reset class="btn btn-sm btn-ghost w-full text-error">
+					@IconSpan("lucide--rotate-ccw", "size-4")
+					<span>Reset Defaults</span>
+				</button>
+			</div>
+		</div>
+
+		<script>
+		(function() {
+			var STORAGE_KEY = 'go-daisy-layout';
+			var DEFAULTS = { theme: 'system', sidebarTheme: 'light', dir: 'ltr' };
+			var daisyThemes = { light: 'nord', dark: 'dracula', dim: 'dim', contrast: 'contrast', material: 'material', system: 'system' };
+
+			function load() {
+				var cfg;
+				try { cfg = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) { cfg = {}; }
+				Object.keys(DEFAULTS).forEach(function(k) { if (!(k in cfg)) cfg[k] = DEFAULTS[k]; });
+				return cfg;
+			}
+
+			function save(cfg) {
+				try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg)); } catch(e) {}
+			}
+
+			function apply(cfg) {
+				var html = document.documentElement;
+				var theme = cfg.theme;
+				if (theme === 'system') {
+					theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+				}
+				var daisy = daisyThemes[theme] || theme;
+				html.setAttribute('data-theme', daisy);
+
+				var sidebar = document.getElementById('_layout-sidebar');
+				if (sidebar) {
+					if (cfg.sidebarTheme === 'dark') {
+						sidebar.classList.add('bg-base-300');
+					} else {
+						sidebar.classList.remove('bg-base-300');
+					}
+				}
+
+				html.setAttribute('dir', cfg.dir);
+			}
+
+			function renderThemeOptions(cfg) {
+				var container = document.getElementById('customizer-theme-options');
+				if (!container) return;
+				var themes = ['light','contrast','material','dark','dim','system'];
+				container.innerHTML = '';
+				themes.forEach(function(t) {
+					var btn = document.createElement('button');
+					btn.className = 'btn btn-sm ' + (cfg.theme === t ? 'btn-primary' : 'btn-ghost');
+					btn.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+					btn.addEventListener('click', function() {
+						cfg.theme = t;
+						apply(cfg);
+						save(cfg);
+						renderThemeOptions(cfg);
+						highlightActive();
+					});
+					container.appendChild(btn);
+				});
+			}
+
+			function highlightActive() {
+				var cfg = load();
+				document.querySelectorAll('[data-customizer-sidebar]').forEach(function(b) {
+					b.className = 'btn btn-sm flex-1 ' + (b.dataset.customizerSidebar === cfg.sidebarTheme ? 'btn-primary' : '');
+				});
+				document.querySelectorAll('[data-customizer-dir]').forEach(function(b) {
+					b.className = 'btn btn-sm flex-1 ' + (b.dataset.customizerDir === cfg.dir ? 'btn-primary' : '');
+				});
+			}
+
+			// Init
+			var cfg = load();
+			apply(cfg);
+
+			// Drawer open/close
+			(function() {
+				var toggle = document.getElementById('layout-customizer-toggle');
+				var drawer = document.getElementById('layout-customizer-drawer');
+				var backdrop = document.getElementById('layout-customizer-backdrop');
+				if (!toggle || !drawer || !backdrop) return;
+				toggle.addEventListener('change', function() {
+					if (toggle.checked) {
+						drawer.classList.remove('translate-x-full');
+						backdrop.classList.remove('hidden');
+						renderThemeOptions(cfg);
+						highlightActive();
+					} else {
+						drawer.classList.add('translate-x-full');
+						backdrop.classList.add('hidden');
+					}
+				});
+			})();
+
+			// Sidebar theme buttons
+			document.querySelectorAll('[data-customizer-sidebar]').forEach(function(b) {
+				b.addEventListener('click', function() {
+					cfg.sidebarTheme = b.dataset.customizerSidebar;
+					apply(cfg);
+					save(cfg);
+					highlightActive();
+				});
+			});
+
+			// Direction buttons
+			document.querySelectorAll('[data-customizer-dir]').forEach(function(b) {
+				b.addEventListener('click', function() {
+					cfg.dir = b.dataset.customizerDir;
+					apply(cfg);
+					save(cfg);
+					highlightActive();
+				});
+			});
+
+			// Fullscreen
+			var fsBtn = document.querySelector('[data-customizer-fullscreen]');
+			if (fsBtn) {
+				fsBtn.addEventListener('click', function() {
+					if (document.fullscreenElement) {
+						document.exitFullscreen();
+					} else {
+						document.documentElement.requestFullscreen();
+					}
+				});
+			}
+
+			// Reset
+			var resetBtn = document.querySelector('[data-customizer-reset]');
+			if (resetBtn) {
+				resetBtn.addEventListener('click', function() {
+					cfg = Object.assign({}, DEFAULTS);
+					apply(cfg);
+					save(cfg);
+					renderThemeOptions(cfg);
+					highlightActive();
+				});
+			}
+
+			// Re-apply after HTMX swap (on sidebar nav etc.)
+			document.addEventListener('htmx:afterSettle', function() {
+				cfg = load();
+				apply(cfg);
+			});
+
+			highlightActive();
+		})();
+		</script>
+	</div>
+}

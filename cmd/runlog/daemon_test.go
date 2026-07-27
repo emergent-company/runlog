@@ -32,7 +32,7 @@ func newDaemonTest(t *testing.T) (*DaemonServer, *runlog.RunDB) {
 	return srv, db
 }
 
-// registerTestRun posts a test run to the daemon and returns the run UUID.
+// registerTestRun posts a daemon batch run to the daemon and returns the run UUID.
 func registerTestRun(t *testing.T, baseURL string, pid int, profile string) string {
 	t.Helper()
 	body := map[string]any{
@@ -51,6 +51,26 @@ func registerTestRun(t *testing.T, baseURL string, pid int, profile string) stri
 	var result map[string]string
 	json.NewDecoder(resp.Body).Decode(&result)
 	return result["id"]
+}
+
+// registerTestFunction creates a per-test-function test_runs row within a batch.
+func registerTestFunction(t *testing.T, baseURL, batchID, testName string) int64 {
+	t.Helper()
+	body := map[string]string{"test_name": testName}
+	b, _ := json.Marshal(body)
+	resp, err := http.Post(baseURL+"/runs/"+batchID+"/functions", "application/json", bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("registerTestFunction: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 201 {
+		t.Fatalf("registerTestFunction: want 201, got %d", resp.StatusCode)
+	}
+	var result struct {
+		TestRunID int64 `json:"test_run_id"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+	return result.TestRunID
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -85,14 +105,15 @@ func TestDaemon_Health(t *testing.T) {
 	}
 }
 
-// TestDaemon_RegisterRun verifies POST /runs creates daemon_runs + test_runs rows with runner=dogfood.
+// TestDaemon_RegisterRun verifies POST /runs creates daemon_runs row, and
+// POST /runs/:id/functions creates a per-function test_runs row.
 func TestDaemon_RegisterRun(t *testing.T) {
 	df := runlog.NewDogfoodRun(t, "daemon")
 	defer df.Done()
 	df.Describe("registerrun")
 	df.Event("log", "registerrun")
 	t.Log("=== TestDaemon_RegisterRun ===")
-	t.Log("Purpose: Verify POST /runs creates daemon_runs + test_runs rows")
+	t.Log("Purpose: Verify POST /runs creates daemon_runs, /runs/:id/functions creates test_runs")
 
 	srv, db := newDaemonTest(t)
 	server := httptest.NewServer(srv.mux)
@@ -133,22 +154,32 @@ func TestDaemon_RegisterRun(t *testing.T) {
 		t.Errorf("want 1 daemon run, got %d", daemonCount)
 	}
 
-	t.Log("Step 5: Verifying test_runs table has 1 row linked via daemon_run_id")
-	df.Event("log", "Query: SELECT COUNT(*) FROM test_runs WHERE daemon_run_id="+runID)
+	t.Log("Step 4b: Verifying test_runs table has 0 rows (no batch row)")
 	var testCount int
 	db.RawDB().QueryRow("SELECT COUNT(*) FROM test_runs WHERE daemon_run_id = ?", runID).Scan(&testCount)
-	if testCount != 1 {
-		t.Errorf("want 1 test run, got %d", testCount)
+	if testCount != 0 {
+		t.Errorf("want 0 test runs after batch creation, got %d", testCount)
 	}
 
-	df.Event("log", "Query: SELECT test_name, runner FROM test_runs")
+	t.Log("Step 5: Registering a test function via POST /runs/:id/functions")
+	testRunID := registerTestFunction(t, server.URL, runID, "TestFoo")
+	if testRunID == 0 {
+		t.Fatal("failed to register test function")
+	}
+	t.Logf("  test_run_id = %d", testRunID)
+
+	t.Log("Step 6: Verifying test_runs row with dogfood runner")
+	df.Event("log", "Query: SELECT test_name, runner FROM test_runs WHERE id=?")
 	var testName, runner string
-	db.RawDB().QueryRow("SELECT test_name, runner FROM test_runs WHERE daemon_run_id = ?", runID).Scan(&testName, &runner)
+	db.RawDB().QueryRow("SELECT test_name, runner FROM test_runs WHERE id = ?", testRunID).Scan(&testName, &runner)
 	t.Logf("  test_name=%q, runner=%q", testName, runner)
 	if runner != "dogfood" {
 		t.Errorf("want runner='dogfood', got %q", runner)
 	}
-	t.Log("✓ POST /runs creates rows in both daemon_runs and test_runs")
+	if testName != "TestFoo" {
+		t.Errorf("want test_name='TestFoo', got %q", testName)
+	}
+	t.Log("✓ POST /runs + /runs/:id/functions creates daemon_runs + test_runs rows")
 }
 
 // TestDaemon_RegisterRun_MissingPID verifies POST /runs without pid returns 400.
@@ -195,21 +226,24 @@ func TestDaemon_InsertEvent(t *testing.T) {
 	server := httptest.NewServer(srv.mux)
 	defer server.Close()
 
-	t.Log("Step 1: Registering a run first")
+	t.Log("Step 1: Registering a run and a test function")
 	runID := registerTestRun(t, server.URL, 12346, "test-events")
 	t.Logf("  run ID = %s", runID)
+	testRunID := registerTestFunction(t, server.URL, runID, "TestEvents")
+	t.Logf("  test_run_id = %d", testRunID)
 
-	t.Log("Step 2: Sending POST /runs/:id/events with kind='log', message='hello from daemon test'")
+	t.Log("Step 2: Sending POST /test-runs/:id/events with kind='log', message='hello from daemon test'")
 	eventBody := map[string]any{
-		"kind":    "log",
-		"message": "hello from daemon test",
-		"details": map[string]any{"key": "value"},
+		"kind":      "log",
+		"message":   "hello from daemon test",
+		"elapsed_s": 0.5,
+		"details":   map[string]any{"key": "value"},
 	}
 	b, _ := json.Marshal(eventBody)
-	url := fmt.Sprintf("%s/runs/%s/events", server.URL, runID)
+	url := fmt.Sprintf("%s/test-runs/%d/events", server.URL, testRunID)
 	resp, err := http.Post(url, "application/json", bytes.NewReader(b))
 	if err != nil {
-		t.Fatalf("POST /runs/%s/events: %v", runID, err)
+		t.Fatalf("POST /test-runs/%d/events: %v", testRunID, err)
 	}
 	defer resp.Body.Close()
 
@@ -224,11 +258,7 @@ func TestDaemon_InsertEvent(t *testing.T) {
 	t.Logf("  event seq = %v", seq)
 
 	t.Log("Step 4: Querying run_events table directly")
-	// Find the test_runs ID linked by daemon_run_id
 	df.Event("log", "Query: SELECT kind, message, details FROM run_events")
-	var testRunID int64
-	db.RawDB().QueryRow("SELECT id FROM test_runs WHERE daemon_run_id = ?", runID).Scan(&testRunID)
-
 	var kind, message string
 	var details *string
 	err = db.RawDB().QueryRow(
@@ -265,9 +295,11 @@ func TestDaemon_MarkRunDone(t *testing.T) {
 	server := httptest.NewServer(srv.mux)
 	defer server.Close()
 
-	t.Log("Step 1: Registering a run first")
+	t.Log("Step 1: Registering a run and a test function")
 	runID := registerTestRun(t, server.URL, 12347, "test-done")
 	t.Logf("  run ID = %s", runID)
+	testRunID := registerTestFunction(t, server.URL, runID, "TestDone")
+	t.Logf("  test_run_id = %d", testRunID)
 
 	t.Logf("Step 2: Sending PUT /runs/%s/done with passed=true", runID)
 	body := map[string]bool{"passed": true}
@@ -279,7 +311,7 @@ func TestDaemon_MarkRunDone(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("PUT /runs/%s/done: %v", runID, err)
+		t.Fatalf("PUT /test-runs/%d/done: %v", testRunID, err)
 	}
 	defer resp.Body.Close()
 
@@ -301,7 +333,7 @@ func TestDaemon_MarkRunDone(t *testing.T) {
 	var finishedStr *string
 	var passedInt *int
 	db.RawDB().QueryRow(
-		"SELECT finished_at, passed FROM test_runs WHERE daemon_run_id = ?", runID,
+		"SELECT finished_at, passed FROM test_runs WHERE id = ?", testRunID,
 	).Scan(&finishedStr, &passedInt)
 	if finishedStr == nil || *finishedStr == "" {
 		t.Errorf("finished_at should be set, got nil/empty")
@@ -480,13 +512,14 @@ func TestDaemon_InsertEvent_RequiresKind(t *testing.T) {
 	defer server.Close()
 
 	runID := registerTestRun(t, server.URL, 12350, "test-no-kind")
+	testRunID := registerTestFunction(t, server.URL, runID, "TestNoKind")
 
 	t.Log("Sending event without 'kind' field")
 	body := map[string]any{"message": "no kind here"}
 	b, _ := json.Marshal(body)
-	resp, err := http.Post(fmt.Sprintf("%s/runs/%s/events", server.URL, runID), "application/json", bytes.NewReader(b))
+	resp, err := http.Post(fmt.Sprintf("%s/test-runs/%d/events", server.URL, testRunID), "application/json", bytes.NewReader(b))
 	if err != nil {
-		t.Fatalf("POST /runs/%s/events: %v", runID, err)
+		t.Fatalf("POST /test-runs/%d/events: %v", testRunID, err)
 	}
 	defer resp.Body.Close()
 

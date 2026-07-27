@@ -19,8 +19,8 @@ Every test must comply with the 10 rules in the E2E Test Constitution:
 → `constitution.md` (project root)
 
 The rules, in brief:
-1. **CLI First** — use `memory` CLI for everything that has a CLI command
-2. **Ask Memory First** — use `memory ask` to understand the platform before guessing
+1. **CLI First** — use `{binary}` CLI for everything that has a CLI command
+2. **Ask Memory First** — use platform query tools to understand the platform before guessing
 3. **Every test has a RunLog** — `newRunLog(t)` + `t.Cleanup(rl.Close)`
 4. **Every section has content** — no empty `rl.Section()` blocks
 5. **CLI steps are logged** — `rl.CLI(invocation, output)` after every CLI call
@@ -59,7 +59,7 @@ package <name>_test
 import (
     "os"
     "testing"
-    framework "github.com/emergent-company/emergent.memory.e2e/framework"
+    framework "github.com/emergent-company/runlog"
 )
 
 func TestMain(m *testing.M) {
@@ -147,7 +147,7 @@ requireServerReady(t, home)  // handles setupCLIAuth internally
 ```
 
 `requireServerReady` calls `framework.SetupCLIAuth` which:
-- In **standalone** mode: sets `server_url` + `api_key` via `memory config set`
+- In **standalone** mode: sets `server_url` + `api_key` via `{binary} config set`
 - In **account** mode: writes `credentials.json` + sets `server_url`
 
 ### Manual auth (when you need explicit control)
@@ -494,7 +494,7 @@ if projectID == "" {
 t.Cleanup(func() {
     ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
     defer cancel()
-    cmd := exec.CommandContext(ctx, "memory", "projects", "delete", projectID)
+    cmd := exec.CommandContext(ctx, os.Args[0], "projects", "delete", projectID)
     cmd.Env = append(filteredEnv(), "HOME="+home, ...)
     cmd.CombinedOutput()
 })
@@ -625,8 +625,8 @@ Verify: no empty sections, all CLI steps logged, description visible, failure ev
 
 | Function | Returns |
 |---|---|
-| `serverURL()` | `MEMORY_TEST_SERVER` |
-| `e2eTestToken()` | `MEMORY_TEST_TOKEN` |
+| `serverURL()` | config server URL |
+| `e2eTestToken()` | config auth token |
 | `requireServerReady(t, home)` | Skips if down, sets up auth |
 | `skipIfServerDown(t)` | Skips if `/health` unreachable |
 | `setupCLIAuth(t, home)` | Configures auth in isolated home |
@@ -643,8 +643,8 @@ Verify: no empty sections, all CLI steps logged, description visible, failure ev
 
 | Function | Extracts from |
 |---|---|
-| `parseProjectID(output)` | `memory projects create` output |
-| `parseAgentID(output)` | `memory agents create` output |
+| `parseProjectID(output)` | `{binary} projects create` output |
+| `parseAgentID(output)` | `{binary} agents create` output |
 | `parseJSONField(json, field)` | Top-level JSON string field |
 | `parseFrontmatterFields(content)` | SKILL.md name + description |
 
@@ -711,7 +711,7 @@ runlog test TestCLI_Auth
 
 **What it does:**
 1. Loads `.env` from your test directory
-2. Overlays `.env.<profile>` if a profile is specified (sets `MEMORY_TEST_ENV=<profile>`)
+2. Overlays `.env.<profile>` if a profile is specified (sets `RUNLOG_TEST_ENV=<profile>`)
 3. Tracks which environment was used for each run (visible in `runlog runs` and `runlog inspect`)
 4. Execs `go test` with the enriched environment
 

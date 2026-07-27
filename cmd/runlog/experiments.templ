@@ -28,11 +28,7 @@ templ ExperimentsPage(experiments []runlog.ExperimentSummary) {
 								id={ "exp-" + exp.Name }
 								data-testid={ "experiment-row-" + exp.Name }
 								class="hover"
-								hx-get={ ExperimentDetailURL(exp.Name) }
-								hx-target="#main-content"
-								hx-swap="innerHTML"
-								hx-push-url="true"
-								hx-sync="#main-content:replace"
+								{ NavRowAttrs(ExperimentDetailURL(exp.Name))... }
 							>
 								@table.TableCell("", nil) {
 									@text(exp.Name)
@@ -84,11 +80,7 @@ templ ExperimentsContent(experiments []runlog.ExperimentSummary) {
 							id={ "exp-" + exp.Name }
 							data-testid={ "experiment-row-" + exp.Name }
 							class="hover"
-							hx-get={ ExperimentDetailURL(exp.Name) }
-							hx-target="#main-content"
-							hx-swap="innerHTML"
-							hx-push-url="true"
-							hx-sync="#main-content:replace"
+							{ NavRowAttrs(ExperimentDetailURL(exp.Name))... }
 						>
 							@table.TableCell("", nil) {
 								@text(exp.Name)

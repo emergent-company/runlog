@@ -13,6 +13,17 @@ logs/
 # Node.js / Playwright
 # OS files
 /runlog
+/fixture
+/flow.db
+/tmp/
+daisyui-avatar-code.png
+nexus-chat.png
+nexus-sidebar.png
+sdk-cli-capture.png
+sdk-page-fixed.png
+sdk-page-v3.png
+sdk-page.png
+daisyui-avatar-code-snapshot.txt
 .runlog/config.yaml
 .runlog/daemon.pid
 *.swo

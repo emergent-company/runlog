@@ -4,6 +4,7 @@ package render
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -132,6 +133,94 @@ func RedirectAfterMutation(w http.ResponseWriter, r *http.Request, path string) 
 		return
 	}
 	http.Redirect(w, r, path, http.StatusSeeOther)
+}
+
+// SetMorph instructs HTMX to swap the response using DOM morphing (idiomorph).
+// The page must include the morph.js bundle and idiomorph must be loaded.
+// Has no effect on non-HTMX requests.
+func SetMorph(w http.ResponseWriter, r *http.Request) {
+	if IsHTMX(r) {
+		w.Header().Set("HX-Reswap", "morph")
+	}
+}
+
+// Preserve returns {"hx-preserve": "true"} for spreading into a Templ element.
+// Elements with hx-preserve survive ANY HTMX swap — they are never destroyed.
+func Preserve() templ.Attributes {
+	return templ.Attributes{"hx-preserve": "true"}
+}
+
+// ForceReload returns a meta tag that forces a full page reload on navigation.
+// Use for pages with third-party JS that doesn't survive HTMX swaps
+// (Google Maps, Stripe Elements, legacy jQuery plugins).
+func ForceReload() templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := w.Write([]byte(`<meta name="turbo-visit-control" content="reload">`))
+		return err
+	})
+}
+
+// EnableViewTransitions returns a meta tag that enables browser-native View
+// Transitions API (crossfade animations on same-origin navigation). Zero JS,
+// zero library weight. Include in <head>. Unsupported browsers silently ignore.
+func EnableViewTransitions() templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		_, err := w.Write([]byte(`<meta name="view-transition" content="same-origin">`))
+		return err
+	})
+}
+
+// CacheFrame sets cache headers for a frame response. Use in HTMX partial
+// handlers to enable browser/CDN caching of frame responses.
+func CacheFrame(w http.ResponseWriter, maxAge int) {
+	w.Header().Set("Cache-Control", fmt.Sprintf("private, max-age=%d", maxAge))
+	w.Header().Add("Vary", "HX-Request-Type, HX-Request")
+}
+
+// CacheSharedFrame sets shared cache headers for public frame responses.
+// Use for frames that are identical for all users (e.g. global sidebar content).
+func CacheSharedFrame(w http.ResponseWriter, maxAge int) {
+	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", maxAge))
+	w.Header().Add("Vary", "HX-Request-Type, HX-Request")
+}
+
+// OnAfterRequest returns {"hx-on::after-request": js} for spreading into a Templ element.
+func OnAfterRequest(js string) templ.Attributes {
+	return templ.Attributes{"hx-on::after-request": js}
+}
+
+// OnAfterSettle returns {"hx-on::after-settle": js} for spreading into a Templ element.
+func OnAfterSettle(js string) templ.Attributes {
+	return templ.Attributes{"hx-on::after-settle": js}
+}
+
+// OnResponseError returns {"hx-on::response-error": js} for spreading into a Templ element.
+func OnResponseError(js string) templ.Attributes {
+	return templ.Attributes{"hx-on::response-error": js}
+}
+
+// OnBeforeRequest returns {"hx-on::before-request": js} for spreading into a Templ element.
+func OnBeforeRequest(js string) templ.Attributes {
+	return templ.Attributes{"hx-on::before-request": js}
+}
+
+// RenderAutoMorph is like RenderAuto but enables DOM morphing for HTMX swaps.
+// Requires morph.js to be loaded on the page.
+func RenderAutoMorph(w http.ResponseWriter, r *http.Request, page, partial templ.Component) {
+	SetMorph(w, r)
+	RenderAuto(w, r, page, partial)
+}
+
+// RenderTripleMorph is like RenderTriple but enables DOM morphing for HTMX swaps.
+func RenderTripleMorph(w http.ResponseWriter, r *http.Request, page, pageContent, partial templ.Component) {
+	SetMorph(w, r)
+	RenderTriple(w, r, page, pageContent, partial)
+}
+
+// RenderPartialMorph is like RenderPartial but enables DOM morphing for HTMX swaps.
+func RenderPartialMorph(w http.ResponseWriter, r *http.Request, content templ.Component) {
+	SetMorph(w, r)
+	RenderPartial(w, r, content)
 }
 
 // AppendToast writes an hx-swap-oob fragment that appends a toast notification

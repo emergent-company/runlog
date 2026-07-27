@@ -14,6 +14,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var sortableScriptOnce = templ.NewOnceHandle()
+
 // SortableOptions configures a SortableJS drag-and-drop list.
 type SortableOptions struct {
 	Animation int    // drag animation duration in ms
@@ -58,7 +60,7 @@ func SortableList(id string, opts SortableOptions) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 21, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 23, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -71,7 +73,7 @@ func SortableList(id string, opts SortableOptions) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(opts.Animation > 0, strconv.Itoa(opts.Animation), "150"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 23, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 25, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -84,7 +86,7 @@ func SortableList(id string, opts SortableOptions) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(opts.Handle)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 24, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 26, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -97,7 +99,7 @@ func SortableList(id string, opts SortableOptions) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(opts.Direction)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 25, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/sortable.templ`, Line: 27, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -193,6 +195,10 @@ func SortableItem(extraClass string, attrs templ.Attributes) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, devmode.Attrs(ctx, "ui/SortableItem"))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, attrs)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -264,7 +270,25 @@ func sortableScript() templ.Component {
 			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script>\n\tif (!window._sortableInit) {\n\t  window._sortableInit = true;\n\n\t  window.initSortable = function(el) {\n\t    if (typeof Sortable === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';\n\t      s.onload = function() { initSortableElement(el); };\n\t      document.head.appendChild(s);\n\t    } else {\n\t      initSortableElement(el);\n\t    }\n\t  };\n\n\t  function initSortableElement(el) {\n\t    if (el._sortable) return;\n\t    try {\n\t      el._sortable = new Sortable(el, {\n\t        animation: parseInt(el.dataset.animation) || 150,\n\t        handle: el.dataset.handle || undefined,\n\t        direction: el.dataset.direction || undefined,\n\t      });\n\t    } catch(e) { console.warn('Sortable init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-sortable]').forEach(initSortableElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-sortable]:not(._sortable-initialized)').forEach(function(el) {\n\t      el.classList.add('_sortable-initialized');\n\t      initSortableElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Var13 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script>\n\tif (!window._sortableInit) {\n\t  window._sortableInit = true;\n\n\t  window.initSortable = function(el) {\n\t    if (typeof Sortable === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';\n\t      s.onload = function() { initSortableElement(el); };\n\t      document.head.appendChild(s);\n\t    } else {\n\t      initSortableElement(el);\n\t    }\n\t  };\n\n\t  function initSortableElement(el) {\n\t    if (el._sortable) return;\n\t    try {\n\t      el._sortable = new Sortable(el, {\n\t        animation: parseInt(el.dataset.animation) || 150,\n\t        handle: el.dataset.handle || undefined,\n\t        direction: el.dataset.direction || undefined,\n\t      });\n\t    } catch(e) { console.warn('Sortable init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-sortable]').forEach(initSortableElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-sortable]:not(._sortable-initialized)').forEach(function(el) {\n\t      el.classList.add('_sortable-initialized');\n\t      initSortableElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sortableScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

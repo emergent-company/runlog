@@ -69,12 +69,13 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 					<span class="text-base-content/40 text-xs">runlog</span>
 				</div>
 			</footer>
+			<div id="footer-sse-url" data-sse-url={ SSEStreamURL("footer") } style="display:none"></div>
 			<script type="text/javascript">
 			(function() {
-				var es = new EventSource({ SSEStreamURL("footer") });
-				es.addEventListener('footer-status', function(e) {
-					var el = document.getElementById('footer-status');
-					if (el) el.innerHTML = JSON.parse(e.data).html;
+				var url = document.getElementById('footer-sse-url').getAttribute('data-sse-url');
+				var es = new EventSource(url);
+				es.addEventListener('cmd', function(e) {
+					dispatchSSECmd(JSON.parse(e.data));
 				});
 				es.onerror = function() {
 					var el = document.getElementById('footer-status');
@@ -85,87 +86,115 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 		</div>
 		@SearchModal()
 	}
-	// Theme init: check localStorage (light|dark|system) → OS preference → default (system).
-	// Legacy migration: 'go-daisy-theme' stored a theme name; migrate to mode.
 	<script>
-		(function() {
-			function applyTheme(mode) {
-				var themes = { light: 'nord', dark: 'dracula' };
-				var html = document.documentElement;
-				if (mode === 'system') {
-					var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-					html.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);
-				} else {
-					html.setAttribute('data-theme', themes[mode] || themes.light);
+	// ── Shared helpers ──────────────────────────────────────────────────────
+	function initSSE(elId, events) {
+		var el = document.getElementById(elId);
+		if (!el) return;
+		var url = el.getAttribute('data-sse-url');
+		if (!url) return;
+		var es = new EventSource(url);
+		Object.keys(events).forEach(function(k) {
+			if (k === 'error') es.onerror = events[k];
+			else es.addEventListener(k, events[k]);
+		});
+		es.onerror = function() { es.close(); };
+		return es;
+	}
+	function dispatchSSECmd(cmd) {
+		switch (cmd.cmd) {
+			case 'replace-html': {
+				var el = document.querySelector(cmd.target);
+				if (el) el.innerHTML = cmd.html;
+				break;
+			}
+			case 'refresh': {
+				location.reload();
+				break;
+			}
+			case 'linter-done': {
+				document.body.dispatchEvent(new CustomEvent('refresh-linters'));
+				break;
+			}
+		}
+	}
+
+	// ── Theme init ──────────────────────────────────────────────────────────
+	(function() {
+		function applyTheme(mode) {
+			var themes = { light: 'nord', dark: 'dracula' };
+			var html = document.documentElement;
+			if (mode === 'system') {
+				var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				html.setAttribute('data-theme', prefersDark ? themes.dark : themes.light);
+			} else {
+				html.setAttribute('data-theme', themes[mode] || themes.light);
+			}
+			['light','dark','system'].forEach(function(m) {
+				var el = document.getElementById('theme-icon-' + m);
+				if (el) el.style.display = m === mode ? '' : 'none';
+				var ck = document.getElementById('check-' + m);
+				if (ck) ck.style.display = m === mode ? '' : 'none';
+			});
+			try { localStorage.setItem('runlog-theme', mode); } catch(e) {}
+		}
+		var saved = null;
+		try { saved = localStorage.getItem('runlog-theme'); } catch(e) {}
+		if (!saved) {
+			try {
+				var legacy = localStorage.getItem('go-daisy-theme');
+				if (legacy) {
+					saved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';
+					localStorage.removeItem('go-daisy-theme');
 				}
-				['light','dark','system'].forEach(function(m) {
-					var el = document.getElementById('theme-icon-' + m);
-					if (el) el.style.display = m === mode ? '' : 'none';
-					var ck = document.getElementById('check-' + m);
-					if (ck) ck.style.display = m === mode ? '' : 'none';
-				});
-				try { localStorage.setItem('runlog-theme', mode); } catch(e) {}
-			}
-			var saved = null;
-			try { saved = localStorage.getItem('runlog-theme'); } catch(e) {}
-			if (!saved) {
-				try {
-					var legacy = localStorage.getItem('go-daisy-theme');
-					if (legacy) {
-						saved = legacy === 'nord' ? 'light' : legacy === 'dracula' ? 'dark' : 'system';
-						localStorage.removeItem('go-daisy-theme');
-					}
-				} catch(e) {}
-			}
-			if (!saved) saved = 'system';
-			applyTheme(saved);
-			var mq = window.matchMedia('(prefers-color-scheme: dark)');
-			mq.addEventListener('change', function() {
-				var cur = null;
-				try { cur = localStorage.getItem('runlog-theme'); } catch(e) {}
-				if (cur === 'system') applyTheme('system');
-			});
-			document.addEventListener('htmx:before:history:restore', function() {
-				var restored = null;
-				try { restored = localStorage.getItem('runlog-theme'); } catch(e) {}
-				if (restored) applyTheme(restored);
-			});
-			document.addEventListener('mousedown', function(e) {
-				var option = e.target.closest('[data-theme-option]');
-				if (option) { applyTheme(option.getAttribute('data-theme-option')); return; }
-			});
-		})();
-	</script>
-	// Keyboard shortcut: Ctrl+K / Cmd+K and / open the search modal.
-	<script>
-		document.addEventListener('keydown', function(e) {
-			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-				e.preventDefault();
-				var modal = document.getElementById('search-modal');
-				if (modal && modal.open) { modal.close(); return; }
-				if (modal) { modal.showModal(); return; }
-			}
-			if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-				var tag = e.target.tagName;
-				if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-				e.preventDefault();
-				var modal = document.getElementById('search-modal');
-				if (modal) modal.showModal();
-			}
+			} catch(e) {}
+		}
+		if (!saved) saved = 'system';
+		applyTheme(saved);
+		var mq = window.matchMedia('(prefers-color-scheme: dark)');
+		mq.addEventListener('change', function() {
+			var cur = null;
+			try { cur = localStorage.getItem('runlog-theme'); } catch(e) {}
+			if (cur === 'system') applyTheme('system');
 		});
-		document.addEventListener('htmx:after:swap', function(e) {
-			if (e.detail?.target?.id === 'search-results') {
-				var input = document.getElementById('search-input');
-				if (input) input.focus();
-			}
+		document.addEventListener('htmx:before:history:restore', function() {
+			var restored = null;
+			try { restored = localStorage.getItem('runlog-theme'); } catch(e) {}
+			if (restored) applyTheme(restored);
 		});
-	</script>
-	// Global loading indicator + error recovery.
-	// No skeleton injection — HTMX swaps content inline; old page stays visible during requests.
-	<script>
-		(function() {
-			var bar = document.getElementById('global-loading-bar');
-			var showTimer;
+		document.addEventListener('mousedown', function(e) {
+			var option = e.target.closest('[data-theme-option]');
+			if (option) { applyTheme(option.getAttribute('data-theme-option')); return; }
+		});
+	})();
+
+	// ── Keyboard shortcuts ──────────────────────────────────────────────────
+	document.addEventListener('keydown', function(e) {
+		if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+			e.preventDefault();
+			var modal = document.getElementById('search-modal');
+			if (modal && modal.open) { modal.close(); return; }
+			if (modal) { modal.showModal(); return; }
+		}
+		if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+			var tag = e.target.tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+			e.preventDefault();
+			var modal = document.getElementById('search-modal');
+			if (modal) modal.showModal();
+		}
+	});
+	document.addEventListener('htmx:after:swap', function(e) {
+		if (e.detail?.target?.id === 'search-results') {
+			var input = document.getElementById('search-input');
+			if (input) input.focus();
+		}
+	});
+
+	// ── Global loading indicator + error recovery ───────────────────────────
+	(function() {
+		var bar = document.getElementById('global-loading-bar');
+		var showTimer;
 
 		document.addEventListener('htmx:before:request', function() {
 			clearTimeout(window.__hideTimer);
@@ -183,35 +212,33 @@ templ AppShellContent(groups []layout.SidebarGroup) {
 				setTimeout(function() { bar.style.opacity = '0'; }, 1500);
 				setTimeout(function() { bar.style.background = ''; }, 2000);
 			}
-			// Recover: reload page so user doesn't see stale state
 			setTimeout(function() { location.reload(); }, 2000);
 		});
-		})();
-	</script>
-	// Event-detail toggle: collapse an expanded detail row on second click.
-	// Uses htmx:before:request delegation so HTMX never fires when already open.
-	<script>
-		document.addEventListener('htmx:before:request', function(evt) {
-			var elt = evt.detail?.ctx?.sourceElement || evt.target;
-			if (!elt || !elt.getAttribute) return;
-			var targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');
-			if (!targetId || !targetId.startsWith('#event-detail-')) return;
-			var det = document.querySelector(targetId);
-			if (det && det.children.length > 0) {
-				det.innerHTML = '';
-				evt.preventDefault();
-			}
-		});
-		// Feedback overlay — loaded after HTMX so the script tag is inside <body>.
-		(function() {
-			var s = document.createElement('script');
-			s.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';
-			s.setAttribute('data-api', 'https://feedback.emergent-company.ai');
-			s.setAttribute('data-repo', 'emergent-company/runlog');
-			s.setAttribute('data-label', 'feedback');
-			s.async = true;
-			document.body.appendChild(s);
-		})();
+	})();
+
+	// ── Event-detail toggle: collapse expanded detail on second click ──────
+	document.addEventListener('htmx:before:request', function(evt) {
+		var elt = evt.detail?.ctx?.sourceElement || evt.target;
+		if (!elt || !elt.getAttribute) return;
+		var targetId = elt.getAttribute('hx-target') || elt.getAttribute('data-hx-target');
+		if (!targetId || !targetId.startsWith('#event-detail-')) return;
+		var det = document.querySelector(targetId);
+		if (det && det.children.length > 0) {
+			det.innerHTML = '';
+			evt.preventDefault();
+		}
+	});
+
+	// ── Feedback overlay ───────────────────────────────────────────────────
+	(function() {
+		var s = document.createElement('script');
+		s.src = 'https://feedback.emergent-company.ai/feedback-overlay.js';
+		s.setAttribute('data-api', 'https://feedback.emergent-company.ai');
+		s.setAttribute('data-repo', 'emergent-company/runlog');
+		s.setAttribute('data-label', 'feedback');
+		s.async = true;
+		document.body.appendChild(s);
+	})();
 	</script>
 }
 

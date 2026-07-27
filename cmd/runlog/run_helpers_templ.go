@@ -89,21 +89,6 @@ func fmtElapsed(elapsedS float64) string {
 	return fmt.Sprintf("%.1fs", elapsedS)
 }
 
-// fmtDurationMs formats an optional event duration (milliseconds) for inline display.
-// Returns empty string when duration is nil or zero.
-func fmtDurationMs(d *float64) string {
-	if d == nil || *d <= 0 {
-		return ""
-	}
-	if *d < 1 {
-		return " · < 1ms"
-	}
-	if *d < 1000 {
-		return fmt.Sprintf(" · %.0fms", *d)
-	}
-	return fmt.Sprintf(" · %.1fs", *d/1000)
-}
-
 func runDuration(r runlog.RunRow) string {
 	if r.FinishedAt == nil {
 		return "running..."

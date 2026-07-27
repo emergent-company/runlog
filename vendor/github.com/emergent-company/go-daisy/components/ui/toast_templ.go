@@ -10,15 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/emergent-company/go-daisy/devmode"
 
-// ToastType maps to a DaisyUI alert class.
-type ToastType string
-
-const (
-	ToastSuccess ToastType = "alert-success"
-	ToastError   ToastType = "alert-error"
-	ToastWarning ToastType = "alert-warning"
-	ToastInfo    ToastType = "alert-info"
-)
+var toastScriptOnceHandle = templ.NewOnceHandle()
 
 // ToastScript renders a single global script that auto-dismisses any element
 // with the "toast-auto-dismiss" class. Include once in the page layout.
@@ -43,7 +35,25 @@ func ToastScript() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<script>\n\t\t(function(){\n\t\t\tfunction dismissToast(el){\n\t\t\t\tvar d = parseInt(el.dataset.duration)||4000;\n\t\t\t\tsetTimeout(function(){\n\t\t\t\t\tel.style.opacity='0';\n\t\t\t\t\tel.style.transition='opacity 0.3s';\n\t\t\t\t\tsetTimeout(function(){ el.remove(); }, 300);\n\t\t\t\t}, d);\n\t\t\t}\n\t\t\tdocument.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);\n\t\t\tvar obs = new MutationObserver(function(mutations){\n\t\t\t\tmutations.forEach(function(m){\n\t\t\t\t\tm.addedNodes.forEach(function(n){\n\t\t\t\t\t\tif(n.nodeType===1){\n\t\t\t\t\t\t\tif(n.classList && n.classList.contains('toast-auto-dismiss')) dismissToast(n);\n\t\t\t\t\t\t\tn.querySelectorAll && n.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t});\n\t\t\tobs.observe(document.body, {childList:true, subtree:true});\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<script>\n\t\t\t(function(){\n\t\t\t\tfunction dismissToast(el){\n\t\t\t\t\tvar d = parseInt(el.dataset.duration)||4000;\n\t\t\t\t\tsetTimeout(function(){\n\t\t\t\t\t\tel.style.opacity='0';\n\t\t\t\t\t\tel.style.transition='opacity 0.3s';\n\t\t\t\t\t\tsetTimeout(function(){ el.remove(); }, 300);\n\t\t\t\t\t}, d);\n\t\t\t\t}\n\t\t\t\tdocument.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);\n\t\t\t\tvar obs = new MutationObserver(function(mutations){\n\t\t\t\t\tmutations.forEach(function(m){\n\t\t\t\t\t\tm.addedNodes.forEach(function(n){\n\t\t\t\t\t\t\tif(n.nodeType===1){\n\t\t\t\t\t\t\t\tif(n.classList && n.classList.contains('toast-auto-dismiss')) dismissToast(n);\n\t\t\t\t\t\t\t\tn.querySelectorAll && n.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t\tobs.observe(document.body, {childList:true, subtree:true});\n\t\t\t})();\n\t\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = toastScriptOnceHandle.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -68,13 +78,13 @@ func Toast(typ ToastType, message string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
+		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var3 == nil {
+			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var3 = []any{"alert text-sm shadow-md toast-auto-dismiss", string(typ)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
+		var templ_7745c5c3_Var4 = []any{"alert text-sm shadow-md toast-auto-dismiss", templ.KV(string(typ), typ != "")}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -82,12 +92,12 @@ func Toast(typ ToastType, message string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var3).String())
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var4).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/toast.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -103,12 +113,12 @@ func Toast(typ ToastType, message string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(message)
+		var templ_7745c5c3_Var6 string
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/toast.templ`, Line: 52, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/toast.templ`, Line: 46, Col: 17}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -137,9 +147,9 @@ func ToastOOB(typ ToastType, message string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var6 == nil {
-			templ_7745c5c3_Var6 = templ.NopComponent
+		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var7 == nil {
+			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div hx-swap-oob=\"beforeend:#toast-container\"")

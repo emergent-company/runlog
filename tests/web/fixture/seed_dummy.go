@@ -38,7 +38,7 @@ func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
 		return err
 	}
 
-	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil)
+	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil, "")
 	db.UpdateRunExperiment(runID, "exp-analyzer-v2")
 	db.UpdateRunTags(runID, []string{"variant:llm-analyzer", "model:gemini-2.5-pro"})
 
@@ -53,7 +53,7 @@ func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
 
 	// Tag after analysis
 	t = t0.Add(8 * time.Second)
-	db.InsertEvent(runID, 3, t, 8, "tag", "coverage:67%", map[string]any{"tags": []string{"coverage:67%", "files:142"}})
+	db.InsertEvent(runID, 3, t, 8, "tag", "coverage:67%", map[string]any{"tags": []string{"coverage:67%", "files:142"}}, "")
 	db.UpdateRunTags(runID, []string{"variant:llm-analyzer", "model:gemini-2.5-pro", "coverage:67%", "files:142"})
 
 	// Agent steps
@@ -70,7 +70,7 @@ func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
 		"input_tokens":  1200,
 		"output_tokens": 3400,
 		"cost_usd":      0.008,
-	})
+	}, "")
 
 	t = t0.Add(16 * time.Second)
 	db.InsertEvent(runID, 6, t, 16, "metric", "planner: 3.1s (in: 450, out: 890)", map[string]any{
@@ -78,7 +78,7 @@ func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
 		"duration_ms":   3100,
 		"input_tokens":  450,
 		"output_tokens": 890,
-	})
+	}, "")
 
 	t = t0.Add(17 * time.Second)
 	sid3, _ := db.InsertGroupEvent(runID, 7, t, 17, "section", "generate tests")
@@ -97,7 +97,7 @@ func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
 			{"agent_name": "planner", "start_s": 12, "end_s": 17, "duration_ms": 5000},
 			{"agent_name": "generator", "start_s": 17, "end_s": 22, "duration_ms": 5000},
 		},
-	})
+	}, "")
 
 	t = t0.Add(23 * time.Second)
 	db.InsertEvent(runID, 9, t, 23, "token_summary", "total: input=2540 output=6390 cost=$0.016", map[string]any{
@@ -109,9 +109,9 @@ func seedAnalyzer(db *runlog.RunDB, t0 time.Time) error {
 			"researcher": map[string]any{"input_tokens": 2090, "output_tokens": 5500, "cost_usd": 0.013},
 			"planner":    map[string]any{"input_tokens": 450, "output_tokens": 890, "cost_usd": 0.003},
 		},
-	})
+	}, "")
 
-	db.InsertEvent(runID, 10, t, 24, "state_change", "test finished", nil)
+	db.InsertEvent(runID, 10, t, 24, "state_change", "test finished", nil, "")
 	db.FinishRunWithCost(runID, t.Add(1*time.Second), runlog.OutcomePass, "", 2540, 6390, 0.016)
 	return nil
 }
@@ -128,12 +128,12 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil)
+	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil, "")
 	db.UpdateRunExperiment(runID, "exp-llm-compare")
 	db.UpdateRunTags(runID, []string{"experiment:llm-compare", "model:gemini-2.0-flash"})
 
 	t := t0.Add(1 * time.Second)
-	db.InsertEvent(runID, 2, t, 1, "tag", "model: gemini-2.0-flash", map[string]any{"tags": []string{"experiment:llm-compare", "model:gemini-2.0-flash", "iter:3"}})
+	db.InsertEvent(runID, 2, t, 1, "tag", "model: gemini-2.0-flash", map[string]any{"tags": []string{"experiment:llm-compare", "model:gemini-2.0-flash", "iter:3"}}, "")
 	db.UpdateRunTags(runID, []string{"experiment:llm-compare", "model:gemini-2.0-flash", "iter:3"})
 
 	// Iteration 1 — pass
@@ -150,7 +150,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 		"iteration":  1,
 		"duration_s": 5.2,
 		"passed":     true,
-	})
+	}, "")
 
 	// Iteration 2 — fail
 	t = t0.Add(10 * time.Second)
@@ -167,7 +167,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 		"duration_s":  5.8,
 		"passed":      false,
 		"fail_reason": "expected 100, got 99",
-	})
+	}, "")
 
 	// Iteration 3 — pass (recovery)
 	t = t0.Add(16 * time.Second)
@@ -182,7 +182,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 		"iteration":  3,
 		"duration_s": 4.1,
 		"passed":     true,
-	})
+	}, "")
 
 	t = t0.Add(21 * time.Second)
 	db.InsertEvent(runID, 9, t, 21, "gantt", "experiment iterations", map[string]any{
@@ -192,10 +192,10 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 			{"agent_name": "iteration-2", "start_s": 10, "end_s": 15, "duration_ms": 5000, "status": "fail"},
 			{"agent_name": "iteration-3", "start_s": 16, "end_s": 20, "duration_ms": 4000, "status": "pass"},
 		},
-	})
+	}, "")
 
 	t = t0.Add(22 * time.Second)
-	db.InsertEvent(runID, 10, t, 22, "state_change", "test finished", nil)
+	db.InsertEvent(runID, 10, t, 22, "state_change", "test finished", nil, "")
 	db.FinishRun(runID, t, runlog.OutcomeFail,
 		"iteration 2 failed: expected 100, got 99")
 
@@ -204,7 +204,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 	if err != nil {
 		return err
 	}
-	db.InsertEvent(runID2, 1, t0.Add(2*time.Minute), 0, "state_change", "test started", nil)
+	db.InsertEvent(runID2, 1, t0.Add(2*time.Minute), 0, "state_change", "test started", nil, "")
 	db.UpdateRunExperiment(runID2, "exp-llm-compare")
 	db.UpdateRunTags(runID2, []string{"experiment:llm-compare", "model:claude-3.5", "iter:2"})
 
@@ -223,7 +223,7 @@ func seedExperiment(db *runlog.RunDB, t0 time.Time) error {
 	})
 
 	t = t0.Add(2*time.Minute + 10*time.Second)
-	db.InsertEvent(runID2, 4, t, 10, "state_change", "test finished", nil)
+	db.InsertEvent(runID2, 4, t, 10, "state_change", "test finished", nil, "")
 	db.FinishRunWithCost(runID2, t, runlog.OutcomePass, "", 640, 1800, 0.004)
 
 	return nil
@@ -237,7 +237,7 @@ func seedHybrid(db *runlog.RunDB, t0 time.Time) error {
 		return err
 	}
 
-	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil)
+	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil, "")
 	db.UpdateRunTags(runID, []string{"variant:hybrid", "module:auth+data"})
 	db.UpdateRunDescription(runID, runlog.RunDescription{
 		Summary: "Hybrid test with auth, data processing, and validation phases",
@@ -261,7 +261,7 @@ func seedHybrid(db *runlog.RunDB, t0 time.Time) error {
 		"duration_ms": 45,
 		"service":     "auth",
 		"operation":   "token_exchange",
-	})
+	}, "")
 
 	// Phase 2: Data processing — group events for sub-steps
 	t = t0.Add(6 * time.Second)
@@ -285,7 +285,7 @@ func seedHybrid(db *runlog.RunDB, t0 time.Time) error {
 		"errors":     3,
 		"sample_row": 412,
 		"column":     "email",
-	})
+	}, "")
 
 	// Phase 3: Validation — partial skip
 	t = t0.Add(18 * time.Second)
@@ -299,7 +299,7 @@ func seedHybrid(db *runlog.RunDB, t0 time.Time) error {
 	})
 
 	t = t0.Add(23 * time.Second)
-	db.InsertEvent(runID, 8, t, 23, "state_change", "test finished", nil)
+	db.InsertEvent(runID, 8, t, 23, "state_change", "test finished", nil, "")
 	db.FinishRun(runID, t, runlog.OutcomeFail, "data quality check failed (3 errors)")
 	return nil
 }
@@ -312,7 +312,7 @@ func seedPerf(db *runlog.RunDB, t0 time.Time) error {
 		return err
 	}
 
-	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil)
+	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil, "")
 	db.UpdateRunExperiment(runID, "exp-perf-baseline")
 	db.UpdateRunTags(runID, []string{"variant:perf", "scale:1000"})
 
@@ -358,14 +358,14 @@ func seedPerf(db *runlog.RunDB, t0 time.Time) error {
 				"p95_ms":     b.p95,
 				"p99_ms":     b.p99,
 				"duration_s": b.durS,
-			})
+	}, "")
 		db.InsertEvent(runID, 5+i, t.Add(time.Duration(b.durS+1)*time.Second), offF+b.durS+1,
 			"token_usage", fmt.Sprintf("%s: input=%d output=%d cost=$%.4f", b.name, b.tokens, b.tokens*3, float64(b.tokens)*0.000002), map[string]any{
 				"benchmark":     b.name,
 				"input_tokens":  b.tokens,
 				"output_tokens": b.tokens * 3,
 				"cost_usd":      float64(b.tokens) * 0.000002,
-			})
+	}, "")
 	}
 
 	// Final gantt
@@ -379,10 +379,10 @@ func seedPerf(db *runlog.RunDB, t0 time.Time) error {
 			{"agent_name": "bench-medium", "start_s": 11, "end_s": 14, "duration_ms": 3400, "status": "pass"},
 			{"agent_name": "bench-large", "start_s": 18, "end_s": 23, "duration_ms": 5200, "status": "pass"},
 		},
-	})
+	}, "")
 
 	t = t0.Add(time.Duration(totalS+1) * time.Second)
-	db.InsertEvent(runID, 9, t, float64(totalS+1), "state_change", "test finished", nil)
+	db.InsertEvent(runID, 9, t, float64(totalS+1), "state_change", "test finished", nil, "")
 	db.FinishRunWithCost(runID, t, runlog.OutcomePass, "", 3330, 9990, 0.015)
 	return nil
 }
@@ -395,7 +395,7 @@ func seedMultiStep(db *runlog.RunDB, t0 time.Time) error {
 		return err
 	}
 
-	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil)
+	db.InsertEvent(runID, 1, t0, 0, "state_change", "test started", nil, "")
 
 	// 8 sequential steps
 	stepNames := []string{
@@ -422,7 +422,7 @@ func seedMultiStep(db *runlog.RunDB, t0 time.Time) error {
 
 	total := 2 + len(stepNames)*2
 	t := t0.Add(time.Duration(total) * time.Second)
-	db.InsertEvent(runID, total, t, float64(total), "state_change", "test finished", nil)
+	db.InsertEvent(runID, total, t, float64(total), "state_change", "test finished", nil, "")
 	db.FinishRun(runID, t, runlog.OutcomePass, "")
 	db.UpdateRunDescription(runID, runlog.RunDescription{
 		Summary: fmt.Sprintf("Multi-step test with %d sequential phases", len(stepNames)),

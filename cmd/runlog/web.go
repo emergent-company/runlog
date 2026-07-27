@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"html"
 	"io"
@@ -78,6 +77,11 @@ type testListData struct {
 	StatusFilter   string
 	TestTypeFilter string
 	TestTypes      []string
+	HasMore        bool
+	NextOffset     int
+	CurrentPage    int
+	TotalPages     int
+	PaginationURL  string // /ui/tests?category=X&test_type=Y&status=Z&page=
 }
 
 type testListCategory struct {
@@ -144,14 +148,18 @@ type testDetailData struct {
 }
 
 type runDetailData struct {
-	Run               runlog.RunRow
-	TimelineEvents    []runlog.EventRow
-	MetaEvents        []runlog.EventRow
-	UnwrappedChildren []runlog.ChildEvent
-	ShowDebug         bool
-	IsActive          bool
-	SSEURL            string
-	RawOutput         string
+	Run           runlog.RunRow
+	SectionGroups []sectionGroup
+	MetaEvents    []runlog.EventRow
+	ShowDebug     bool
+	IsActive      bool
+	SSEURL        string
+	RawOutput     string
+}
+
+type sectionGroup struct {
+	Label  string
+	Events []runlog.EventRow
 }
 
 // ── Time formatting ──────────────────────────────────────────────────────────
@@ -272,15 +280,12 @@ var metaRunEventKinds = map[string]bool{
 	"test_version":  true,
 }
 
-// splitRunEvents separates a run's raw events into timeline (execution steps)
-// and meta (tags, versions, token usage — debug-only) rows, and detects the
-// common case of a single top-level section with no sibling timeline events.
-// A lone section adds a pointless extra click-to-expand layer with nothing
-// to organize against, so its children are unwrapped and rendered directly
-// as if they were top-level events instead.
-func splitRunEvents(events []runlog.EventRow) (timeline, meta []runlog.EventRow, unwrapped []runlog.ChildEvent) {
-	timeline = make([]runlog.EventRow, 0, len(events))
-	meta = make([]runlog.EventRow, 0, len(events))
+// groupBySection separates meta events from timeline events and groups
+// timeline events by their Section label. Ungrouped events (section="")
+// become a single group with an empty label (rendered without header).
+func groupBySection(events []runlog.EventRow) ([]sectionGroup, []runlog.EventRow) {
+	var timeline []runlog.EventRow
+	meta := make([]runlog.EventRow, 0, len(events))
 	for _, e := range events {
 		if metaRunEventKinds[e.Kind] {
 			meta = append(meta, e)
@@ -288,13 +293,31 @@ func splitRunEvents(events []runlog.EventRow) (timeline, meta []runlog.EventRow,
 			timeline = append(timeline, e)
 		}
 	}
-	if len(timeline) == 1 && timeline[0].Kind == "section" && len(timeline[0].Children) > 0 {
-		unwrapped = timeline[0].Children
-		timeline = nil
+
+	// Collect unique section labels in order of first appearance.
+	var labels []string
+	labelIndex := make(map[string]int)
+	for _, e := range timeline {
+		if _, ok := labelIndex[e.Section]; !ok {
+			labelIndex[e.Section] = len(labels)
+			labels = append(labels, e.Section)
+		}
 	}
-	return timeline, meta, unwrapped
+
+	groups := make([]sectionGroup, len(labels))
+	for i, label := range labels {
+		groups[i].Label = label
+	}
+	for _, e := range timeline {
+		idx := labelIndex[e.Section]
+		groups[idx].Events = append(groups[idx].Events, e)
+	}
+
+	return groups, meta
 }
 
+// eventChildrenData is deprecated — kept for backward compat with old templates.
+// New code uses sectionGroup instead.
 type eventChildrenData struct {
 	EventID  int64
 	Children []runlog.ChildEvent
@@ -423,7 +446,7 @@ func NewLauncherManager(db *runlog.RunDB, config *runlog.Config) *LauncherManage
 	}
 }
 
-func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[string]string) (*ActiveLaunch, error) {
+func (lm *LauncherManager) Launch(testName string, runID int64, workDir string, extraEnv ...map[string]string) (*ActiveLaunch, error) {
 	lm.mu.Lock()
 	if _, ok := lm.launches[testName]; ok {
 		lm.mu.Unlock()
@@ -434,6 +457,10 @@ func (lm *LauncherManager) Launch(testName string, runID int64, extraEnv ...map[
 	now := time.Now()
 
 	cmd := exec.Command("sh", "-c", expanded)
+	cmd.Env = append(cmd.Environ(), "GOWORK=off")
+	if workDir != "" {
+		cmd.Dir = workDir
+	}
 	if len(extraEnv) > 0 {
 		cmd.Env = append(cmd.Environ(), envMapToSlice(extraEnv[0])...)
 	}
@@ -678,12 +705,13 @@ func (lm *LinterManager) Lint(name, command string) (*ActiveLinter, error) {
 		_ = lm.db.UpdateLinterRunResult(al.RunID, status, al.exitCode, out, time.Now())
 		close(al.done)
 		if lm.sse != nil {
-			data, _ := json.Marshal(map[string]interface{}{
-				"name":      name,
-				"status":    status,
-				"exit_code": al.exitCode,
+			ec := al.exitCode
+			lm.sse.PublishCmd("linters", "cmd", SSECommand{
+				Cmd:      "linter-done",
+				Name:     name,
+				Status:   status,
+				ExitCode: &ec,
 			})
-			lm.sse.Publish("linters", SSEEvent{Event: "linter-done", Data: string(data)})
 		}
 		lm.mu.Lock()
 		delete(lm.runs, name)
@@ -788,6 +816,9 @@ type WebApp struct {
 	startedAt time.Time
 	workDir   string
 	cancel    context.CancelFunc
+	// discovered caches test function discovery from filesystem scan.
+	// Computed once at startup; daemon restart picks up new test files.
+	discovered map[string][]string
 }
 
 func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp {
@@ -867,8 +898,6 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 	e.GET("/tests/:name", app.handleTestDetail)
 	e.GET("/runs", app.handleAllRuns)
 	e.GET("/runs/:id", app.handleRunDetail)
-	e.GET("/runs/:id/events/:eventID", app.handleEventChildren)
-	e.GET("/runs/:id/events-table", app.handleRunEventsTable)
 	e.GET("/runs/:id/status", app.handleRunStatusSSE)
 	e.GET("/stream", app.handleSSEStream)
 	e.POST("/launch/:name", app.handleLaunchTest)
@@ -890,6 +919,23 @@ func newWebApp(db *runlog.RunDB, config *runlog.Config, workDir string) *WebApp 
 
 	// Search
 	e.GET("/search", app.handleSearch)
+
+	app.discovered = DiscoverTestFunctions(workDir)
+
+	// Seed discovery rows into DB so never-run tests appear in ListTestCatalog.
+	dirType := make(map[string]string)
+	if config != nil {
+		for typ, dirs := range config.TestTypes {
+			for _, d := range dirs {
+				dirType[d] = typ
+			}
+		}
+	}
+	for cat, tests := range app.discovered {
+		for _, name := range tests {
+			_ = db.UpsertDefinition(name, cat, dirType[cat])
+		}
+	}
 
 	return app
 }

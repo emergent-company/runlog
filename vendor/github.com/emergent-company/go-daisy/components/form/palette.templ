@@ -1,0 +1,145 @@
+package form
+
+import (
+	"strings"
+
+	alpine "github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// PaletteProps configures an Alpine color swatch picker.
+type PaletteProps struct {
+	ID          string
+	Hues        []string
+	Shades      []string
+	ShowHex     bool
+	HideNeutral bool
+	HideReset   bool
+	Class       string
+	Attrs       templ.Attributes
+}
+
+// tailwindHues returns the full set of Tailwind hues or a restricted subset.
+func tailwindHues(restrict []string) []string {
+	if len(restrict) > 0 {
+		return restrict
+	}
+	return []string{
+		"slate", "gray", "zinc", "neutral", "stone",
+		"red", "orange", "amber", "yellow", "lime",
+		"green", "emerald", "teal", "cyan", "sky",
+		"blue", "indigo", "violet", "purple", "fuchsia",
+		"pink", "rose",
+	}
+}
+
+// tailwindShades returns the shade set.
+func tailwindShades(restrict []string) []string {
+	if len(restrict) > 0 {
+		return restrict
+	}
+	return []string{"50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"}
+}
+
+// tailwindColorClass returns the Tailwind bg class for a given hue+shade.
+func tailwindColorClass(hue, shade string) string {
+	return "bg-" + hue + "-" + shade
+}
+
+// tailwindHex returns approximate hex values for Tailwind shades.
+func tailwindHex(hue, shade string) string {
+	// Approximate hex for common shades
+	hexes := map[string]string{
+		"50": "#f8fafc", "100": "#f1f5f9", "200": "#e2e8f0", "300": "#cbd5e1",
+		"400": "#94a3b8", "500": "#64748b", "600": "#475569", "700": "#334155",
+		"800": "#1e293b", "900": "#0f172a", "950": "#020617",
+	}
+	if v, ok := hexes[shade]; ok {
+		return v
+	}
+	return ""
+}
+
+templ Palette(props PaletteProps) {
+	<div
+		{ alpine.XData(alpine.Toggle(false))... }
+		class={ "space-y-3", templ.KV(props.Class, props.Class != "") }
+		{ devmode.Attrs(ctx, "form/Palette")... }
+		{ props.Attrs... }
+	>
+		if !props.HideNeutral {
+			<div class="flex gap-1 flex-wrap">
+				<button
+					type="button"
+					class="w-7 h-7 rounded border border-base-300 bg-white"
+					title="White"
+					@click={ "picked = 'white'; $dispatch('palette-pick', {value: 'white'})" }
+					aria-label="Pick white"
+				></button>
+				<button
+					type="button"
+					class="w-7 h-7 rounded border border-base-300 bg-black"
+					title="Black"
+					@click={ "picked = 'black'; $dispatch('palette-pick', {value: 'black'})" }
+					aria-label="Pick black"
+				></button>
+				<button
+					type="button"
+					class="w-7 h-7 rounded border border-base-300"
+					style="background: transparent"
+					title="Transparent"
+					@click={ "picked = 'transparent'; $dispatch('palette-pick', {value: 'transparent'})" }
+					aria-label="Pick transparent"
+				></button>
+			</div>
+		}
+		for _, hue := range tailwindHues(props.Hues) {
+			if strings.HasPrefix(hue, "#") {
+				<div class="flex gap-1 flex-wrap">
+					if props.ShowHex {
+						<span class="text-xs text-base-content/60 w-full">{ hue }</span>
+					}
+					<button
+						type="button"
+						class="w-7 h-7 rounded border border-base-300"
+						style={ "background:" + hue }
+						title={ hue }
+						@click={ "picked = '" + hue + "'; $dispatch('palette-pick', {value: '" + hue + "'})" }
+						aria-label={ "Pick color " + hue }
+					></button>
+				</div>
+			} else {
+				<div class="flex gap-1 flex-wrap">
+					if props.ShowHex {
+						<span class="text-xs text-base-content/60 w-full">{ hue }</span>
+					}
+					for _, shade := range tailwindShades(props.Shades) {
+		{{
+			hex := tailwindHex(hue, shade)
+			title := hue + "-" + shade
+			if hex != "" { title += " " + hex }
+			pickVal := hue + "-" + shade
+		}}
+					<button
+						type="button"
+						class={ "w-7 h-7 rounded border border-base-300 rounded-btn", tailwindColorClass(hue, shade) }
+						title={ title }
+						@click={ "picked = '" + pickVal + "'; $dispatch('palette-pick', {value: '" + pickVal + "'})" }
+						aria-label={ "Pick " + hue + "-" + shade }
+					></button>
+					}
+				</div>
+			}
+		}
+		if !props.HideReset {
+			<div class="pt-2">
+				<button
+					type="button"
+					class="btn btn-xs btn-ghost"
+					@click={ "picked = ''; $dispatch('palette-pick', {value: ''})" }
+				>Reset</button>
+			</div>
+		}
+		<input type="hidden" x-model={ "picked" } x-bind:name={ props.ID }/>
+	</div>
+}

@@ -1,0 +1,28 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+var csrfScriptOnce = templ.NewOnceHandle()
+
+// CSRFMeta renders a meta tag containing the CSRF token. Place in <head>.
+// HTMX and the bundled CSRF JS will auto-inject this token into all
+// non-GET requests as X-CSRF-TOKEN header.
+templ CSRFMeta(token string) {
+	<meta name="csrf-token" content={ token } { devmode.Attrs(ctx, "ui/CSRFMeta")... }/>
+}
+
+// CSRFAutoInject returns an inline script that automatically reads the CSRF
+// token from the meta tag and injects it into all HTMX requests. Include
+// once per page, typically in layout.Page.
+templ CSRFAutoInject() {
+	@csrfScriptOnce.Once() {
+		<script { devmode.Attrs(ctx, "ui/CSRFAutoInject")... }>
+	document.addEventListener('htmx:configRequest', function(event) {
+		var token = document.querySelector('meta[name="csrf-token"]')?.content;
+		if (token) event.detail.headers['X-CSRF-TOKEN'] = token;
+	});
+	</script>
+	}
+}

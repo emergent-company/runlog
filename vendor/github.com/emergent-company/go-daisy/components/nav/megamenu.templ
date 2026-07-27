@@ -1,0 +1,66 @@
+package nav
+
+import (
+	"github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// MegamenuColumn is a single column inside a Megamenu dropdown.
+type MegamenuColumn struct {
+	Title string
+	Links []MegamenuLink
+}
+
+// MegamenuLink is a single link inside a MegamenuColumn.
+type MegamenuLink struct {
+	Label string
+	Href  string
+	Icon  string // optional Lucide icon, e.g. "lucide--settings"
+}
+
+// MegamenuItem is a top-level navigation item with an optional megamenu dropdown.
+type MegamenuItem struct {
+	Label   string
+	Href    string // direct link (no dropdown if set and no Columns)
+	Columns []MegamenuColumn
+	Active  bool
+}
+
+// Megamenu renders a DaisyUI 5 megamenu — a horizontal nav bar where each
+// item can show a large popover dropdown with multiple columns of links.
+templ Megamenu(items []MegamenuItem) {
+	<ul class="menu menu-horizontal px-1 rounded-box" { devmode.Attrs(ctx, "nav/Megamenu")... }>
+		for _, item := range items {
+			if len(item.Columns) > 0 {
+				<li>
+					<details>
+						<summary class={ templ.KV("active", item.Active) }>{ item.Label }</summary>
+						<ul class="p-2 bg-base-100 rounded-box shadow-lg w-max min-w-96 flex flex-row flex-wrap gap-4">
+							for _, col := range item.Columns {
+								<li class="w-48">
+									<h3 class="menu-title px-2 pt-2">{ col.Title }</h3>
+									<ul>
+										for _, link := range col.Links {
+											<li>
+												<a href={ templ.URL(link.Href) }>
+													if link.Icon != "" {
+														@ui.IconSpan(link.Icon, "size-4")
+													}
+													{ link.Label }
+												</a>
+											</li>
+										}
+									</ul>
+								</li>
+							}
+						</ul>
+					</details>
+				</li>
+			} else if item.Href != "" {
+				<li>
+					<a href={ templ.URL(item.Href) } class={ templ.KV("active", item.Active) }>{ item.Label }</a>
+				</li>
+			}
+		}
+	</ul>
+}

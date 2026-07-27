@@ -61,8 +61,12 @@ type RunLog struct {
 	seq   atomic.Int64 // monotonically increasing event sequence number
 
 	// Daemon HTTP client (SDK mode; set when RUNLOG_DAEMON_URL is configured).
-	daemon      *DaemonClient
-	daemonRunID string
+	daemon        *DaemonClient
+	daemonBatchID string // self-created daemon_runs UUID (daemon mode only)
+
+	// Auth headers injected into all rl.HTTP* calls when non-empty.
+	httpToken   string
+	httpProject string
 
 	// Current section label — set by Section(), written onto subsequent events.
 	// Empty string = no active section (events are top-level).
@@ -180,7 +184,50 @@ func NewRunLog(t *testing.T) *RunLog { //nolint:deadcode
 	// (SharedDB would block on the daemon's WAL lock).
 	if du := os.Getenv("RUNLOG_DAEMON_URL"); du != "" {
 		rl.daemon = NewDaemonClient(du)
-		rl.daemonRunID = os.Getenv("RUNLOG_RUN_ID")
+
+		rl.testType = deriveTestType(srcFile)
+		if exp := os.Getenv("EXPERIMENT"); exp != "" {
+			rl.experiment = exp
+		}
+
+		// Self-register: create a daemon batch, then register this test function.
+		batch, err := rl.daemon.CreateRunNF(t, CreateRunOpts{
+			PID:     os.Getpid(),
+			Runner:  Runner(),
+			EnvVars: captureEnvVars(),
+		})
+		if err != nil {
+			t.Logf("warn: RunLog: daemon CreateRun: %v", err)
+		} else {
+			rl.daemonBatchID = batch.DaemonID
+		}
+
+		if rl.daemonBatchID != "" {
+			if id, err := rl.daemon.RegisterFunction(rl.daemonBatchID, t.Name(), rl.testType, rl.experiment); err == nil {
+				rl.runID = id
+			} else {
+				t.Logf("warn: RunLog: daemon RegisterFunction: %v", err)
+			}
+		}
+
+		// Auto-detect test version from the test source file.
+		if srcFile != "" {
+			sha := FileSHA256(srcFile)
+			gitHash := GitCommitHash(srcFile)
+			testVer := sha
+			if testVer == "" {
+				testVer = gitHash
+			}
+			if testVer != "" {
+				details := map[string]any{"sha256": sha}
+				if gitHash != "" {
+					details["git_commit"] = gitHash
+				}
+				rl.testVersion = testVer
+				rl.writef("test_version: %s\n", testVer)
+				rl.dbEvent("test_version", testVer, details, 0)
+			}
+		}
 		return rl
 	}
 
@@ -278,10 +325,16 @@ func (rl *RunLog) Close() { //nolint:deadcode
 	default:
 		outcome = OutcomePass
 	}
-	if rl.daemon != nil {
-		rl.daemon.markDoneNF(rl.t, rl.daemonRunID, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD)
+	if rl.daemon != nil && rl.runID != 0 {
+		// Upload the log file as raw_output for this test_runs row.
+		if rl.path != "" {
+			if data, err := os.ReadFile(rl.path); err == nil {
+				rl.daemon.putRawOutputNF(rl.t, rl.runID, string(data))
+			}
+		}
+		rl.daemon.markDoneNF(rl.t, rl.runID, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD)
 		if rl.coverageData != "" && rl.coveragePct > 0 {
-			rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "coverage_pct", fmt.Sprintf("%.4f", rl.coveragePct))
+			rl.daemon.setMetadataNF(rl.t, rl.runID, "coverage_pct", fmt.Sprintf("%.4f", rl.coveragePct))
 		}
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.FinishRunWithCost(rl.runID, now, outcome, reason, rl.inputTokens, rl.outputTokens, rl.costUSD); err != nil {
@@ -427,8 +480,8 @@ func (rl *RunLog) SetExperiment(name string) { //nolint:deadcode
 
 	rl.writef("experiment: %s\n", name)
 
-	if rl.daemon != nil {
-		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "experiment", name)
+	if rl.daemon != nil && rl.runID != 0 {
+		rl.daemon.setMetadataNF(rl.t, rl.runID, "experiment", name)
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunExperiment(rl.runID, name); err != nil {
 			rl.t.Logf("warn: RunLog.SetExperiment: DB UpdateRunExperiment: %v", err)
@@ -450,8 +503,8 @@ func (rl *RunLog) SetCategory(category string) { //nolint:deadcode
 
 	rl.writef("category: %s\n", category)
 
-	if rl.daemon != nil {
-		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "category", category)
+	if rl.daemon != nil && rl.runID != 0 {
+		rl.daemon.setMetadataNF(rl.t, rl.runID, "category", category)
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunCategory(rl.runID, category); err != nil {
 			rl.t.Logf("warn: RunLog.SetCategory: DB UpdateRunCategory: %v", err)
@@ -472,8 +525,8 @@ func (rl *RunLog) SetTestType(testType string) { //nolint:deadcode
 
 	rl.writef("test_type: %s\n", testType)
 
-	if rl.daemon != nil {
-		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "test_type", testType)
+	if rl.daemon != nil && rl.runID != 0 {
+		rl.daemon.setMetadataNF(rl.t, rl.runID, "test_type", testType)
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunField(rl.runID, "test_type", testType); err != nil {
 			rl.t.Logf("warn: RunLog.SetTestType: DB UpdateRunField: %v", err)
@@ -495,8 +548,8 @@ func (rl *RunLog) SetTimeout(d time.Duration) { //nolint:deadcode
 
 	rl.writef("timeout: %.0fs\n", sec)
 
-	if rl.daemon != nil {
-		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "timeout_seconds", fmt.Sprintf("%.0f", sec))
+	if rl.daemon != nil && rl.runID != 0 {
+		rl.daemon.setMetadataNF(rl.t, rl.runID, "timeout_seconds", fmt.Sprintf("%.0f", sec))
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunTimeout(rl.runID, sec); err != nil {
 			rl.t.Logf("warn: RunLog.SetTimeout: DB UpdateRunTimeout: %v", err)
@@ -513,8 +566,8 @@ func (rl *RunLog) SetCoverage(coveragePct float64, coverageData string) { //noli
 	rl.coverageData = coverageData
 	rl.mu.Unlock()
 	rl.writef("coverage: %.1f%%\n", coveragePct)
-	if rl.daemon != nil {
-		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "coverage_pct", fmt.Sprintf("%.4f", coveragePct))
+	if rl.daemon != nil && rl.runID != 0 {
+		rl.daemon.setMetadataNF(rl.t, rl.runID, "coverage_pct", fmt.Sprintf("%.4f", coveragePct))
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunCoverage(rl.runID, coveragePct, coverageData); err != nil {
 			rl.t.Logf("warn: RunLog.SetCoverage: DB UpdateRunCoverage: %v", err)
@@ -540,8 +593,8 @@ func (rl *RunLog) SetAppVersion(version string) { //nolint:deadcode
 	rl.writef("app_version: %s\n", version)
 
 	// Persist to the DB run row (best-effort).
-	if rl.daemon != nil {
-		rl.daemon.setMetadataNF(rl.t, rl.daemonRunID, "app_version", version)
+	if rl.daemon != nil && rl.runID != 0 {
+		rl.daemon.setMetadataNF(rl.t, rl.runID, "app_version", version)
 	} else if rl.db != nil && rl.runID != 0 {
 		if err := rl.db.UpdateRunAppVersion(rl.runID, version); err != nil {
 			rl.t.Logf("warn: RunLog.SetAppVersion: DB UpdateRunAppVersion: %v", err)
@@ -836,6 +889,14 @@ func (rl *RunLog) HTTPCall(method, url string, statusCode int, requestBody, resp
 // High-level HTTP helpers — make the call, measure duration, log http_call, return result
 // ─────────────────────────────────────────────────────────────────────────────
 
+// SetHTTPAuth configures the Authorization and X-Project-ID headers that are
+// automatically injected into every rl.HTTPGet/Post/Put/Delete/Do call.
+// Call once at the start of a test; pass empty strings to clear.
+func (rl *RunLog) SetHTTPAuth(token, projectID string) { //nolint:deadcode
+	rl.httpToken = token
+	rl.httpProject = projectID
+}
+
 // HTTPDo makes an HTTP request, measures its round-trip duration, logs an
 // http_call event, and returns an *HTTPResult for chainable assertions.
 // Optional expects run inline after the call; failures call rl.Failf.
@@ -933,6 +994,16 @@ func (rl *RunLog) HTTPDelete(url string, expects ...HTTPExpect) *HTTPResult { //
 // doHTTP is the internal implementation shared by all HTTP helpers.
 func (rl *RunLog) doHTTP(req *http.Request, reqBody []byte) *HTTPResult { //nolint:deadcode
 	rl.t.Helper()
+	if rl.httpToken != "" {
+		if strings.HasPrefix(rl.httpToken, "Bearer ") || strings.HasPrefix(rl.httpToken, "bearer ") {
+			req.Header.Set("Authorization", rl.httpToken)
+		} else {
+			req.Header.Set("Authorization", "Bearer "+rl.httpToken)
+		}
+	}
+	if rl.httpProject != "" {
+		req.Header.Set("X-Project-ID", rl.httpProject)
+	}
 	start := time.Now()
 	resp, err := http.DefaultClient.Do(req)
 	duration := time.Since(start)
@@ -987,6 +1058,24 @@ func (rl *RunLog) Event(kind, message string, details any) { //nolint:deadcode
 	ts := fmt.Sprintf("%.1fs", time.Since(rl.StartedAt).Seconds())
 	rl.writef("[%s] [%s] %s\n", ts, kind, message)
 	rl.dbEvent(kind, message, details, 0)
+}
+
+// EventErr emits a structured error event. If err is nil, behaves like Event.
+// Otherwise appends ": <err.Error()>" to the message and includes the error
+// string under a "error" key in details.
+func (rl *RunLog) EventErr(kind, message string, err error, details map[string]any) { //nolint:deadcode
+	rl.t.Helper()
+	msg := message
+	det := details
+	if err != nil {
+		msg = message + ": " + err.Error()
+		if det == nil {
+			det = map[string]any{"error": err.Error()}
+		} else {
+			det["error"] = err.Error()
+		}
+	}
+	rl.Event(kind, msg, det)
 }
 
 // Group emits a single parent event in the DB whose children are the lines
@@ -1114,7 +1203,7 @@ func (rl *RunLog) writeLocked(s string) { //nolint:deadcode
 func (rl *RunLog) dbEvent(kind, message string, details any, duration time.Duration) { //nolint:deadcode
 	elapsed := time.Since(rl.StartedAt).Seconds()
 	if rl.daemon != nil {
-		rl.daemon.addEventNF(rl.t, rl.daemonRunID, kind, message, details, elapsed, durationToMs(duration))
+		rl.daemon.addEventNF(rl.t, rl.runID, kind, message, details, elapsed, durationToMs(duration))
 		return
 	}
 	if rl.db == nil || rl.runID == 0 {
@@ -1527,9 +1616,21 @@ func GitCommitHash(filePath string) string { //nolint:deadcode
 // other configuration that affects test behavior.
 //
 // The returned map may be empty if no tracked variables are set.
+var sensitiveKeyPattern = []string{
+	"API_KEY", "TOKEN", "SECRET",
+}
+
+func isSensitiveKey(key string) bool {
+	upper := strings.ToUpper(key)
+	for _, p := range sensitiveKeyPattern {
+		if strings.Contains(upper, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func captureEnvVars() map[string]string { //nolint:deadcode
-	// List of environment variables to capture.
-	// Add any variable you want to see in runlog output here.
 	trackedVars := []string{
 		"GOOGLE_AI_API_KEY",
 		"MEMORY_TEST_SERVER",
@@ -1544,7 +1645,11 @@ func captureEnvVars() map[string]string { //nolint:deadcode
 	result := make(map[string]string)
 	for _, key := range trackedVars {
 		if val := os.Getenv(key); val != "" {
-			result[key] = val
+			if isSensitiveKey(key) {
+				result[key] = "***"
+			} else {
+				result[key] = val
+			}
 		}
 	}
 	return result

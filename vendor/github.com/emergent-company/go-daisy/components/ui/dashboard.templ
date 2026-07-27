@@ -1,0 +1,86 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// DashboardGrid renders a responsive CSS grid for dashboard widgets.
+// cols is the number of columns at full width (e.g. 1, 2, 3, 4, 12).
+// Widgets placed inside automatically resize for tablet and mobile.
+//
+// Common patterns:
+//   cols=4 → 4 equal stat cards side by side
+//   cols=12 → fine-grained column spans for complex grids
+templ DashboardGrid(cols int) {
+	<div
+		class={
+			"grid gap-4",
+			templ.KV("grid-cols-"+strconv.Itoa(cols), cols > 0),
+			templ.KV("md:grid-cols-"+strconv.Itoa(max(cols, 2)), cols > 0),
+			"sm:grid-cols-1",
+		}
+		{ devmode.Attrs(ctx, "ui/DashboardGrid")... }
+	>
+		{ children... }
+	</div>
+}
+
+// DashboardCard wraps a chart or stat component in a card with title and optional subtitle.
+// Children are placed in the card body after the optional title/subtitle header.
+templ DashboardCard(title string, subtitle string) {
+	<div
+		class="card bg-base-100 border border-base-200 shadow-sm"
+		{ devmode.Attrs(ctx, "ui/DashboardCard")... }
+	>
+		<div class="card-body p-5">
+			if title != "" {
+				<div class="mb-3">
+					<h3 class="text-base font-semibold text-base-content">{ title }</h3>
+					if subtitle != "" {
+						<p class="text-sm text-base-content/60 mt-0.5">{ subtitle }</p>
+					}
+				</div>
+			}
+			{ children... }
+		</div>
+	</div>
+}
+
+// DashboardRow renders a horizontal flex row with optional gap.
+// Each child gets equal space.
+templ DashboardRow() {
+	<div
+		class="flex flex-col lg:flex-row gap-4"
+		{ devmode.Attrs(ctx, "ui/DashboardRow")... }
+	>
+		{ children... }
+	</div>
+}
+
+// DashboardColumn renders a flex column that occupies a fraction of a DashboardRow.
+// width: "1/4", "1/3", "2/3", "1/2", "3/4", "full". Empty = auto width.
+templ DashboardColumn(width string) {
+	<div
+		class={
+			"min-w-0",
+			templ.KV("lg:w-1/4", width == "1/4"),
+			templ.KV("lg:w-1/3", width == "1/3"),
+			templ.KV("lg:w-2/3", width == "2/3"),
+			templ.KV("lg:w-1/2", width == "1/2"),
+			templ.KV("lg:w-3/4", width == "3/4"),
+			templ.KV("w-full", width == "full"),
+		}
+		{ devmode.Attrs(ctx, "ui/DashboardColumn")... }
+	>
+		{ children... }
+	</div>
+}
+
+// DashboardSection renders a labeled section header for grouping dashboard content.
+templ DashboardSection(title string) {
+	<div class="mb-3" { devmode.Attrs(ctx, "ui/DashboardSection")... }>
+		<h2 class="text-lg font-semibold text-base-content">{ title }</h2>
+	</div>
+}

@@ -4,6 +4,9 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var commandPaletteTriggerOnce = templ.NewOnceHandle()
+var commandPaletteScriptOnce = templ.NewOnceHandle()
+
 // CommandPaletteItem represents a single action in the command palette.
 type CommandPaletteItem struct {
 	ID          string
@@ -20,6 +23,7 @@ type CommandPaletteProps struct {
 	ID          string
 	Placeholder string
 	Items       []CommandPaletteItem
+	ItemsURL    string // JSON endpoint for remote results (fetched client-side)
 	Groups      []string
 	Open        bool
 	Attrs       templ.Attributes
@@ -46,7 +50,11 @@ templ CommandPalette(props CommandPaletteProps) {
 				/>
 				<label for={ props.ID + "-toggle" } class="btn btn-ghost btn-xs">Esc</label>
 			</div>
-			<div class="max-h-80 overflow-y-auto p-2" id={ props.ID + "-results" }>
+			<div class="max-h-80 overflow-y-auto p-2" id={ props.ID + "-results" }
+			if props.ItemsURL != "" {
+				data-items-url={ props.ItemsURL }
+			}
+		>
 				for _, group := range props.Groups {
 					@paletteGroup(props.ID, group, props.Items)
 				}
@@ -106,7 +114,8 @@ templ paletteGroup(paletteID, group string, items []CommandPaletteItem) {
 }
 
 templ commandPaletteTrigger(paletteID string) {
-	<script>
+	@commandPaletteTriggerOnce.Once() {
+		<script>
 	if (!window._paletteTriggerInit) {
 	  window._paletteTriggerInit = true;
 
@@ -125,18 +134,86 @@ templ commandPaletteTrigger(paletteID string) {
 	    }
 	  });
 	}
-	</script>
+		</script>
+	}
 }
 
 templ commandPaletteScript() {
-	<script>
+	@commandPaletteScriptOnce.Once() {
+		<script>
 	if (!window._paletteFilterInit) {
 	  window._paletteFilterInit = true;
 
 	  window.filterPaletteItems = function(input) {
 	    var q = input.value.toLowerCase().trim();
-	    var results = document.getElementById(input.id.replace('-input', '-results'));
+	    var modal = input.closest('.modal');
+	    var results = modal ? modal.querySelector('[id$="-results"]') : document.getElementById(input.id.replace('-input', '-results'));
 	    if (!results) return;
+
+	    if (results.dataset.itemsUrl && !window['_paletteFetched' + results.id]) {
+	      window['_paletteFetched' + results.id] = true;
+	      var xhr = new XMLHttpRequest();
+	      xhr.open('GET', results.dataset.itemsUrl);
+	      xhr.onload = function() {
+	        if (xhr.status === 200) {
+	          try {
+	            var data = JSON.parse(xhr.responseText);
+	            window['_paletteRemote' + results.id] = data;
+	          } catch(e) {}
+	        }
+	        filterResults(q, results);
+	      };
+	      xhr.send();
+	      return;
+	    }
+	    filterResults(q, results);
+	  };
+
+	  function filterResults(q, results) {
+	    var remote = window['_paletteRemote' + results.id] || [];
+	    if (remote.length) {
+	      var existing = results.querySelector('[data-remote-results]');
+	      if (existing) existing.remove();
+	      var div = document.createElement('div');
+	      div.setAttribute('data-remote-results', '');
+	      var found = 0;
+	      remote.forEach(function(item) {
+	        var label = (item.label || item.title || '').toLowerCase();
+	        var desc = (item.description || '').toLowerCase();
+	        var section = (item.section || item.group || '').toLowerCase();
+	        if (q && !label.includes(q) && !desc.includes(q) && !section.includes(q)) return;
+	        found++;
+	        var a = document.createElement('a');
+	        a.className = 'flex items-center gap-3 px-3 py-2.5 rounded-box hover:bg-base-200 cursor-pointer transition-colors';
+	        a.href = item.href || '#';
+	        if (item.icon) {
+	          var icon = document.createElement('span');
+	          icon.className = 'iconify size-4 shrink-0 text-base-content/50 ' + item.icon;
+	          a.appendChild(icon);
+	        }
+	        var body = document.createElement('div');
+	        body.className = 'flex-1 min-w-0';
+	        var title = document.createElement('p');
+	        title.className = 'text-sm font-medium text-base-content truncate';
+	        title.textContent = item.label || item.title;
+	        body.appendChild(title);
+	        if (item.description) {
+	          var d = document.createElement('p');
+	          d.className = 'text-xs text-base-content/40 truncate';
+	          d.textContent = item.description;
+	          body.appendChild(d);
+	        }
+	        a.appendChild(body);
+	        div.appendChild(a);
+	      });
+	      if (found === 0 && q) {
+	        var empty = document.createElement('p');
+	        empty.className = 'text-sm text-base-content/40 text-center py-4';
+	        empty.textContent = 'No results found.';
+	        div.appendChild(empty);
+	      }
+	      results.appendChild(div);
+	    }
 	    results.querySelectorAll('[data-palette-group]').forEach(function(group) {
 	      var items = group.querySelectorAll('[data-label]');
 	      var hasVisible = false;
@@ -149,7 +226,8 @@ templ commandPaletteScript() {
 	      var header = group.querySelector('p');
 	      if (header) header.style.display = hasVisible ? '' : 'none';
 	    });
-	  };
+	  }
 	}
 	</script>
+	}
 }

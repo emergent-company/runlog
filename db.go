@@ -386,6 +386,14 @@ DROP INDEX IF EXISTS idx_run_events_parent_id;
 `,
 	},
 	{
+		version: 26,
+		sql: `
+-- v26 was an experimental draft that was abandoned before release.
+-- Cleaned up at application startup — no schema changes from v26 remain.
+-- Present as a placeholder to keep the migration sequence contiguous.
+`,
+	},
+	{
 		version: 27,
 		sql: `
 -- test_definitions stores known test functions from filesystem discovery.
@@ -408,6 +416,22 @@ CREATE TABLE IF NOT EXISTS test_definitions (
 -- duration_ms records how long a single event took (e.g. HTTP call, CLI
 -- execution). NULL when not applicable (log lines, tags, sections).
 ALTER TABLE run_events ADD COLUMN duration_ms REAL;
+`,
+	},
+	{
+		version: 29,
+		sql: `
+-- test_name captures the Go test function name (t.Name()) for each event
+-- so the TUI/inspector can group events by test within a daemon batch run.
+ALTER TABLE run_events ADD COLUMN test_name TEXT NOT NULL DEFAULT '';
+`,
+	},
+	{
+		version: 30,
+		sql: `
+-- work_dir stores the working directory from which the test batch was run.
+-- Used by the daemon UI "rerun" action to spawn go test from the correct directory.
+ALTER TABLE daemon_runs ADD COLUMN work_dir TEXT NOT NULL DEFAULT '';
 `,
 	},
 }
@@ -476,6 +500,16 @@ func (rdb *RunDB) applyMigrations() error {
 		return fmt.Errorf("rundb: bootstrap migrations table: %w", err)
 	}
 
+	// Validate migrations are contiguous.
+	for i := range migrations {
+		if i == 0 {
+			continue
+		}
+		if migrations[i].version != migrations[i-1].version+1 {
+			return fmt.Errorf("rundb: non-contiguous migration version: %d follows %d", migrations[i].version, migrations[i-1].version)
+		}
+	}
+
 	for _, m := range migrations {
 		var exists int
 		row := rdb.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, m.version)
@@ -513,7 +547,7 @@ func (rdb *RunDB) ListEventsSince(runID int64, sinceID int64) ([]EventRow, error
 	defer rdb.mu.Unlock()
 
 	rows, err := rdb.db.Query(`
-        SELECT id, run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section, children
+        SELECT id, run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section, test_name, children
         FROM run_events
         WHERE run_id = ? AND id > ?
         ORDER BY seq
@@ -539,6 +573,7 @@ func (rdb *RunDB) ListEventsSince(runID int64, sinceID int64) ([]EventRow, error
 			&row.Message,
 			&row.Details,
 			&row.Section,
+			&row.TestName,
 			&childrenJSON,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListEventsSince scan: %w", err)
@@ -700,10 +735,24 @@ func (rdb *RunDB) UpdateRunTimeout(id int64, timeoutSeconds float64) error {
 	return err
 }
 
+// allowedUpdateFields lists columns that UpdateRunField is permitted to set.
+var allowedUpdateFields = map[string]bool{
+	"test_type":    true,
+	"category":     true,
+	"experiment":   true,
+	"description":  true,
+	"app_version":  true,
+	"test_version": true,
+}
+
 // UpdateRunField updates a single text column on the test_runs row identified by id.
-// field is the column name (e.g. "test_type", "category", "experiment").
+// field must be one of the allowed column names; unknown fields return an error
+// to prevent SQL injection.
 // value is the new text value.
 func (rdb *RunDB) UpdateRunField(id int64, field, value string) error {
+	if !allowedUpdateFields[field] {
+		return fmt.Errorf("UpdateRunField: %q is not an allowed column", field)
+	}
 	rdb.mu.Lock()
 	defer rdb.mu.Unlock()
 	q := fmt.Sprintf(`UPDATE test_runs SET %s = ? WHERE id = ?`, field)
@@ -1017,6 +1066,7 @@ type EventRow struct {
 	Message    string
 	Details    *string      // raw JSON, nil if absent
 	Section    string       // grouping label (empty = top-level, no group)
+	TestName   string       // Go test function name (populated by daemon events)
 	ParentID   *int64       // legacy; nil for new rows
 	Children   []ChildEvent // legacy; may be populated for old data
 }
@@ -2036,7 +2086,7 @@ func (rdb *RunDB) ListEvents(runID int64) ([]EventRow, error) {
 	defer rdb.mu.Unlock()
 
 	rows, err := rdb.db.Query(`
-        SELECT id, run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section, children
+        SELECT id, run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, section, test_name, children
         FROM run_events
         WHERE run_id = ?
         ORDER BY seq
@@ -2062,6 +2112,7 @@ func (rdb *RunDB) ListEvents(runID int64) ([]EventRow, error) {
 			&row.Message,
 			&row.Details,
 			&row.Section,
+			&row.TestName,
 			&childrenJSON,
 		); err != nil {
 			return nil, fmt.Errorf("rundb: ListEvents scan: %w", err)

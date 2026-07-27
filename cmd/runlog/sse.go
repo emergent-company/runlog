@@ -15,6 +15,15 @@ type SSEEvent struct {
 	Data  string
 }
 
+type SSECommand struct {
+	Cmd      string `json:"cmd"`
+	Target   string `json:"target,omitempty"`
+	HTML     string `json:"html,omitempty"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Status   string `json:"status,omitempty"`
+}
+
 type SSEBroker struct {
 	mu        sync.Mutex
 	clients   map[string][]chan SSEEvent
@@ -68,6 +77,11 @@ func (b *SSEBroker) Publish(topic string, event SSEEvent) {
 	}
 }
 
+func (b *SSEBroker) PublishCmd(topic string, event string, cmd SSECommand) {
+	data, _ := json.Marshal(cmd)
+	b.Publish(topic, SSEEvent{Event: event, Data: string(data)})
+}
+
 func (b *SSEBroker) Run(ctx context.Context) {
 	go b.runFooterPoller(ctx)
 }
@@ -106,8 +120,7 @@ func (b *SSEBroker) runFooterPoller(ctx context.Context) {
 				`<div class="status status-success status-xs"></div><span class="text-base-content/50">Running — %d runs, %d tests</span><span class="text-base-content/30 ml-2">up %s</span>%s`,
 				totalRuns, totalTests, uptimeStr, linterStatus,
 			)
-			data, _ := json.Marshal(map[string]string{"html": html})
-			b.Publish("footer", SSEEvent{Event: "footer-status", Data: string(data)})
+			b.PublishCmd("footer", "cmd", SSECommand{Cmd: "replace-html", Target: "#footer-status", HTML: html})
 
 		case <-ctx.Done():
 			return

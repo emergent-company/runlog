@@ -1,0 +1,33 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// DatalistOption is a single option in a datalist autocomplete.
+type DatalistOption struct {
+	Value string
+	Label string
+}
+
+// DatalistInput renders a text input with an associated <datalist> for
+// native browser autocomplete. Options appear as suggestions when the
+// user starts typing.
+templ DatalistInput(id string, placeholder string, options []DatalistOption) {
+	{{
+		listID := id + "-list"
+	}}
+	<input
+		type="text"
+		id={ id }
+		list={ listID }
+		placeholder={ placeholder }
+		class="input input-bordered w-full"
+		{ devmode.Attrs(ctx, "form/DatalistInput")... }
+	/>
+	<datalist id={ listID }>
+		for _, opt := range options {
+			{{ val := opt.Value }}
+			{{ if val == "" { val = opt.Label } }}
+			<option value={ val }>{ opt.Label }</option>
+		}
+	</datalist>
+}

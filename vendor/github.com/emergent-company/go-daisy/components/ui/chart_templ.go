@@ -10,22 +10,27 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"encoding/json"
-	"strconv"
 
 	"github.com/emergent-company/go-daisy/devmode"
 )
+
+var chartScriptOnce = templ.NewOnceHandle()
 
 // ChartType represents the ApexCharts chart type.
 type ChartType string
 
 const (
-	ChartArea   ChartType = "area"
-	ChartBar    ChartType = "bar"
-	ChartColumn ChartType = "column"
-	ChartLine   ChartType = "line"
-	ChartPie    ChartType = "pie"
-	ChartDonut  ChartType = "donut"
-	ChartRadial ChartType = "radial"
+	ChartArea     ChartType = "area"
+	ChartBar      ChartType = "bar"
+	ChartColumn   ChartType = "column"
+	ChartLine     ChartType = "line"
+	ChartPie      ChartType = "pie"
+	ChartDonut    ChartType = "donut"
+	ChartRadial   ChartType = "radial"
+	ChartRangeBar ChartType = "rangeBar"
+	ChartHeatmap  ChartType = "heatmap"
+	ChartRadar    ChartType = "radar"
+	ChartScatter  ChartType = "scatter"
 )
 
 // ChartSeries is a single data series for ApexCharts.
@@ -34,29 +39,120 @@ type ChartSeries struct {
 	Data []float64 `json:"data"`
 }
 
-// ChartProps configures an ApexCharts chart.
-type ChartProps struct {
-	ID         string
-	Type       ChartType
-	Title      string
-	Height     string // e.g. "350", "200"
-	Width      string // e.g. "100%"
-	Series     []ChartSeries
-	Categories []string // x-axis labels
-	Colors     []string // optional color palette
-	Sparkline  bool     // enable sparkline mode
-	Attrs      templ.Attributes
+// ChartAnnotation configures a y-axis, x-axis, or point annotation line/label.
+type ChartAnnotation struct {
+	Type  string  // "yaxis", "xaxis", "point"
+	Value float64 `json:"value"`
+	Extra float64 `json:"extra,omitempty"` // y-coordinate for point annotations
+	Label string  `json:"label,omitempty"`
+	Color string  `json:"borderColor,omitempty"`
 }
 
-// chartHeight returns height with default fallback.
+// ChartColorStop defines a gradient color stop for fill.type = "gradient".
+type ChartColorStop struct {
+	Offset  int     `json:"offset"`
+	Color   string  `json:"color"`
+	Opacity float64 `json:"opacity"`
+}
+
+// ChartProps configures an ApexCharts chart. All fields except ID, Type, and Series are optional.
+type ChartProps struct {
+	ID    string
+	Type  ChartType
+	Title string
+
+	Height string // e.g. "350", "200" — px appended automatically
+	Width  string // e.g. "100%"
+
+	Series     []ChartSeries
+	Categories []string // x-axis labels (or segment labels for pie/donut/radial)
+	Colors     []string // custom color palette
+
+	// ── Stacking ──────────────────────────────────────────────────
+	Stacked   bool   // enable stacked bars/columns
+	StackType string // "normal" (default) or "100%" for percentage stack
+
+	// ── Fill ──────────────────────────────────────────────────────
+	FillType     string           // "solid", "gradient", "pattern"
+	FillOpacity  float64          // 0.0-1.0 (default 1.0)
+	FillGradient []ChartColorStop // gradient stops for fill.type = "gradient"
+
+	// ── Stroke ────────────────────────────────────────────────────
+	StrokeCurve      string    // "smooth" (default), "straight", "stepline"
+	StrokeWidth      float64   // line width in px (default 2)
+	StrokeWidthSlice []float64 // per-series stroke widths (overrides StrokeWidth when set)
+	StrokeDash       int       // dash array value (0 = solid line)
+
+	// ── Data Labels ───────────────────────────────────────────────
+	ShowDataLabels     bool   // show values on chart elements
+	DataLabelFormatter string // JS function body for data label formatter, e.g. "return val + '%'"
+
+	// ── Tooltip ───────────────────────────────────────────────────
+	TooltipShared    bool // shared tooltip across series
+	TooltipIntersect bool // tooltip only on exact intersection (default true for bar)
+
+	// ── Forecast ──────────────────────────────────────────────────
+	ForecastCount int // number of data points to mark as forecast (dashed)
+
+	// ── Goals ────────────────────────────────────────────────────
+	GoalValues []float64 // horizontal goal markers (bar charts)
+
+	// ── Group ─────────────────────────────────────────────────────
+	GroupID string // for synced chart groups (same ID = synchronized tooltips)
+
+	// ── Legend ────────────────────────────────────────────────────
+	LegendPosition string // "bottom" (default), "top", "right", "left"
+
+	// ── Annotations ───────────────────────────────────────────────
+	Annotations []ChartAnnotation // reference lines/labels
+
+	// ── Bar/Column ────────────────────────────────────────────────
+	Horizontal      bool    // horizontal bars (auto-set for ChartBar, manual override)
+	Dumbbell        bool    // rangeBar with isDumbbell:true
+	BarBorderRadius float64 // bar end radius in px (0 = square)
+	BarColumnWidth  string  // column width, e.g. "65%" or "100px"
+	Distributed     bool    // one color per bar (ignores series-level color mapping)
+
+	// ── Bar background ─────────────────────────────────────────────
+	BarBackgroundColors []string // background bar column colors
+	BarBackgroundRadius float64  // background bar column radius
+	BarHeight           string   // bar height, e.g. "100%"
+
+	// ── Grid / Axis visibility ─────────────────────────────────────
+	GridShow        *bool // if false, grid is hidden (default true)
+	YAxisShow       *bool // if false, y-axis is hidden (default true)
+	YAxisLabelsShow *bool // if false, y-axis labels are hidden
+	XAxisTickShow   *bool // if false, x-axis ticks hidden
+
+	// ── Pie/Donut ─────────────────────────────────────────────────
+	Monochrome bool // single-color pie with shadeIntensity (overrides Colors)
+
+	// ── Sparkline ─────────────────────────────────────────────────
+	Sparkline bool // compact inline chart (no axes, no toolbar)
+
+	// ── Responsive ────────────────────────────────────────────────
+	ResponsiveBreakpoints []ResponsiveBreakpoint // mobile breakpoint overrides
+
+	// ── Raw config passthrough ─────────────────────────────────────
+	RawConfigJSON string // if set, bypasses chartOptionsJSON and uses this raw ApexCharts config
+
+	Attrs templ.Attributes
+}
+
+// ResponsiveBreakpoint defines a breakpoint-specific chart option override.
+type ResponsiveBreakpoint struct {
+	Breakpoint int            `json:"breakpoint"`
+	Options    map[string]any `json:"options"`
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
 func chartHeight(s string) string {
 	if s == "" {
 		return "350"
 	}
 	return s
 }
-
-// chartWidth returns width with default fallback.
 func chartWidth(s string) string {
 	if s == "" {
 		return "100%"
@@ -64,15 +160,22 @@ func chartWidth(s string) string {
 	return s
 }
 
-// chartTypeToApex converts ChartType to the ApexCharts wire string.
 func chartTypeToApex(t ChartType) string {
-	if t == ChartColumn {
+	switch t {
+	case ChartColumn, ChartRangeBar:
 		return "bar"
+	case ChartHeatmap:
+		return "heatmap"
+	case ChartRadar:
+		return "radar"
+	case ChartScatter:
+		return "scatter"
+	default:
+		return string(t)
 	}
-	return string(t)
 }
 
-// Chart renders an ApexCharts chart div with Alpine.js init.
+// Chart renders an ApexCharts chart div with lazy-loaded init.
 func Chart(props ChartProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -101,20 +204,20 @@ func Chart(props ChartProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/chart.templ`, Line: 70, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/chart.templ`, Line: 163, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" class=\"chart-container\" style=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" style=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("width:" + chartWidth(props.Width) + ";height:" + chartHeight(props.Height) + "px")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/chart.templ`, Line: 72, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/chart.templ`, Line: 164, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -125,9 +228,9 @@ func Chart(props ChartProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(chartOptionsJSON(props))
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(chartOptions(props))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/chart.templ`, Line: 74, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/chart.templ`, Line: 166, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -149,100 +252,318 @@ func Chart(props ChartProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = apexChartScript().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		if props.RawConfigJSON == "" {
+			templ_7745c5c3_Err = apexChartScript().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})
 }
 
-// chartOptionsJSON builds the ApexCharts options JSON.
+func chartOptions(props ChartProps) string {
+	if props.RawConfigJSON != "" {
+		return props.RawConfigJSON
+	}
+	return chartOptionsJSON(props)
+}
+
+// chartOptionsJSON builds the full ApexCharts options JSON.
 func chartOptionsJSON(props ChartProps) string {
-	type chart struct {
-		Type      string `json:"type"`
-		Sparkline struct {
-			Enabled bool `json:"enabled"`
-		} `json:"sparkline,omitempty"`
-		Toolbar struct {
-			Show bool `json:"show"`
-		} `json:"toolbar,omitempty"`
+	apexType := chartTypeToApex(props.Type)
+	sparkline := props.Sparkline
+	isCircular := apexType == "pie" || apexType == "donut" || apexType == "radialBar"
+	isRadar := apexType == "radar"
+	isScatter := apexType == "scatter"
+
+	// Chart
+	chartObj := map[string]any{
+		"type":      apexType,
+		"sparkline": map[string]bool{"enabled": sparkline},
+		"toolbar":   map[string]bool{"show": !sparkline},
 	}
-	type title struct {
-		Text  string            `json:"text,omitempty"`
-		Style map[string]string `json:"style,omitempty"`
+	if props.ForecastCount > 0 {
+		chartObj["forecastDataPoints"] = map[string]int{"count": props.ForecastCount}
 	}
-	type xaxis struct {
-		Categories []string `json:"categories,omitempty"`
-	}
-	type stroke struct {
-		Curve string `json:"curve,omitempty"`
-	}
-	type dataLabels struct {
-		Enabled bool `json:"enabled"`
-	}
-	type plotOptsBar struct {
-		Horizontal bool `json:"horizontal"`
-	}
-	type plotOptions struct {
-		Bar plotOptsBar `json:"bar,omitempty"`
-	}
-	type options struct {
-		Chart       chart         `json:"chart"`
-		Title       title         `json:"title,omitempty"`
-		Series      []ChartSeries `json:"series"`
-		Xaxis       xaxis         `json:"xaxis,omitempty"`
-		Stroke      stroke        `json:"stroke,omitempty"`
-		DataLabels  dataLabels    `json:"dataLabels"`
-		PlotOptions plotOptions   `json:"plotOptions,omitempty"`
-		Colors      []string      `json:"colors,omitempty"`
-		Labels      []string      `json:"labels,omitempty"`
+	if props.GroupID != "" {
+		chartObj["group"] = props.GroupID
 	}
 
-	chartType := chartTypeToApex(props.Type)
-	sparklineEnabled := props.Sparkline
-
-	opts := options{
-		Chart: chart{
-			Type: chartType,
-			Sparkline: struct {
-				Enabled bool `json:"enabled"`
-			}{Enabled: sparklineEnabled},
-			Toolbar: struct {
-				Show bool `json:"show"`
-			}{Show: !sparklineEnabled},
-		},
-		Title:      title{Text: props.Title},
-		Series:     props.Series,
-		Xaxis:      xaxis{Categories: props.Categories},
-		DataLabels: dataLabels{Enabled: false},
+	opts := map[string]any{
+		"chart": chartObj,
+	}
+	if !sparkline {
+		if props.Title != "" {
+			opts["title"] = map[string]string{"text": props.Title}
+		}
+		if props.LegendPosition != "" {
+			opts["legend"] = map[string]string{"position": props.LegendPosition}
+		}
 	}
 
-	if chartType == "bar" && props.Type == ChartBar {
-		opts.PlotOptions.Bar.Horizontal = true
+	// Series
+	opts["series"] = props.Series
+
+	// X-axis categories / labels
+	if !isCircular && !isRadar && len(props.Categories) > 0 {
+		xaxis := map[string]any{"categories": props.Categories}
+		if props.XAxisTickShow != nil && !*props.XAxisTickShow {
+			xaxis["axisTicks"] = map[string]bool{"show": false}
+			xaxis["axisBorder"] = map[string]bool{"show": false}
+		}
+		opts["xaxis"] = xaxis
+	}
+	if isCircular && len(props.Categories) > 0 {
+		opts["labels"] = props.Categories
 	}
 
-	if chartType == "pie" || chartType == "donut" || chartType == "radial" {
-		opts.Labels = props.Categories
+	// Grid
+	if props.GridShow != nil && !*props.GridShow {
+		opts["grid"] = map[string]bool{"show": false}
 	}
 
-	if len(props.Colors) > 0 {
-		opts.Colors = props.Colors
+	// Y-axis
+	if props.YAxisShow != nil || props.YAxisLabelsShow != nil {
+		yaxis := map[string]any{}
+		if props.YAxisShow != nil && !*props.YAxisShow {
+			yaxis["show"] = false
+		}
+		if props.YAxisLabelsShow != nil && !*props.YAxisLabelsShow {
+			yaxis["labels"] = map[string]bool{"show": false}
+		}
+		if props.YAxisShow != nil || props.YAxisLabelsShow != nil {
+			yaxis["axisBorder"] = map[string]bool{"show": false}
+			yaxis["axisTicks"] = map[string]bool{"show": false}
+		}
+		if len(yaxis) > 0 {
+			opts["yaxis"] = yaxis
+		}
 	}
 
-	if !sparklineEnabled && chartType != "pie" && chartType != "donut" && chartType != "radial" {
-		opts.Stroke.Curve = "smooth"
+	// Colors
+	if props.Monochrome && isCircular {
+		opts["theme"] = map[string]any{"monochrome": map[string]float64{"enabled": 1, "shadeIntensity": 0.8}}
+	} else if len(props.Colors) > 0 {
+		opts["colors"] = props.Colors
+	}
+
+	// Data labels
+	if props.ShowDataLabels {
+		dl := map[string]any{"enabled": true}
+		if props.DataLabelFormatter != "" {
+			dl["formatter"] = "function(val, opt) { " + props.DataLabelFormatter + " }"
+		}
+		opts["dataLabels"] = dl
+	} else {
+		opts["dataLabels"] = map[string]bool{"enabled": false}
+	}
+
+	// Stroke (skip for bar/column — NX doesn't set stroke on bar charts)
+	if !isCircular && apexType != "bar" {
+		stroke := map[string]any{}
+		curve := props.StrokeCurve
+		if curve == "" {
+			curve = "smooth"
+		}
+		stroke["curve"] = curve
+		if len(props.StrokeWidthSlice) > 0 {
+			stroke["width"] = props.StrokeWidthSlice
+		} else if props.StrokeWidth > 0 {
+			stroke["width"] = props.StrokeWidth
+		}
+		if props.StrokeDash > 0 {
+			stroke["dashArray"] = []int{props.StrokeDash}
+		}
+		if props.ForecastCount > 0 {
+			stroke["dashArray"] = props.ForecastCount
+		}
+		opts["stroke"] = stroke
+	}
+
+	// Tooltip
+	if props.TooltipShared || !props.TooltipIntersect {
+		tt := map[string]any{}
+		if props.TooltipShared {
+			tt["shared"] = true
+		}
+		if !props.TooltipIntersect {
+			tt["intersect"] = false
+		}
+		if len(tt) > 0 {
+			opts["tooltip"] = tt
+		}
+	}
+
+	// Fill
+	if props.FillType != "" && props.FillType != "solid" {
+		fill := map[string]any{"type": props.FillType}
+		if props.FillOpacity > 0 {
+			fill["opacity"] = props.FillOpacity
+		}
+		if props.FillType == "gradient" && len(props.FillGradient) > 0 {
+			stops := make([]map[string]any, len(props.FillGradient))
+			for i, s := range props.FillGradient {
+				stops[i] = map[string]any{
+					"offset":  s.Offset,
+					"color":   s.Color,
+					"opacity": s.Opacity,
+				}
+			}
+			fill["gradient"] = map[string]any{"shade": "dark", "type": "vertical", "colorStops": stops}
+		}
+		opts["fill"] = fill
+	}
+
+	// Plot options (bar/column settings)
+	if apexType == "bar" || isCircular {
+		plotOpts := map[string]any{}
+		barOpts := map[string]any{}
+
+		if props.Type == ChartBar || props.Horizontal {
+			barOpts["horizontal"] = true
+		}
+		if props.Stacked {
+			barOpts["stacked"] = true
+		} else if props.StackType == "100%" && !props.Stacked {
+			barOpts["stacked"] = true
+		}
+		if props.Type == ChartRangeBar {
+			barOpts["isDumbbell"] = props.Dumbbell
+		}
+		if props.Distributed {
+			barOpts["distributed"] = true
+		}
+		if props.BarBorderRadius > 0 {
+			barOpts["borderRadius"] = props.BarBorderRadius
+			barOpts["borderRadiusApplication"] = "end"
+		}
+		if props.BarColumnWidth != "" {
+			barOpts["columnWidth"] = props.BarColumnWidth
+		}
+		if props.BarHeight != "" {
+			barOpts["barHeight"] = props.BarHeight
+		}
+		if len(props.BarBackgroundColors) > 0 || props.BarBackgroundRadius > 0 {
+			bgColors := map[string]any{}
+			if len(props.BarBackgroundColors) > 0 {
+				barColorStrs := make([]string, len(props.BarBackgroundColors))
+				for i, c := range props.BarBackgroundColors {
+					barColorStrs[i] = c
+				}
+				bgColors["backgroundBarColors"] = barColorStrs
+			}
+			if props.BarBackgroundRadius > 0 {
+				bgColors["backgroundBarRadius"] = props.BarBackgroundRadius
+			}
+			barOpts["colors"] = bgColors
+		}
+		if props.BarBorderRadius > 0 && props.Stacked {
+			barOpts["borderRadiusWhenStacked"] = "last"
+		}
+		if props.Type == ChartColumn || props.Type == ChartRangeBar || props.Distributed {
+			if len(barOpts) > 0 {
+				plotOpts["bar"] = barOpts
+			}
+		}
+		if props.BarBorderRadius > 0 && props.Type == ChartBar {
+			plotOpts["bar"] = barOpts
+		}
+		if len(plotOpts) > 0 {
+			opts["plotOptions"] = plotOpts
+		}
+	}
+
+	// Goals
+	if len(props.GoalValues) > 0 && !isRadar && !isScatter {
+		goals := make([]map[string]any, len(props.GoalValues))
+		for i, v := range props.GoalValues {
+			goals[i] = map[string]any{
+				"value":           v,
+				"strokeWidth":     2,
+				"strokeDashArray": 4,
+				"strokeColor":     "#775DD0",
+			}
+		}
+		barOpts := map[string]any{"goals": goals}
+		if existing, ok := opts["plotOptions"]; ok {
+			po := existing.(map[string]any)
+			if bar, ok2 := po["bar"]; ok2 {
+				po["bar"] = mergeMaps(bar.(map[string]any), barOpts)
+			} else {
+				po["bar"] = barOpts
+			}
+		} else {
+			opts["plotOptions"] = map[string]any{"bar": barOpts}
+		}
+	}
+
+	// Annotations
+	if len(props.Annotations) > 0 {
+		yAnns := []map[string]any{}
+		xAnns := []map[string]any{}
+		pointAnns := []map[string]any{}
+		for _, a := range props.Annotations {
+			switch a.Type {
+			case "xaxis":
+				xAnns = append(xAnns, map[string]any{
+					"x":           a.Value,
+					"borderColor": a.Color,
+					"label": map[string]any{
+						"text":        a.Label,
+						"borderColor": a.Color,
+					},
+				})
+			case "point":
+				pointAnns = append(pointAnns, map[string]any{
+					"x":      a.Value,
+					"y":      a.Extra,
+					"marker": map[string]any{"size": 6},
+					"label": map[string]any{
+						"text":        a.Label,
+						"borderColor": a.Color,
+					},
+				})
+			default:
+				yAnns = append(yAnns, map[string]any{
+					"y":           a.Value,
+					"borderColor": a.Color,
+					"label": map[string]any{
+						"text":        a.Label,
+						"borderColor": a.Color,
+					},
+				})
+			}
+		}
+		annotations := map[string]any{}
+		if len(yAnns) > 0 {
+			annotations["yaxis"] = yAnns
+		}
+		if len(xAnns) > 0 {
+			annotations["xaxis"] = xAnns
+		}
+		if len(pointAnns) > 0 {
+			annotations["points"] = pointAnns
+		}
+		if len(annotations) > 0 {
+			opts["annotations"] = annotations
+		}
+	}
+
+	// Responsive breakpoints
+	if len(props.ResponsiveBreakpoints) > 0 {
+		opts["responsive"] = props.ResponsiveBreakpoints
 	}
 
 	b, _ := json.Marshal(opts)
 	return string(b)
 }
 
-// parseIntHeight extracts a numeric height from a string like "350" or "350px".
-func parseIntHeight(h string) int {
-	// For standalone use (not render-time)
-	n, _ := strconv.Atoi(h)
-	return n
+func mergeMaps(base, overlay map[string]any) map[string]any {
+	for k, v := range overlay {
+		base[k] = v
+	}
+	return base
 }
 
 func apexChartScript() templ.Component {
@@ -266,7 +587,25 @@ func apexChartScript() templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<script>\n\tif (!window._apexChartInit) {\n\t  window._apexChartInit = true;\n\n\t  window.initApexChart = function(el) {\n\t    if (typeof ApexCharts === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/apexcharts@4.5.0/dist/apexcharts.min.js';\n\t      s.onload = function() { renderApexChart(el); };\n\t      document.head.appendChild(s);\n\t    } else {\n\t      renderApexChart(el);\n\t    }\n\t  };\n\n\t  function renderApexChart(el) {\n\t    if (el._chart) {\n\t      el._chart.updateOptions(JSON.parse(el.dataset.options));\n\t      return;\n\t    }\n\t    try {\n\t      var opts = JSON.parse(el.dataset.options);\n\t      el._chart = new ApexCharts(el, opts);\n\t      el._chart.render();\n\t    } catch(e) { console.warn('ApexChart init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-chart]').forEach(initApexChart);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-chart]:not(._ac-initialized)').forEach(function(el) {\n\t      el.classList.add('_ac-initialized');\n\t      initApexChart(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<script>\n\tif (!window._apexChartInit) {\n\t  window._apexChartInit = true;\n\n\t  window.initApexChart = function(el) {\n\t    if (typeof ApexCharts === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/apexcharts/4.3.0/apexcharts.min.js';\n\t      s.onload = function() { renderApexChart(el); };\n\t      document.head.appendChild(s);\n\t    } else {\n\t      renderApexChart(el);\n\t    }\n\t  };\n\n\t  function renderApexChart(el) {\n\t    if (el._chart) {\n\t      el._chart.updateOptions(JSON.parse(el.dataset.options));\n\t      return;\n\t    }\n\t    try {\n\t      var opts = JSON.parse(el.dataset.options);\n\t      el._chart = new ApexCharts(el, opts);\n\t      el._chart.render();\n\t    } catch(e) { console.warn('ApexChart init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-chart]').forEach(initApexChart);\n\t  });\n\t  // Also scan immediately in case page is already loaded\n\t  if (document.readyState === 'complete' || document.readyState === 'interactive') {\n\t    document.querySelectorAll('[data-chart]').forEach(initApexChart);\n\t  }\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-chart]:not(._ac-initialized)').forEach(function(el) {\n\t      el.classList.add('_ac-initialized');\n\t      initApexChart(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = chartScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

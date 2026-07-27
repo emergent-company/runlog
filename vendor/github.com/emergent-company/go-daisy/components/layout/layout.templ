@@ -1,28 +1,118 @@
 package layout
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+	"github.com/emergent-company/go-daisy/staticfs"
+)
+
+var layoutAriaBusyOnce = templ.NewOnceHandle()
+var layoutPrefetchOnce = templ.NewOnceHandle()
+var layoutViewTransitionsOnce = templ.NewOnceHandle()
 
 // Page renders the full HTML shell. themeAttr is the DaisyUI data-theme value
 // (e.g. "nord", "flow", "dark"). Pass "" to use the browser/OS default.
+//
+// Deprecated: use PageFull(PageProps{...}) instead.
 templ Page(title string, themeAttr string) {
+	@PageFull(PageProps{Title: title, ThemeAttr: themeAttr}) {
+		{ children... }
+	}
+}
+
+// PageFull renders the full HTML shell with optional Alpine.js, morphing,
+// prefetch, and Stimulus support.
+templ PageFull(props PageProps) {
 	<!DOCTYPE html>
-	<html lang="en" data-theme={ themeAttr } class="group/html">
+	<html lang="en" data-theme={ props.ThemeAttr } class="group/html" data-asset-track="reload">
 	<head>
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 		<meta name="htmx-config" content='{"implicitInheritance":true,"noSwap":[204,304]}'/>
-		<title>{ title }</title>
-		<link rel="stylesheet" href="/static/css/app.css"/>
+		<title>{ props.Title }</title>
+		<link rel="stylesheet" href={ "/static/css/app.css?v=" + staticfs.Hash() } data-asset-track="reload"/>
+		if props.ViewTransitions {
+			<meta name="view-transition" content="same-origin"/>
+		}
 	</head>
 	<body class="bg-base-200 min-h-screen">
 		<!-- Modal container -->
 		<div id="modal-container"></div>
 		<!-- Toast container -->
-		<div id="toast-container" class="toast toast-top toast-end z-70"></div>
+		<div id="toast-container" class="toast toast-top toast-end z-70" aria-live="polite"></div>
 		<!-- Main content slot -->
 		{ children... }
-		<!-- HTMX v4 -->
-		<script src="/static/js/htmx.js"></script>
+		<!-- HTMX -->
+		<script src={ "/static/js/htmx.js?v=" + staticfs.Hash() }></script>
+		@layoutAriaBusyOnce.Once() {
+			<script>
+			(function() {
+			document.addEventListener('htmx:beforeRequest', function() {
+				document.documentElement.setAttribute('aria-busy', 'true');
+			});
+			document.addEventListener('htmx:afterSettle', function() {
+				document.documentElement.removeAttribute('aria-busy');
+			});
+		})();
+			</script>
+		}
+		if props.Morph {
+			<script src={ "/static/js/morph.js?v=" + staticfs.Hash() }></script>
+		}
+		if props.Alpine {
+			<script defer src={ "/static/js/alpine.js?v=" + staticfs.Hash() }></script>
+		}
+		if props.Stimulus {
+			<script src={ "/static/js/stimulus.js?v=" + staticfs.Hash() }></script>
+			<script src={ "/static/js/stimulus-controllers.js?v=" + staticfs.Hash() }></script>
+		}
+		if props.SSE {
+			<script src={ "/static/js/htmx-sse.js?v=" + staticfs.Hash() }></script>
+		}
+		if props.WS {
+			<script src={ "/static/js/htmx-ws.js?v=" + staticfs.Hash() }></script>
+		}
+		if props.Prefetch {
+			@layoutPrefetchOnce.Once() {
+				<script>
+				(function() {
+				var timer;
+				document.addEventListener('mouseover', function(e) {
+					var link = e.target.closest('a[href]');
+					if (!link || link.dataset.prefetch === 'false') return;
+					var url = link.getAttribute('href');
+					if (!url || url.startsWith('#') || url.startsWith('http')) return;
+					clearTimeout(timer);
+					timer = setTimeout(function() {
+						var pre = document.createElement('link');
+						pre.rel = 'prefetch';
+						pre.href = url;
+						pre.as = 'document';
+						document.head.appendChild(pre);
+					}, 100);
+				}, {passive: true});
+			})();
+				</script>
+			}
+		}
+		if props.ViewTransitions {
+			@layoutViewTransitionsOnce.Once() {
+				<script>
+				(function() {
+				document.addEventListener('htmx:beforeHistorySave', function() {
+					document.documentElement.setAttribute('data-navigation-direction', 'forward');
+				});
+				window.addEventListener('popstate', function() {
+					document.documentElement.setAttribute('data-navigation-direction', 'back');
+				});
+				document.addEventListener('htmx:afterSettle', function() {
+					setTimeout(function() {
+						document.documentElement.removeAttribute('data-navigation-direction');
+					}, 300);
+				});
+			})();
+				</script>
+			}
+		}
 	</body>
 	</html>
 }

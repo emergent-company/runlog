@@ -1,0 +1,30 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// AlpineThemeToggle renders a sun/moon theme toggle using Alpine.js instead of
+// custom inline JS. Stores theme preference in localStorage under the
+// go-daisy-theme key.
+templ AlpineThemeToggle() {
+	<div
+		{ alpine.XData(alpine.ThemeState(false))... }
+		x-init="
+			var t = localStorage.getItem('go-daisy-theme') || document.documentElement.getAttribute('data-theme') || 'nord';
+			dark = (t === 'dracula' || t === 'dim' || t === 'sunset');
+			$watch('dark', function(v) {
+				var theme = v ? 'dracula' : 'nord';
+				document.documentElement.setAttribute('data-theme', theme);
+				localStorage.setItem('go-daisy-theme', theme);
+			})
+		"
+		{ devmode.Attrs(ctx, "ui/AlpineThemeToggle")... }
+	>
+		<label class="swap swap-rotate cursor-pointer">
+			<input type="checkbox" class="hidden" { alpine.BooleanBinding("checked", "dark")... } { alpine.On("change", "dark = $el.checked")... }/>
+			@themeToggleVisual()
+		</label>
+	</div>
+}

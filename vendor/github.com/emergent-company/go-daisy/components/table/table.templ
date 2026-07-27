@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/emergent-company/go-daisy/devmode"
+	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
 // SortDir indicates the current sort direction.
@@ -162,9 +163,9 @@ templ TableHeader(label string, sortKey string, currentSortKey string, currentDi
 				{ label }
 				if currentSortKey == sortKey {
 					if currentDir == SortAsc {
-					<span class="iconify lucide--chevron-up size-3" aria-hidden="true"></span>
-				} else {
-						<span class="iconify lucide--chevron-down size-3" aria-hidden="true"></span>
+						@ui.IconSpan("lucide--chevron-up", "size-3")
+					} else {
+						@ui.IconSpan("lucide--chevron-down", "size-3")
 					}
 				}
 			</a>

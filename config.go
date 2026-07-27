@@ -61,6 +61,7 @@ var knownTopLevelKeys = map[string]bool{
 	"projects":      true,
 	"environments":  true,
 	"categories":    true,
+	"test_types":    true,
 }
 
 // Config holds optional configuration loaded from a .runlog/config.yaml file.
@@ -123,6 +124,20 @@ type Config struct {
 	//	    - TestCLIInstalled_ProjectCreateGetDelete
 	//	    - TestCLIInstalled_ProjectsList
 	Categories map[string][]string `yaml:"categories"`
+
+	// TestTypes maps directory prefixes to type labels. Each key is a type
+	// (e.g. "e2e", "integration", "benchmark") and each value is a list of
+	// directory prefixes. When a test is discovered from the filesystem
+	// (never run yet), its directory is matched against these prefixes to
+	// determine its type. Example:
+	//
+	//	test_types:
+	//	  e2e:
+	//	    - api
+	//	    - cli
+	//	  integration:
+	//	    - integration
+	TestTypes map[string][]string `yaml:"test_types"`
 }
 
 // LoadConfig searches for a config.yaml configuration file and returns the
@@ -142,16 +157,17 @@ func LoadConfig(dbDir string) (*Config, error) {
 		searchPaths = append(searchPaths, p)
 	}
 
-	// 2. Project .runlog dir
-	searchPaths = append(searchPaths, filepath.Join(RunlogDir(), "config.yaml"))
-
-	// 3. DB directory
 	if dbDir != "" {
+		// 2. Explicit DB directory — takes priority over walk-up detection.
+		//    dbDir already points to the project the daemon/CLI was told about.
 		searchPaths = append(searchPaths, filepath.Join(dbDir, "config.yaml"))
 		searchPaths = append(searchPaths, filepath.Join(dbDir, ".runlog.yaml"))
+	} else {
+		// 2. Project .runlog dir (walk-up from CWD)
+		searchPaths = append(searchPaths, filepath.Join(RunlogDir(), "config.yaml"))
 	}
 
-	// 4. Current working directory
+	// 3. Current working directory (.runlog.yaml in CWD)
 	if wd, err := os.Getwd(); err == nil {
 		searchPaths = append(searchPaths, filepath.Join(wd, ".runlog.yaml"))
 	}
@@ -380,6 +396,20 @@ func parseConfigFile(path string) (*Config, error) {
 						cfg.Categories[currentCategory] = nil
 					}
 				}
+			case "test_types":
+				if strings.HasPrefix(trimmed, "- ") {
+					item := strings.TrimPrefix(trimmed, "- ")
+					item = strings.Trim(item, "\"'")
+					if currentCategory != "" {
+						cfg.TestTypes[currentCategory] = append(cfg.TestTypes[currentCategory], item)
+					}
+				} else if strings.HasSuffix(trimmed, ":") {
+					currentCategory = strings.TrimSuffix(trimmed, ":")
+					currentCategory = strings.Trim(currentCategory, "\"'")
+					if _, ok := cfg.TestTypes[currentCategory]; !ok {
+						cfg.TestTypes[currentCategory] = nil
+					}
+				}
 			}
 			continue
 		}
@@ -443,17 +473,23 @@ func parseConfigFile(path string) (*Config, error) {
 			envSubSection = ""
 			continue
 		}
-		if trimmed == "categories:" {
-			currentSection = "categories"
-			currentCategory = ""
-			cfg.Categories = make(map[string][]string)
-			continue
-		}
+	if trimmed == "categories:" {
+		currentSection = "categories"
+		currentCategory = ""
+		cfg.Categories = make(map[string][]string)
+		continue
+	}
+	if trimmed == "test_types:" {
+		currentSection = "test_types"
+		currentCategory = ""
+		cfg.TestTypes = make(map[string][]string)
+		continue
+	}
 
 		// Unknown top-level key — reject with error
 		key := strings.SplitN(trimmed, ":", 2)[0]
 		if !knownTopLevelKeys[key] {
-			return cfg, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, artifacts_dir, env, test_packages, linters, projects, environments, categories)", path, key)
+			return cfg, fmt.Errorf("config %s: unknown key %q (supported: testCommand, db, daemon_port, work_dir, artifacts_dir, env, test_packages, linters, projects, environments, categories, test_types)", path, key)
 		}
 	}
 

@@ -70,6 +70,7 @@ type ButtonProps struct {
 	Block   bool             // when true, adds btn-block
 	ExtraClass string        // additional CSS classes appended to the btn class list (e.g. "gap-2 me-3")
 	OnClick templ.ComponentScript // optional script-backed onclick, e.g. a `script` block call or templ.JSFuncCall(...)
+	AriaLabel string         // optional aria-label for accessibility
 	Attrs   templ.Attributes // optional extra HTML attributes
 }
 
@@ -111,7 +112,10 @@ templ Button(props ButtonProps) {
 				templ.KV(string(props.Shape), props.Shape != ""),
 				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
 				templ.KV("btn-block", props.Block),
-				props.ExtraClass }
+				templ.KV(props.ExtraClass, props.ExtraClass != "") }
+			if props.AriaLabel != "" {
+				aria-label={ props.AriaLabel }
+			}
 			if props.OnClick.Name != "" {
 				onclick={ props.OnClick }
 			}
@@ -131,7 +135,10 @@ templ Button(props ButtonProps) {
 				templ.KV(string(props.Shape), props.Shape != ""),
 				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
 				templ.KV("btn-block", props.Block),
-				props.ExtraClass }
+				templ.KV(props.ExtraClass, props.ExtraClass != "") }
+			if props.AriaLabel != "" {
+				aria-label={ props.AriaLabel }
+			}
 			{ devmode.Attrs(ctx, "ui/Button")... }
 			{ props.Attrs... }
 		>
@@ -150,8 +157,11 @@ templ Button(props ButtonProps) {
 				templ.KV(string(props.Style), props.Style != ButtonStyleDefault),
 				templ.KV("btn-block", props.Block),
 				templ.KV("loading loading-spinner", props.Loading),
-				props.ExtraClass }
+				templ.KV(props.ExtraClass, props.ExtraClass != "") }
 			disabled?={ props.Loading }
+			if props.AriaLabel != "" {
+				aria-label={ props.AriaLabel }
+			}
 			if props.OnClick.Name != "" {
 				onclick={ props.OnClick }
 			}

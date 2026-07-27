@@ -23,6 +23,9 @@ type LabelProps struct {
 // Label renders a DaisyUI label with optional primary and alt text.
 // Use it to wrap form inputs and provide accessible field labeling.
 // Children (the input element) are rendered below the top label row.
+//
+// Deprecated: use FormControl instead. FormControl is the canonical form
+// wrapper with label, hint, error, and positioning support.
 func Label(props LabelProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -69,7 +72,7 @@ func Label(props LabelProps) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.For)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 24, Col: 20}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 27, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 				if templ_7745c5c3_Err != nil {
@@ -92,7 +95,7 @@ func Label(props LabelProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Text)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 28, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 31, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -111,7 +114,7 @@ func Label(props LabelProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.AltText)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 31, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 34, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -141,6 +144,8 @@ func Label(props LabelProps) templ.Component {
 
 // LabelAlt renders a bottom label row — typically used for hints or error text below an input.
 // text appears on the left (hint), altText appears on the right (e.g. character count or secondary note).
+//
+// Deprecated: use FormControl instead. Pass hint text via FormControl hint parameter.
 func LabelAlt(text string, altText string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -182,7 +187,7 @@ func LabelAlt(text string, altText string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 44, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 49, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -201,7 +206,7 @@ func LabelAlt(text string, altText string) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(altText)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 47, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/label.templ`, Line: 52, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {

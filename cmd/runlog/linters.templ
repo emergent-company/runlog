@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 
 	"github.com/emergent-company/go-daisy/components/table"
@@ -37,17 +36,23 @@ templ lintersContent(data linterListData) {
 			@linterTable(data.Linters)
 		</div>
 	</div>
+	<div id="linter-sse-url" data-sse-url={ LinterEventsSSEURL() } style="display:none"></div>
+	<div
+		id="linter-auto-refresh"
+		hx-get="/ui/linters"
+		hx-trigger="refresh-linters from:body"
+		hx-target="[data-testid='linters-content']"
+		hx-swap="innerHTML"
+		style="display:none"
+	></div>
 	<script type="text/javascript">
 	(function() {
-		var es = new EventSource({ LinterEventsSSEURL() });
-		es.addEventListener('linter-done', function(e) {
-			var data = JSON.parse(e.data);
-			var row = document.getElementById('linter-' + data.name);
-			if (row) {
-				htmx.ajax('GET', '/ui/linters', {target: '[data-testid="linters-content"]', swap: 'innerHTML'});
-			}
+		var url = document.getElementById('linter-sse-url').getAttribute('data-sse-url');
+		var es = new EventSource(url);
+		es.addEventListener('cmd', function(e) {
+			dispatchSSECmd(JSON.parse(e.data));
 		});
-		es.addEventListener('linter-error', function(e) {
+		es.addEventListener('linter-error', function() {
 			es.close();
 		});
 	})();
@@ -72,12 +77,7 @@ templ linterTable(entries []linterListEntry) {
 						id={ "linter-" + e.Name }
 						data-testid={ "linter-row-" + e.Name }
 						class="hover"
-						hx-get={ LinterDetailURL(e.Name) }
-						hx-target="#main-content"
-						hx-swap="innerHTML"
-						hx-push-url="true"
-						hx-sync="#main-content:replace"
-						hx-trigger="click[!target.closest('.dropdown')]"
+						{ NavTriggerAttrs(LinterDetailURL(e.Name))... }
 					>
 						@table.TableCell("", nil) {
 							@text(e.Name)
@@ -208,11 +208,7 @@ templ linterRunsTable(runs []runlog.LinterRow) {
 					id={ fmt.Sprintf("linter-run-%d", r.ID) }
 					data-testid={ fmt.Sprintf("linter-run-row-%d", r.ID) }
 					class="hover cursor-pointer"
-					hx-get={ LinterRunDetailURL(r.LinterName, r.ID) }
-					hx-target="#main-content"
-					hx-swap="innerHTML"
-					hx-push-url="true"
-					hx-sync="#main-content:replace"
+					{ NavRowAttrs(LinterRunDetailURL(r.LinterName, r.ID))... }
 				>
 					@table.TableCell("", nil) {
 						@linterStatusBadge(r.Status)

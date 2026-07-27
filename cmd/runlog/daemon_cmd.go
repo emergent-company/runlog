@@ -287,9 +287,14 @@ func runDaemonInternal(args []string) error {
 	}
 	defer db.Close()
 
-	// Walk up from DB directory to find .runlog.yaml config
+	// Walk up from DB directory to find .runlog/ directory or .runlog.yaml config.
+	// Prefer .runlog/ (contains rich config.yaml) over legacy .runlog.yaml.
 	cfgDir := filepath.Dir(dbPath)
 	for i := 0; i < 5; i++ {
+		if info, err := os.Stat(filepath.Join(cfgDir, ".runlog")); err == nil && info.IsDir() {
+			cfgDir = filepath.Join(cfgDir, ".runlog")
+			break
+		}
 		if info, err := os.Stat(filepath.Join(cfgDir, ".runlog.yaml")); err == nil && !info.IsDir() {
 			break
 		}

@@ -96,7 +96,7 @@ func NewTest(t *testing.T, opts TestOpts) *TestContext { //nolint:deadcode
 
 	// Override test type (if provided).
 	if opts.TestType != "" {
-		rl.testType = opts.TestType
+		rl.SetTestType(opts.TestType)
 	}
 
 	// Set app version (if provided).

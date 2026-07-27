@@ -1,0 +1,38 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// AlpineAccordionItem renders a single collapse item with Alpine.js smooth
+// height animation (x-collapse) instead of CSS checkbox hack.
+templ AlpineAccordionItem(title string, open bool) {
+	<div
+		{ alpine.XData(alpine.Toggle(open))... }
+		class="collapse collapse-arrow border border-base-200 bg-base-100"
+		{ devmode.Attrs(ctx, "ui/AlpineAccordionItem")... }
+	>
+		<div
+			class="collapse-title text-xl font-medium cursor-pointer"
+			{ alpine.On("click", "open = !open")... }
+			{ alpine.ClassBinding("{ 'collapse-open': open, 'collapse-close': !open }")... }
+		>
+			{ title }
+		</div>
+		<div
+			x-show="open"
+			{ alpine.Collapse()... }
+			class="collapse-content"
+		>
+			{ children... }
+		</div>
+	</div>
+}
+
+// AlpineAccordion wraps multiple AlpineAccordionItems.
+templ AlpineAccordion() {
+	<div class="join join-vertical w-full" { devmode.Attrs(ctx, "ui/AlpineAccordion")... }>
+		{ children... }
+	</div>
+}

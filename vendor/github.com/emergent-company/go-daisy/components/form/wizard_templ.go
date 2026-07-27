@@ -16,6 +16,8 @@ import (
 	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
+var wizardScriptOnce = templ.NewOnceHandle()
+
 // WizardStep holds data for one step in the wizard indicator.
 type WizardStep struct {
 	// Label is the step name shown next to the dot (hidden on small screens).
@@ -61,7 +63,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 29, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 31, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -91,7 +93,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(i + 1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 33, Col: 107}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 35, Col: 107}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -122,7 +124,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(id + "-dot-" + strconv.Itoa(i+1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 35, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 37, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -148,7 +150,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(i + 1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 37, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 39, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -183,7 +185,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(step.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 38, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 40, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -217,7 +219,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(id + "-panel-" + strconv.Itoa(i+1))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 48, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 50, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 			if templ_7745c5c3_Err != nil {
@@ -243,7 +245,7 @@ func WizardStepper(id string, steps []WizardStep, panels []WizardStepPanel) temp
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(panel.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 49, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/wizard.templ`, Line: 51, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -351,7 +353,25 @@ func wizardScript(id string, total int) templ.Component {
 			templ_7745c5c3_Var18 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<script>\n\t(function() {\n\t  var wid = { templ.JSONString(id) };\n\t  var current = 1, total = { templ.JSONString(strconv.Itoa(total)) } * 1;\n\t  function goTo(n) {\n\t    document.getElementById(wid+'-panel-'+current).classList.add('hidden');\n\t    current = Math.max(1, Math.min(total, n));\n\t    document.getElementById(wid+'-panel-'+current).classList.remove('hidden');\n\t    for (var i = 1; i <= total; i++) {\n\t      var dot = document.getElementById(wid+'-dot-'+i);\n\t      if (i < current) {\n\t        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-primary text-primary-content';\n\t        dot.innerHTML = '<svg class=\"size-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"><polyline points=\"20 6 9 17 4 12\"/></svg>';\n\t      } else if (i === current) {\n\t        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-primary text-primary-content';\n\t        dot.textContent = i;\n\t      } else {\n\t        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-base-200 text-base-content/50';\n\t        dot.textContent = i;\n\t      }\n\t    }\n\t    document.getElementById(wid+'-prev').disabled = current === 1;\n\t    var nextBtn = document.getElementById(wid+'-next');\n\t    if (current === total) {\n\t      nextBtn.textContent = 'Finish';\n\t      nextBtn.className = 'btn btn-success btn-sm';\n\t    } else {\n\t      nextBtn.innerHTML = 'Next <svg class=\"size-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"9 18 15 12 9 6\"/></svg>';\n\t      nextBtn.className = 'btn btn-primary btn-sm';\n\t    }\n\t  }\n\t  window['wizardGoTo_'+wid] = goTo;\n\t  window['wizardNext_'+wid] = function() { if (current < total) goTo(current + 1); };\n\t  window['wizardPrev_'+wid] = function() { if (current > 1) goTo(current - 1); };\n\t})();\n\t</script>")
+		templ_7745c5c3_Var19 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<script>\n\t(function() {\n\t  var wid = { templ.JSONString(id) };\n\t  var current = 1, total = { templ.JSONString(strconv.Itoa(total)) } * 1;\n\t  function goTo(n) {\n\t    document.getElementById(wid+'-panel-'+current).classList.add('hidden');\n\t    current = Math.max(1, Math.min(total, n));\n\t    document.getElementById(wid+'-panel-'+current).classList.remove('hidden');\n\t    for (var i = 1; i <= total; i++) {\n\t      var dot = document.getElementById(wid+'-dot-'+i);\n\t      if (i < current) {\n\t        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-primary text-primary-content';\n\t        dot.innerHTML = '<svg class=\"size-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"><polyline points=\"20 6 9 17 4 12\"/></svg>';\n\t      } else if (i === current) {\n\t        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-primary text-primary-content';\n\t        dot.textContent = i;\n\t      } else {\n\t        dot.className = 'flex size-7 items-center justify-center rounded-full font-semibold text-sm bg-base-200 text-base-content/50';\n\t        dot.textContent = i;\n\t      }\n\t    }\n\t    document.getElementById(wid+'-prev').disabled = current === 1;\n\t    var nextBtn = document.getElementById(wid+'-next');\n\t    if (current === total) {\n\t      nextBtn.textContent = 'Finish';\n\t      nextBtn.className = 'btn btn-success btn-sm';\n\t    } else {\n\t      nextBtn.innerHTML = 'Next <svg class=\"size-4\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"9 18 15 12 9 6\"/></svg>';\n\t      nextBtn.className = 'btn btn-primary btn-sm';\n\t    }\n\t  }\n\t  window['wizardGoTo_'+wid] = goTo;\n\t  window['wizardNext_'+wid] = function() { if (current < total) goTo(current + 1); };\n\t  window['wizardPrev_'+wid] = function() { if (current > 1) goTo(current - 1); };\n\t})();\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = wizardScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var19), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

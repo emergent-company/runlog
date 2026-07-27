@@ -97,6 +97,9 @@ type StatCardMinimalItem struct {
 	// Trend direction and percentage label (e.g. "12.3%").
 	Trend      StatTrend
 	TrendLabel string
+	// ComparisonLabel is optional text shown after the trend badge (e.g. "vs. $494.16 last period").
+	// When empty, defaults to "vs last month".
+	ComparisonLabel string
 	// Icon is a Lucide icon suffix, e.g. "lucide--briefcase".
 	// When set, StatCardMinimal renders as StatCardIconCorner style with a
 	// floating icon badge and a soft trend pill; otherwise as the minimal layout.
@@ -119,7 +122,11 @@ templ StatCardMinimal(item StatCardMinimalItem) {
 			if item.TrendLabel != "" {
 				<div class="mt-5 flex items-center gap-2">
 					@BadgeWithBoundary(statTrendIntent(item.Trend), BadgeStyleSoft, BadgeSizeSM, false, statTrendIcon(item.Trend), item.TrendLabel)
-					<p class="text-base-content/60 text-sm">vs last month</p>
+					if item.ComparisonLabel != "" {
+						<p class="text-base-content/60 text-sm">{ item.ComparisonLabel }</p>
+					} else {
+						<p class="text-base-content/60 text-sm">vs last month</p>
+					}
 				</div>
 			}
 		</div>

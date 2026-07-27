@@ -44,12 +44,7 @@ templ tableContent(cfg TableConfig) {
 						data-testid={ "row-" + fmt.Sprintf("%p", row) }
 						class="hover"
 						if cfg.RowClick != nil && cfg.RowClick(row) != "" {
-							hx-get={ cfg.RowClick(row) }
-							hx-target="#main-content"
-							hx-swap="innerHTML"
-							hx-push-url="true"
-							hx-sync="#main-content:replace"
-							hx-trigger="click[!target.closest('.dropdown')]"
+							{ NavTriggerAttrs(cfg.RowClick(row))... }
 						}
 					>
 						for _, col := range cfg.Columns {

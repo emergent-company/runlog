@@ -104,7 +104,7 @@ func EnhancedSelect(props EnhancedSelectProps) templ.Component {
 		}
 		var templ_7745c5c3_Var4 = []any{"select select-bordered w-full",
 			templ.KV("select-error", props.Error != ""),
-			props.Class}
+			templ.KV(props.Class, props.Class != "")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -371,36 +371,15 @@ func EnhancedSelect(props EnhancedSelectProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = choicesScript().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func choicesScript() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var18 == nil {
-			templ_7745c5c3_Var18 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<script>\n\tif (!window._choicesInit) {\n\t  window._choicesInit = true;\n\n\t  window.initChoices = function(el) {\n\t    if (typeof Choices === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js';\n\t      s.onload = function() { initChoicesElement(el); };\n\t      document.head.appendChild(s);\n\t      var l = document.createElement('link');\n\t      l.rel = 'stylesheet';\n\t      l.href = 'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css';\n\t      document.head.appendChild(l);\n\t    } else {\n\t      initChoicesElement(el);\n\t    }\n\t  };\n\n\t  function initChoicesElement(el) {\n\t    if (el._choicesInstance) return;\n\t    try {\n\t      el._choicesInstance = new Choices(el, {\n\t        allowHTML: false,\n\t        searchEnabled: el.dataset.search !== 'false',\n\t        removeItemButton: el.dataset.removeItems === 'true',\n\t        itemSelectText: '',\n\t        placeholderValue: el.dataset.placeholder || '',\n\t        shouldSort: false,\n\t      });\n\t    } catch(e) { console.warn('Choices init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('select[data-choices]').forEach(initChoicesElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('select[data-choices]:not(._choices-initialized)').forEach(function(el) {\n\t      el.classList.add('_choices-initialized');\n\t      initChoicesElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Err = LazyLoadScript(LazyLoadConfig{
+			GuardName:  "_choices",
+			LibVarName: "Choices",
+			ScriptURL:  "https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js",
+			StyleURL:   "'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css'",
+			Selector:   "select[data-choices]",
+			InitFunc:   "new Choices(el, {allowHTML: false, searchEnabled: el.dataset.search !== 'false', removeItemButton: el.dataset.removeItems === 'true', itemSelectText: '', placeholderValue: el.dataset.placeholder || '', shouldSort: false})",
+			FnSuffix:   "Choices",
+		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,17 +1,15 @@
 package nav
 
 import (
-	"context"
-	"io"
-
 	"github.com/a-h/templ"
 	"github.com/emergent-company/go-daisy/devmode"
+	"github.com/emergent-company/go-daisy/shared"
 )
 
 // PageHeaderWithBoundary wraps PageHeader with a dev-mode component boundary annotation.
 // gallery:token steps
 // gallery:hint steps:slice(3)
-func PageHeaderWithBoundary(steps []BreadcrumbStep) templ.Component {
+func PageHeaderWithBoundary(steps []BreadcrumbItem) templ.Component {
 	return devmode.ComponentBoundary("PageHeader", PageHeader(steps, nil), map[string]any{"stepCount": len(steps)})
 }
 
@@ -30,10 +28,15 @@ func SimpleTabsWithBoundary(tabs []Tab) templ.Component {
 }
 
 // TopBarWithBoundary wraps TopBar with a dev-mode component boundary annotation.
-// gallery:token title
+// gallery:token title,scrollAware
 // gallery:hint title:default(My Application)
-func TopBarWithBoundary(title string) templ.Component {
-	return devmode.ComponentBoundary("TopBar", TopBar(title, nil), map[string]any{"title": title})
+// gallery:hint scrollAware:default(false)
+func TopBarWithBoundary(title string, scrollAware bool) templ.Component {
+	props := TopBarProps{Title: title, ScrollAware: scrollAware}
+	return devmode.ComponentBoundary("TopBar", TopBar(props), map[string]any{
+		"title":       title,
+		"scrollAware": scrollAware,
+	})
 }
 
 // MenuWithBoundary wraps Menu with a dev-mode component boundary annotation.
@@ -49,8 +52,8 @@ func MenuWithBoundary(size MenuSize, items []MenuItem) templ.Component {
 // BreadcrumbsWithBoundary wraps Breadcrumbs with a dev-mode component boundary annotation.
 // gallery:token items
 // gallery:hint items:slice(3)
-func BreadcrumbsWithBoundary(items []BreadcrumbItem) templ.Component {
-	return devmode.ComponentBoundary("Breadcrumbs", Breadcrumbs(items), map[string]any{"itemCount": len(items)})
+func BreadcrumbsWithBoundary(items []BreadcrumbItem, divider BreadcrumbsDivider) templ.Component {
+	return devmode.ComponentBoundary("Breadcrumbs", Breadcrumbs(items, divider), map[string]any{"itemCount": len(items), "divider": string(divider)})
 }
 
 // DockWithBoundary wraps Dock with a dev-mode component boundary annotation.
@@ -64,13 +67,7 @@ func DockWithBoundary(items []DockItem) templ.Component {
 // gallery:token variant
 // gallery:hint variant:default(link)
 func LinkWithBoundary(href string, variant LinkVariant, label string) templ.Component {
-	child := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := io.WriteString(w, label)
-		return err
-	})
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return Link(href, variant, "", nil).Render(templ.WithChildren(ctx, child), w)
-	})
+	inner := shared.RenderInto(Link(href, variant, "", nil), shared.StrComp(label))
 	return devmode.ComponentBoundary("Link", inner, map[string]any{
 		"href":    href,
 		"variant": string(variant),
@@ -78,8 +75,16 @@ func LinkWithBoundary(href string, variant LinkVariant, label string) templ.Comp
 	})
 }
 
+// PageHeadingWithBoundary wraps PageHeading with a dev-mode component boundary annotation.
+func PageHeadingWithBoundary(props PageHeadingProps) templ.Component {
+	return devmode.ComponentBoundary("PageHeading", PageHeading(props), map[string]any{
+		"title":         props.Title,
+		"breadcrumbCount": len(props.Breadcrumbs),
+	})
+}
+
 // PageTitleMinimalWithBoundary wraps PageTitleMinimal with a dev-mode component boundary annotation.
-func PageTitleMinimalWithBoundary(title string, steps []PageTitleStep) templ.Component {
+func PageTitleMinimalWithBoundary(title string, steps []BreadcrumbItem) templ.Component {
 	return devmode.ComponentBoundary("PageTitleMinimal", PageTitleMinimal(title, steps), map[string]any{
 		"title":     title,
 		"stepCount": len(steps),
@@ -87,7 +92,7 @@ func PageTitleMinimalWithBoundary(title string, steps []PageTitleStep) templ.Com
 }
 
 // PageTitleEditorWithBoundary wraps PageTitleEditor with a dev-mode component boundary annotation.
-func PageTitleEditorWithBoundary(steps []BreadcrumbStep, title, subtitle string, actions []PageTitleEditorAction) templ.Component {
+func PageTitleEditorWithBoundary(steps []BreadcrumbItem, title, subtitle string, actions []PageTitleEditorAction) templ.Component {
 	return devmode.ComponentBoundary("PageTitleEditor", PageTitleEditor(steps, title, subtitle, actions), map[string]any{
 		"title":       title,
 		"subtitle":    subtitle,
@@ -151,11 +156,20 @@ func PageTitleVariantWithBoundary(style string, opts PageTitleVariantOpts) templ
 	})
 }
 
-// ScrollTopbarWithBoundary wraps ScrollTopbar with a dev-mode component boundary annotation.
-// gallery:token title
-// gallery:hint title:default(Dashboard)
-func ScrollTopbarWithBoundary(title string) templ.Component {
-	return devmode.ComponentBoundary("ScrollTopbar", ScrollTopbar(title, nil), map[string]any{
-		"title": title,
+// MegamenuWithBoundary wraps Megamenu with a dev-mode component boundary annotation.
+func MegamenuWithBoundary(items []MegamenuItem) templ.Component {
+	return devmode.ComponentBoundary("Megamenu", Megamenu(items), map[string]any{
+		"itemCount": len(items),
+	})
+}
+
+// MenuSectionWithBoundary wraps MenuSection with a dev-mode component boundary annotation.
+// gallery:token title,items
+// gallery:hint title:default(Section)
+// gallery:hint items:slice(3)
+func MenuSectionWithBoundary(title string, items []MenuItem) templ.Component {
+	return devmode.ComponentBoundary("MenuSection", MenuSection(title, items), map[string]any{
+		"title":     title,
+		"itemCount": len(items),
 	})
 }

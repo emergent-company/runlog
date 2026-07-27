@@ -4,8 +4,12 @@
 package runlog
 
 import (
+	"encoding/json"
+	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -50,10 +54,87 @@ func SetToken() string { //nolint:deadcode
 	return "all-scopes"
 }
 
-// OrgID returns the organization ID to set in config when MEMORY_ORG_ID is
-// provided.  An empty return value means auto-detection should be relied upon.
+// ─────────────────────────────────────────────────────────────────────────────
+// Org ID resolution — thread-safe, lazy, retry-backed.
+// ─────────────────────────────────────────────────────────────────────────────
+
+var (
+	orgIDOnce  sync.Once
+	orgIDValue string
+)
+
+// OrgID returns the organization ID for the test server.
+// Checks MEMORY_ORG_ID first (set by parent `runlog test` process).
+// If not set, lazily discovers it from the server with retry (cached via
+// sync.Once so each test binary queries the server at most once).
+//
+// Returns an empty string when the org cannot be determined — callers
+// should handle the empty case gracefully.
 func OrgID() string { //nolint:deadcode
-	return os.Getenv("MEMORY_ORG_ID")
+	if id := os.Getenv("MEMORY_ORG_ID"); id != "" {
+		return id
+	}
+	orgIDOnce.Do(func() {
+		orgIDValue = discoverOrgID()
+	})
+	return orgIDValue
+}
+
+// discoverOrgID queries the server for the first org ID with retry.
+// Uses a fresh http.Client with 15s timeout per attempt. Includes
+// 0-2s random jitter before first attempt so parallel test binaries
+// stagger their requests.
+func discoverOrgID() string {
+	srv := ServerURL()
+	if srv == "" {
+		fmt.Fprintf(os.Stderr, "[setup] discoverOrgID: MEMORY_TEST_SERVER not set — org-dependent tests will skip\n")
+		return ""
+	}
+	token := E2ETestToken()
+	client := &http.Client{Timeout: 15 * time.Second}
+
+	// Random jitter so parallel test binaries don't hammer the server simultaneously.
+	time.Sleep(time.Duration(rand.Intn(2000)) * time.Millisecond)
+
+	for attempt := 0; attempt < 5; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+		req, _ := http.NewRequest("GET", srv+"/api/user/orgs-and-projects", nil)
+		SetAuthHeader(req, token)
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[setup] discoverOrgID attempt %d/5: %v (server=%s)\n", attempt+1, err, srv)
+			continue
+		}
+		var orgs []struct {
+			ID string `json:"id"`
+		}
+		decodeErr := json.NewDecoder(resp.Body).Decode(&orgs)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || decodeErr != nil || len(orgs) == 0 {
+			fmt.Fprintf(os.Stderr, "[setup] discoverOrgID attempt %d/5: status=%d decode=%v orgs=%d\n",
+				attempt+1, resp.StatusCode, decodeErr, len(orgs))
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "[setup] discovered org ID: %s\n", orgs[0].ID)
+		return orgs[0].ID
+	}
+	fmt.Fprintf(os.Stderr, "[setup] discoverOrgID: all 5 attempts failed — org-dependent tests will skip\n")
+	return ""
+}
+
+// DiscoverOrgID is a no-op — org discovery is now lazy via OrgID().
+// Kept for backward compatibility with TestMain files; safe to remove.
+func DiscoverOrgID() {} //nolint:deadcode
+
+// DiscoverOrgIDForce queries the server for the first org ID synchronously
+// (bypasses the internal sync.Once cache).  Use this in the parent process
+// (e.g. `runlog test`) to set MEMORY_ORG_ID before spawning child test
+// binaries so every binary inherits the value without hitting the server.
+// Returns the org ID or empty string on failure (logged to stderr).
+func DiscoverOrgIDForce() string { //nolint:deadcode
+	return discoverOrgID()
 }
 
 // SkipIfServerDown skips t if the Emergent server at ServerURL() is unreachable.
@@ -79,9 +160,9 @@ func SkipIfServerDown(t *testing.T, rl ...*RunLog) { //nolint:deadcode
 		DoSkipf(t, runlog, "server unreachable (%s): %v — is MEMORY_TEST_SERVER set?", srv, err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		DoSkipf(t, runlog, "server health check returned %d (%s)", resp.StatusCode, srv)
-	}
+	// Server responded — it's reachable. Health endpoint may return
+	// non-200 (e.g. 503 when optional services like storage aren't
+	// configured) but the API is still operational.
 }
 
 // SkipIfEndpointMissing skips t if a GET/HEAD to the given path returns 404.

@@ -26,12 +26,25 @@ templ SidebarMenuLabel(label string) {
 	<p class="menu-label px-2.5 pb-1.5">{ label }</p>
 }
 
+templ SidebarMenuLabelNexus(label string) {
+	<p class="sidebar-menu-title">{ label }</p>
+}
+
 templ SidebarMenuItem(label string, href string, icon string, active bool) {
 	<a class={ "menu-item", templ.KV("active", active) } href={ templ.SafeURL(href) } { devmode.Attrs(ctx, "layout/SidebarMenuItem")... }>
 		if icon != "" {
 			<span class={ "iconify size-4 " + icon }></span>
 		}
 		<span class="grow">{ label }</span>
+	</a>
+}
+
+templ SidebarMenuItemNexus(label string, href string, icon string, active bool) {
+	<a class={ "sidebar-menu-item", templ.KV("active", active) } href={ templ.SafeURL(href) } { devmode.Attrs(ctx, "layout/SidebarMenuItemNexus")... }>
+		if icon != "" {
+			<span class={ "iconify size-4 " + icon }></span>
+		}
+		{ label }
 	</a>
 }
 
@@ -65,6 +78,24 @@ templ SidebarCollapsible(icon string, label string, children []templ.Component, 
 					@c
 				}
 			</div>
+		</div>
+	</div>
+}
+
+templ SidebarCollapsibleNexus(icon string, label string, children []templ.Component, open bool) {
+	<div class="group collapse" { devmode.Attrs(ctx, "layout/SidebarCollapsibleNexus")... }>
+		<input aria-label="Sidemenu item trigger" class="peer" type="checkbox" name="sidebar-menu-parent-item" { checkedAttr(open) }/>
+		<div class="collapse-title">
+			if icon != "" {
+				<span class={ "iconify size-4 " + icon }></span>
+			}
+			<span class="grow">{ label }</span>
+			<span class="iconify lucide--chevron-right arrow-icon size-3.5"></span>
+		</div>
+		<div class="collapse-content">
+			for _, c := range children {
+				@c
+			}
 		</div>
 	</div>
 }

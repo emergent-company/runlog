@@ -58,7 +58,7 @@ templ TestimonialCard(props TestimonialCardProps) {
 		</blockquote>
 		// Avatar + name/role
 		<div class="flex items-center gap-3 mt-auto pt-3 border-t border-base-content/10">
-			@Avatar(props.Name, props.AvatarSrc, props.AvatarIcon, AvatarSM, nil)
+			@Avatar(props.Name, props.AvatarSrc, props.AvatarIcon, AvatarSM, "", nil)
 			<div>
 				<p class="text-sm font-semibold text-base-content">{ props.Name }</p>
 				if props.Role != "" {

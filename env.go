@@ -32,16 +32,28 @@ import (
 //	.env.mcj-emergent   — account-mode auth against the shared test server
 //	.env.localhost      — standalone auth against a local dev server
 func LoadDotEnv() { //nolint:deadcode
-	_, filename, _, ok := runtime.Caller(1) // caller's source file
-	if !ok {
-		return
-	}
-	dir := filepath.Dir(filename)
-
 	// Check if tests are being run via raw 'go test' instead of 'runlog test'
 	checkRawGoTest()
 
+	// Search upward from the caller's source directory for the nearest .env
+	// file — tests may live in subpackages under the project root.
+	_, filename, _, ok := runtime.Caller(1)
+	if !ok {
+		return
+	}
+	dir := findDotEnvDir(filepath.Dir(filename))
 	loadDotEnvDir(dir)
+}
+
+// findDotEnvDir walks up from start until it finds a directory containing .env
+// or hits the filesystem root. Returns start if no .env found.
+func findDotEnvDir(start string) string {
+	for d := start; d != "/" && d != "."; d = filepath.Dir(d) {
+		if _, err := os.Stat(filepath.Join(d, ".env")); err == nil {
+			return d
+		}
+	}
+	return start
 }
 
 // checkRawGoTest detects when tests are being run via raw 'go test' and provides
@@ -59,7 +71,6 @@ func checkRawGoTest() { //nolint:deadcode
 		// Only flag if we can detect we're in the e2e repository
 		if wd, err := os.Getwd(); err == nil && strings.Contains(wd, "emergent.memory.e2e") {
 			printRawGoTestWarning()
-			os.Exit(1)
 		}
 	}
 }
@@ -184,7 +195,6 @@ func ValidateEnv(env *EnvironmentConfig) []EnvResult {
 	var results []EnvResult
 	for key, check := range env.Requires {
 		val := os.Getenv(key)
-		_ = os.WriteFile("/tmp/env_debug.log", []byte("ValidateEnv: key="+key+" getenv="+os.Getenv(key)+" envVal="+env.Env[key]+" default="+check.Default+"\n"), 0644)
 		if val == "" {
 			val = env.Env[key]
 		}

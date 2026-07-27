@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -199,10 +200,10 @@ func TestWebApp_Dashboard_HTMXPartial_NoShell(t *testing.T) {
 func TestWebApp_Tests_RendersList(t *testing.T) {
 	_, app, dc, df := newWebTest(t, "web", "Tests page renders list of seeded runs")
 	df.Event("log", "Seeding 2 test runs: TestAlpha (pass), TestBeta (fail)")
-	r1 := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestAlpha"})
-	dc.MarkDone(t, r1.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
-	r2 := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestBeta"})
-	dc.MarkDone(t, r2.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(false)})
+	r1 := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestAlpha"}, t.Name())
+	dc.MarkDone(t, r1.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
+	r2 := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestBeta"}, t.Name())
+	dc.MarkDone(t, r2.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(false)})
 
 	df.Event("log", "Fetching GET /tests")
 	rec := echoRequest(t, app, "GET", "/tests")
@@ -237,15 +238,15 @@ func TestWebApp_Tests_FilterByStatus(t *testing.T) {
 	_, app, dc, df := newWebTest(t, "web", "Status filters return matching badge variants")
 
 	df.Event("log", "Seeding runs: pass, fail, skip, timeout, running")
-	r := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterPass"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
-	r = dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterFail"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(false)})
-	r = dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterSkip"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Skipped: boolPtr(true)})
-	r = dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterTimeout"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(false), Reason: "timed out"})
-	dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterRunning"})
+	r := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterPass"}, "TestFilterPass")
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
+	r = dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterFail"}, "TestFilterFail")
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(false)})
+	r = dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterSkip"}, "TestFilterSkip")
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Skipped: boolPtr(true)})
+	r = dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterTimeout"}, "TestFilterTimeout")
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(false), Reason: "timed out"})
+	dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestFilterRunning"}, "TestFilterRunning")
 
 	tests := []struct {
 		filter      string
@@ -262,7 +263,7 @@ func TestWebApp_Tests_FilterByStatus(t *testing.T) {
 		body := rec.Body.String()
 		df.Event("http_call", fmt.Sprintf("GET /tests?status=%s → %d", tt.filter, rec.Code))
 		if !strings.Contains(body, tt.wantVariant) {
-			if strings.Contains(body, "no tests found") || strings.Contains(body, "empty") {
+			if strings.Contains(body, "No tests found") || strings.Contains(body, "empty") {
 				df.Event("assertion", fmt.Sprintf("status=%s: no matching tests (empty state)", tt.filter))
 				t.Logf("status=%s: no matching tests in response (empty state)", tt.filter)
 			} else {
@@ -290,8 +291,8 @@ func TestWebApp_Tests_FilterByStatus(t *testing.T) {
 func TestWebApp_TestDetail_RendersTestName(t *testing.T) {
 	_, app, dc, df := newWebTest(t, "web", "Test detail page shows correct test name")
 	df.Event("log", "Seeding run for TestDetailFoo")
-	r := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestDetailFoo"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
+	r := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestDetailFoo"}, t.Name())
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
 
 	df.Event("log", "Fetching test detail page")
 	rec := echoRequest(t, app, "GET", "/tests/TestDetailFoo")
@@ -312,8 +313,8 @@ func TestWebApp_TestDetail_RendersTestName(t *testing.T) {
 func TestWebApp_TestDetail_HTMXPartial(t *testing.T) {
 	_, app, dc, df := newWebTest(t, "web", "Test detail HTMX partial without shell")
 	df.Event("log", "Seeding run for TestHTMXDetail")
-	r := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestHTMXDetail"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
+	r := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestHTMXDetail"}, t.Name())
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
 
 	df.Event("log", "Requesting HTMX test detail partial")
 	rec := htmxRequest(t, app, "GET", "/tests/TestHTMXDetail")
@@ -333,10 +334,10 @@ func TestWebApp_TestDetail_HTMXPartial(t *testing.T) {
 func TestWebApp_RunDetail_RendersRun(t *testing.T) {
 	_, app, dc, df := newWebTest(t, "web", "Run detail page shows test name and event data")
 	df.Event("log", "Seeding run with events for TestRunView")
-	r := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: "TestRunView"})
-	dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
-	dc.AddEvent(t, r.DaemonID, "section", "test setup")
-	dc.AddEvent(t, r.DaemonID, "log", "hello world")
+	r := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: "TestRunView"}, t.Name())
+	dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
+	dc.AddEvent(t, r.TestRunID, "section", "test setup")
+	dc.AddEvent(t, r.TestRunID, "log", "hello world")
 
 	df.Event("log", "Fetching run detail page")
 	rec := echoRequest(t, app, "GET", "/runs/"+fmt.Sprintf("%d", r.TestRunID))
@@ -432,7 +433,7 @@ func TestWebApp_ExpandCommand_NoPlaceholders(t *testing.T) {
 	}
 }
 
-// TestWebApp_LaunchAndPollUpdates verifies launching a real test via the web API and polling events-table until completion.
+// TestWebApp_LaunchAndPollUpdates verifies launching a real test via the web API and polling run detail until events appear.
 func TestWebApp_LaunchAndPollUpdates(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping E2E launch test in short mode")
@@ -509,7 +510,7 @@ func TestE2E_UpdateCheck(t *testing.T) {
 	deadline := time.Now().Add(25 * time.Second)
 	var eventsBody string
 	for time.Now().Before(deadline) {
-		rec = echoRequest(t, app, "GET", fmt.Sprintf("/runs/%s/events-table", runID))
+		rec = echoRequest(t, app, "GET", detailPath)
 		eventsBody = rec.Body.String()
 		if strings.Contains(eventsBody, "step 2 complete") {
 			break
@@ -517,7 +518,7 @@ func TestE2E_UpdateCheck(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 	}
 	if !strings.Contains(eventsBody, "step 2 complete") {
-		t.Errorf("events-table: expected 'step 2 complete' within 25s, got: %s", eventsBody[:min(len(eventsBody), 300)])
+		t.Errorf("run detail: expected 'step 2 complete' within 25s, got: %s", eventsBody[:min(len(eventsBody), 300)])
 	}
 
 	deadline = time.Now().Add(15 * time.Second)
@@ -624,5 +625,133 @@ func checkTestID(t *testing.T, body, testID string) {
 	marker := `data-testid="` + testID + `"`
 	if !strings.Contains(body, marker) {
 		t.Errorf("expected data-testid=%q in response body", testID)
+	}
+}
+
+func TestBuildEventDeltaRows_EmptyInitial(t *testing.T) {
+	_, app, _, _ := newWebTest(t, "web", "Delta builder: empty initial returns nothing")
+
+	id, _ := app.db.InsertRun("TestDelta_Empty", time.Now(), "host", "env", nil, "")
+
+	html, newLastID, newSection, err := app.buildEventDeltaRows(context.Background(), id, 0, "", false)
+	if err != nil {
+		t.Fatalf("buildEventDeltaRows: %v", err)
+	}
+	if html != "" {
+		t.Errorf("expected empty html for no new events, got: %s", html)
+	}
+	if newLastID != 0 {
+		t.Errorf("expected lastID=0, got %d", newLastID)
+	}
+	if newSection != "" {
+		t.Errorf("expected section='', got %s", newSection)
+	}
+}
+
+func TestBuildEventDeltaRows_NewEvents(t *testing.T) {
+	_, app, _, _ := newWebTest(t, "web", "Delta builder: returns new event rows")
+
+	id, _ := app.db.InsertRun("TestDelta_New", time.Now(), "host", "env", nil, "")
+	now := time.Now().UTC()
+
+	app.db.InsertEvent(id, 1, now, 0.5, "log", "hello", nil, "")
+	app.db.InsertEvent(id, 2, now, 1.0, "cli", "go build", nil, "build")
+
+	html, newLastID, _, err := app.buildEventDeltaRows(context.Background(), id, 0, "", false)
+	if err != nil {
+		t.Fatalf("buildEventDeltaRows: %v", err)
+	}
+	if html == "" {
+		t.Fatal("expected delta HTML, got empty")
+	}
+	if !strings.Contains(html, "hello") {
+		t.Errorf("expected 'hello' in delta HTML, got: %s", html)
+	}
+	if !strings.Contains(html, "go build") {
+		t.Errorf("expected 'go build' in delta HTML, got: %s", html)
+	}
+	if !strings.Contains(html, "section") {
+		t.Errorf("expected section header for new section, got: %s", html)
+	}
+	if newLastID == 0 {
+		t.Error("expected lastID > 0 after new events")
+	}
+}
+
+func TestBuildEventDeltaRows_SkipsMetaEvents(t *testing.T) {
+	_, app, _, _ := newWebTest(t, "web", "Delta builder: skips meta events when debug off")
+
+	id, _ := app.db.InsertRun("TestDelta_Meta", time.Now(), "host", "env", nil, "")
+	now := time.Now().UTC()
+
+	app.db.InsertEvent(id, 1, now, 0, "tag", "baseline", nil, "")
+	app.db.InsertEvent(id, 2, now, 0.1, "log", "visible", nil, "")
+
+	html, _, _, err := app.buildEventDeltaRows(context.Background(), id, 0, "", false)
+	if err != nil {
+		t.Fatalf("buildEventDeltaRows: %v", err)
+	}
+	if strings.Contains(html, "baseline") {
+		t.Error("meta event should be skipped when debug is false")
+	}
+	if !strings.Contains(html, "visible") {
+		t.Error("non-meta event should be included")
+	}
+}
+
+func TestHandleRunStatusSSE_ActiveRun(t *testing.T) {
+	_, app, _, _ := newWebTest(t, "web", "RunStatusSSE: sends events-table for active run")
+
+	id, _ := app.db.InsertRun("TestSSE_Active", time.Now(), "host", "env", nil, "")
+	now := time.Now().UTC()
+	app.db.InsertEvent(id, 1, now, 0.1, "log", "step one", nil, "")
+
+	req := httptest.NewRequest("GET", fmt.Sprintf("/runs/%d/status", id), nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		app.ServeHTTP(rec, req)
+		close(done)
+	}()
+	<-done
+
+	body := rec.Body.String()
+	if !strings.Contains(body, ": connected") {
+		t.Error("expected :connected comment in SSE body")
+	}
+	if !strings.Contains(body, "event: events-table") {
+		t.Errorf("expected events-table event, got body: %s", body[:min(len(body), 500)])
+	}
+	if !strings.Contains(body, "step one") {
+		t.Errorf("expected 'step one' in body, got: %s", body[:min(len(body), 500)])
+	}
+}
+
+func TestHandleRunStatusSSE_FinishedRun(t *testing.T) {
+	_, app, _, _ := newWebTest(t, "web", "RunStatusSSE: finished run returns done immediately")
+
+	id, _ := app.db.InsertRun("TestSSE_Finished", time.Now(), "host", "env", nil, "")
+	app.db.FinishRun(id, time.Now(), runlog.OutcomePass, "")
+
+	req := httptest.NewRequest("GET", fmt.Sprintf("/runs/%d/status", id), nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		app.ServeHTTP(rec, req)
+		close(done)
+	}()
+	<-done
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "event: done") {
+		t.Errorf("expected done event for finished run, got: %s", body[:min(len(body), 500)])
 	}
 }

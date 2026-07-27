@@ -45,10 +45,54 @@ type CreateRunOpts struct {
 // CreateRunResult holds the response from creating a run.
 type CreateRunResult struct {
 	DaemonID  string // daemon_runs UUID
-	TestRunID int64  // test_runs auto-increment ID (0 if not returned)
+	TestRunID int64  // test_runs auto-increment ID (0 for batch creation only)
 }
 
-// CreateRun creates a run via POST /runs and returns the result.
+// CreateRunNF is the non-fatal variant of CreateRun. Returns (CreateRunResult, error).
+func (c *DaemonClient) CreateRunNF(t *testing.T, opts CreateRunOpts) (CreateRunResult, error) {
+	t.Helper()
+	pid := opts.PID
+	if pid <= 0 {
+		pid = 12345
+	}
+	body := map[string]any{
+		"pid":             pid,
+		"env_profile":     opts.EnvProfile,
+		"server_url":      opts.ServerURL,
+		"token":           opts.Token,
+		"category":        opts.Category,
+		"tags":            opts.Tags,
+		"description":     opts.Description,
+		"experiment":      opts.Experiment,
+		"runner":          opts.Runner,
+		"app_version":     opts.AppVersion,
+		"test_version":    opts.TestVersion,
+		"env_vars":        opts.EnvVars,
+		"started_at":      opts.StartedAt,
+		"timeout_seconds": opts.TimeoutSeconds,
+	}
+	b, _ := json.Marshal(body)
+	resp, err := c.client.Post(c.baseURL+"/runs", "application/json", bytes.NewReader(b))
+	if err != nil {
+		return CreateRunResult{}, fmt.Errorf("POST /runs: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return CreateRunResult{}, fmt.Errorf("POST /runs → %d: %s", resp.StatusCode, string(respBody))
+	}
+	var result struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return CreateRunResult{}, fmt.Errorf("decode response: %w", err)
+	}
+	return CreateRunResult{DaemonID: result.ID}, nil
+}
+
+// CreateRun creates a daemon batch run via POST /runs and returns the result.
+// Creates only a daemon_runs row (no test_runs). Use RegisterFunction to create
+// per-test-function test_runs rows within the batch.
 func (c *DaemonClient) CreateRun(t *testing.T, opts CreateRunOpts) CreateRunResult {
 	t.Helper()
 	pid := opts.PID
@@ -82,16 +126,56 @@ func (c *DaemonClient) CreateRun(t *testing.T, opts CreateRunOpts) CreateRunResu
 		t.Fatalf("DaemonClient.CreateRun: POST /runs → %d: %s", resp.StatusCode, string(respBody))
 	}
 	var result struct {
-		ID        string `json:"id"`
-		TestRunID int64  `json:"test_run_id,omitempty"`
+		ID string `json:"id"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatalf("DaemonClient.CreateRun: decode response: %v", err)
 	}
-	return CreateRunResult{DaemonID: result.ID, TestRunID: result.TestRunID}
+	return CreateRunResult{DaemonID: result.ID}
 }
 
-// MarkDoneOpts holds fields for completing a run via PUT /runs/:id/done.
+// RegisterFunction creates a per-test-function test_runs row within a daemon
+// batch via POST /runs/:id/functions. Returns the new test_runs.id.
+func (c *DaemonClient) RegisterFunction(batchID, testName, testType, experiment string) (int64, error) {
+	body := map[string]string{
+		"test_name":  testName,
+		"test_type":  testType,
+		"experiment": experiment,
+	}
+	b, _ := json.Marshal(body)
+	url := c.baseURL + "/runs/" + batchID + "/functions"
+	resp, err := c.client.Post(url, "application/json", bytes.NewReader(b))
+	if err != nil {
+		return 0, fmt.Errorf("POST %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("POST %s → %d: %s", url, resp.StatusCode, string(respBody))
+	}
+	var result struct {
+		TestRunID int64 `json:"test_run_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("decode response: %w", err)
+	}
+	return result.TestRunID, nil
+}
+
+// CreateTestRun creates a batch + registers a test function in one call.
+// AfterCreateRun, calls RegisterFunction with testName. Returns the
+// daemon batch ID and the test_runs.id for subsequent AddEvent/MarkDone calls.
+func (c *DaemonClient) CreateTestRun(t *testing.T, opts CreateRunOpts, testName string) CreateRunResult {
+	t.Helper()
+	r := c.CreateRun(t, opts)
+	id, err := c.RegisterFunction(r.DaemonID, testName, "", "")
+	if err != nil {
+		t.Fatalf("DaemonClient.CreateTestRun: RegisterFunction: %v", err)
+	}
+	return CreateRunResult{DaemonID: r.DaemonID, TestRunID: id}
+}
+
+// MarkDoneOpts holds fields for completing a run via PUT /test-runs/:id/done.
 type MarkDoneOpts struct {
 	Passed       *bool
 	Skipped      *bool
@@ -102,8 +186,8 @@ type MarkDoneOpts struct {
 	CostUSD      *float64
 }
 
-// MarkDone marks a run as done via PUT /runs/:id/done.
-func (c *DaemonClient) MarkDone(t *testing.T, runID string, opts MarkDoneOpts) {
+// MarkDone marks a run as done via PUT /test-runs/:id/done.
+func (c *DaemonClient) MarkDone(t *testing.T, runID int64, opts MarkDoneOpts) {
 	t.Helper()
 	body := map[string]any{}
 	if opts.Passed != nil {
@@ -128,21 +212,22 @@ func (c *DaemonClient) MarkDone(t *testing.T, runID string, opts MarkDoneOpts) {
 		body["cost_usd"] = *opts.CostUSD
 	}
 	b, _ := json.Marshal(body)
-	req, _ := http.NewRequest("PUT", c.baseURL+"/runs/"+runID+"/done", bytes.NewReader(b))
+	url := fmt.Sprintf("%s/test-runs/%d/done", c.baseURL, runID)
+	req, _ := http.NewRequest("PUT", url, bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		t.Fatalf("DaemonClient.MarkDone: PUT /runs/%s/done: %v", runID, err)
+		t.Fatalf("DaemonClient.MarkDone: PUT /test-runs/%d/done: %v", runID, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		t.Fatalf("DaemonClient.MarkDone: PUT /runs/%s/done → %d: %s", runID, resp.StatusCode, string(respBody))
+		t.Fatalf("DaemonClient.MarkDone: PUT /test-runs/%d/done → %d: %s", runID, resp.StatusCode, string(respBody))
 	}
 }
 
-// AddEvent adds an event to a run via POST /runs/:id/events.
-func (c *DaemonClient) AddEvent(t *testing.T, runID, kind, message string) {
+// AddEvent adds an event to a run via POST /test-runs/:id/events.
+func (c *DaemonClient) AddEvent(t *testing.T, runID int64, kind, message string) {
 	t.Helper()
 	body := map[string]any{
 		"kind":      kind,
@@ -150,32 +235,34 @@ func (c *DaemonClient) AddEvent(t *testing.T, runID, kind, message string) {
 		"elapsed_s": 0.5,
 	}
 	b, _ := json.Marshal(body)
-	resp, err := c.client.Post(c.baseURL+"/runs/"+runID+"/events", "application/json", bytes.NewReader(b))
+	url := fmt.Sprintf("%s/test-runs/%d/events", c.baseURL, runID)
+	resp, err := c.client.Post(url, "application/json", bytes.NewReader(b))
 	if err != nil {
-		t.Fatalf("DaemonClient.AddEvent: POST /runs/%s/events: %v", runID, err)
+		t.Fatalf("DaemonClient.AddEvent: POST /test-runs/%d/events: %v", runID, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
-		t.Fatalf("DaemonClient.AddEvent: POST /runs/%s/events → %d: %s", runID, resp.StatusCode, string(respBody))
+		t.Fatalf("DaemonClient.AddEvent: POST /test-runs/%d/events → %d: %s", runID, resp.StatusCode, string(respBody))
 	}
 }
 
-// SetMetadata updates a string field on the test_runs row via PUT /runs/:id/<field>.
-func (c *DaemonClient) SetMetadata(t *testing.T, runID, field, value string) { //nolint:deadcode
+// SetMetadata updates a string field on the test_runs row via PUT /test-runs/:id/metadata/:field.
+func (c *DaemonClient) SetMetadata(t *testing.T, runID int64, field, value string) { //nolint:deadcode
 	t.Helper()
 	body := map[string]string{"value": value}
 	b, _ := json.Marshal(body)
-	req, _ := http.NewRequest("PUT", c.baseURL+"/runs/"+runID+"/"+field, bytes.NewReader(b))
+	url := fmt.Sprintf("%s/test-runs/%d/metadata/%s", c.baseURL, runID, field)
+	req, _ := http.NewRequest("PUT", url, bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		t.Fatalf("DaemonClient.SetMetadata: PUT /runs/%s/%s: %v", runID, field, err)
+		t.Fatalf("DaemonClient.SetMetadata: PUT /test-runs/%d/metadata/%s: %v", runID, field, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		t.Fatalf("DaemonClient.SetMetadata: PUT /runs/%s/%s → %d: %s", runID, field, resp.StatusCode, string(respBody))
+		t.Fatalf("DaemonClient.SetMetadata: PUT /test-runs/%d/metadata/%s → %d: %s", runID, field, resp.StatusCode, string(respBody))
 	}
 }
 
@@ -241,7 +328,7 @@ func (c *DaemonClient) MustGetEvents(t *testing.T, id int64) []map[string]any { 
 }
 
 // addEventNF is the non-fatal variant of AddEvent for use inside RunLog.
-func (c *DaemonClient) addEventNF(t *testing.T, runID string, kind, message string, details any, elapsedSec float64, durationMs float64) { //nolint:deadcode
+func (c *DaemonClient) addEventNF(t *testing.T, runID int64, kind, message string, details any, elapsedSec float64, durationMs float64) { //nolint:deadcode
 	t.Helper()
 	body := map[string]any{
 		"kind":      kind,
@@ -255,20 +342,21 @@ func (c *DaemonClient) addEventNF(t *testing.T, runID string, kind, message stri
 		body["duration_ms"] = durationMs
 	}
 	b, _ := json.Marshal(body)
-	resp, err := c.client.Post(c.baseURL+"/runs/"+runID+"/events", "application/json", bytes.NewReader(b))
+	url := fmt.Sprintf("%s/test-runs/%d/events", c.baseURL, runID)
+	resp, err := c.client.Post(url, "application/json", bytes.NewReader(b))
 	if err != nil {
-		t.Logf("warn: DaemonClient.addEventNF: POST /runs/%s/events: %v", runID, err)
+		t.Logf("warn: DaemonClient.addEventNF: POST /test-runs/%d/events: %v", runID, err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
-		t.Logf("warn: DaemonClient.addEventNF: POST /runs/%s/events → %d: %s", runID, resp.StatusCode, string(respBody))
+		t.Logf("warn: DaemonClient.addEventNF: POST /test-runs/%d/events → %d: %s", runID, resp.StatusCode, string(respBody))
 	}
 }
 
 // markDoneNF is the non-fatal variant of MarkDone for use inside RunLog.Close().
-func (c *DaemonClient) markDoneNF(t *testing.T, runID string, outcome RunOutcome, reason string, inputTokens, outputTokens int64, costUSD float64) {
+func (c *DaemonClient) markDoneNF(t *testing.T, runID int64, outcome RunOutcome, reason string, inputTokens, outputTokens int64, costUSD float64) {
 	t.Helper()
 	body := map[string]any{}
 	switch outcome {
@@ -292,35 +380,57 @@ func (c *DaemonClient) markDoneNF(t *testing.T, runID string, outcome RunOutcome
 		body["cost_usd"] = costUSD
 	}
 	b, _ := json.Marshal(body)
-	req, _ := http.NewRequest("PUT", c.baseURL+"/runs/"+runID+"/done", bytes.NewReader(b))
+	url := fmt.Sprintf("%s/test-runs/%d/done", c.baseURL, runID)
+	req, _ := http.NewRequest("PUT", url, bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		t.Logf("warn: DaemonClient.markDoneNF: PUT /runs/%s/done: %v", runID, err)
+		t.Logf("warn: DaemonClient.markDoneNF: PUT /test-runs/%d/done: %v", runID, err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		t.Logf("warn: DaemonClient.markDoneNF: PUT /runs/%s/done → %d: %s", runID, resp.StatusCode, string(respBody))
+		t.Logf("warn: DaemonClient.markDoneNF: PUT /test-runs/%d/done → %d: %s", runID, resp.StatusCode, string(respBody))
+	}
+}
+
+// putRawOutputNF uploads raw log content to the test_runs row via PUT
+// /test-runs/:id/raw_output. Non-fatal (logs warning on failure).
+func (c *DaemonClient) putRawOutputNF(t *testing.T, runID int64, output string) {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"output": output})
+	url := fmt.Sprintf("%s/test-runs/%d/raw_output", c.baseURL, runID)
+	req, _ := http.NewRequest("PUT", url, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		t.Logf("warn: DaemonClient.putRawOutputNF: PUT /test-runs/%d/raw_output: %v", runID, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		t.Logf("warn: DaemonClient.putRawOutputNF: PUT /test-runs/%d/raw_output → %d: %s", runID, resp.StatusCode, string(respBody))
 	}
 }
 
 // setMetadataNF is the non-fatal variant of SetMetadata for use inside RunLog.
-func (c *DaemonClient) setMetadataNF(t *testing.T, runID, field, value string) { //nolint:deadcode
+func (c *DaemonClient) setMetadataNF(t *testing.T, runID int64, field, value string) { //nolint:deadcode
 	t.Helper()
 	body := map[string]string{"value": value}
 	b, _ := json.Marshal(body)
-	req, _ := http.NewRequest("PUT", c.baseURL+"/runs/"+runID+"/"+field, bytes.NewReader(b))
+	url := fmt.Sprintf("%s/test-runs/%d/metadata/%s", c.baseURL, runID, field)
+	req, _ := http.NewRequest("PUT", url, bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	if err != nil {
-		t.Logf("warn: DaemonClient.setMetadataNF: PUT /runs/%s/%s: %v", runID, field, err)
+		t.Logf("warn: DaemonClient.setMetadataNF: PUT /test-runs/%d/metadata/%s: %v", runID, field, err)
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		t.Logf("warn: DaemonClient.setMetadataNF: PUT /runs/%s/%s → %d: %s", runID, field, resp.StatusCode, string(respBody))
+		t.Logf("warn: DaemonClient.setMetadataNF: PUT /test-runs/%d/metadata/%s → %d: %s", runID, field, resp.StatusCode, string(respBody))
 	}
 }

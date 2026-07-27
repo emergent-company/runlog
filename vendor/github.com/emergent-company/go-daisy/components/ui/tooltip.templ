@@ -1,0 +1,26 @@
+package ui
+
+// TooltipProps configures a rich JS-powered tooltip using the Popover component.
+// Use TooltipScript() in the page layout to load the popover runtime.
+type TooltipProps struct {
+	Tip      string
+	Position string // "top", "bottom", "left", "right"
+	Class    string
+	Attrs    templ.Attributes
+}
+
+templ Tooltip(props ...TooltipProps) {
+	{{ var p TooltipProps
+	if len(props) > 0 { p = props[0] }
+	if p.Position == "" { p.Position = "top" } }}
+	@Popover(PopoverRootProps{Attrs: p.Attrs})
+		@PopoverTrigger(PopoverTriggerProps{TriggerType: PopoverTriggerHover, Class: p.Class})
+			{ children... }
+		@PopoverContent(PopoverContentProps{
+			Placement:        PopoverPlacement(p.Position),
+			ShowArrow:        true,
+			DisableClickaway: true,
+			Class:            "px-3 py-1.5 text-xs font-medium bg-foreground text-background border-0",
+		})
+			{ p.Tip }
+}

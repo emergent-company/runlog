@@ -47,7 +47,7 @@ func ButtonGlow(props ButtonProps) templ.Component {
 				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
 				templ.KV("shadow-error/30", props.Variant == ButtonError),
 				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
-				props.ExtraClass}
+				templ.KV(props.ExtraClass, props.ExtraClass != "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -141,7 +141,7 @@ func ButtonGlow(props ButtonProps) templ.Component {
 				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
 				templ.KV("shadow-error/30", props.Variant == ButtonError),
 				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
-				props.ExtraClass}
+				templ.KV(props.ExtraClass, props.ExtraClass != "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -204,7 +204,7 @@ func ButtonGlow(props ButtonProps) templ.Component {
 				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
 				templ.KV("shadow-error/30", props.Variant == ButtonError),
 				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
-				props.ExtraClass}
+				templ.KV(props.ExtraClass, props.ExtraClass != "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var8...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

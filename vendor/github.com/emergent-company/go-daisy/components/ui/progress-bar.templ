@@ -1,0 +1,77 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+var progressBarScriptOnce = templ.NewOnceHandle()
+
+// ProgressBar renders a fixed-position thin bar at the top of the page that
+// auto-shows during slow HTMX requests (>500ms). Include this inside the
+// <body> of layout.Page.
+//
+// Controlled by inline JS: listens for htmx:beforeRequest (starts timer) and
+// htmx:afterSettle (hides bar). After 500ms without a response, the bar slides
+// in and animates to 90% width until the response arrives.
+templ ProgressBar() {
+	<div
+		id="progress-bar"
+		class="fixed top-0 left-0 h-1 bg-primary z-100 hidden transition-all duration-300"
+		style="width:0%"
+		{ devmode.Attrs(ctx, "ui/ProgressBar")... }
+	></div>
+	@progressBarScriptOnce.Once() {
+		<script>
+	if (!window._goDaisyProgressInit) {
+		window._goDaisyProgressInit = true;
+		(function() {
+			var bar = document.getElementById('progress-bar');
+			if (!bar) return;
+			var timer, animFrame;
+
+			function show() {
+				bar.classList.remove('hidden');
+				bar.style.width = '0%';
+				var start = Date.now();
+				function tick() {
+					var elapsed = Date.now() - start;
+					var pct = Math.min(90, (elapsed / 3000) * 90);
+					bar.style.width = pct + '%';
+					if (pct < 90 && bar.classList.contains('htmx-request')) {
+						animFrame = requestAnimationFrame(tick);
+					}
+				}
+				animFrame = requestAnimationFrame(tick);
+			}
+
+			function hide() {
+				bar.classList.add('htmx-settling');
+				bar.style.width = '100%';
+				setTimeout(function() {
+					bar.classList.add('hidden');
+					bar.classList.remove('htmx-settling');
+					bar.style.width = '0%';
+				}, 200);
+			}
+
+			document.addEventListener('htmx:beforeRequest', function(e) {
+				if (e.target === document.body || e.target.matches('body *')) {
+					bar.classList.add('htmx-request');
+					clearTimeout(timer);
+					timer = setTimeout(show, 500);
+				}
+			});
+
+			document.addEventListener('htmx:afterSettle', function(e) {
+				clearTimeout(timer);
+				cancelAnimationFrame(animFrame);
+				if (bar.classList.contains('htmx-request')) {
+					hide();
+					bar.classList.remove('htmx-request');
+				}
+			});
+		})();
+	}
+		</script>
+	}
+}

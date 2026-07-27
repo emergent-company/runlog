@@ -21,7 +21,7 @@ templ ButtonGlow(props ButtonProps) {
 				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
 				templ.KV("shadow-error/30", props.Variant == ButtonError),
 				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
-				props.ExtraClass }
+				templ.KV(props.ExtraClass, props.ExtraClass != "") }
 			if props.OnClick.Name != "" {
 				onclick={ props.OnClick }
 			}
@@ -48,7 +48,7 @@ templ ButtonGlow(props ButtonProps) {
 				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
 				templ.KV("shadow-error/30", props.Variant == ButtonError),
 				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
-				props.ExtraClass }
+				templ.KV(props.ExtraClass, props.ExtraClass != "") }
 			{ devmode.Attrs(ctx, "ui/ButtonGlow")... }
 			{ props.Attrs... }
 		>
@@ -74,7 +74,7 @@ templ ButtonGlow(props ButtonProps) {
 				templ.KV("shadow-success/30", props.Variant == ButtonSuccess),
 				templ.KV("shadow-error/30", props.Variant == ButtonError),
 				templ.KV("shadow-neutral/30", props.Variant == ButtonNeutral),
-				props.ExtraClass }
+				templ.KV(props.ExtraClass, props.ExtraClass != "") }
 			disabled?={ props.Loading }
 			if props.OnClick.Name != "" {
 				onclick={ props.OnClick }

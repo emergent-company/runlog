@@ -62,6 +62,7 @@ templ SearchResults(sections []searchResultSection) {
 									hx-target="#main-content"
 									hx-swap="innerHTML"
 									hx-push-url="true"
+									hx-sync="#main-content:replace"
 									data-testid="search-result-item"
 								>
 									<span class={ "iconify size-4 text-base-content/50 shrink-0 " + item.Icon }></span>

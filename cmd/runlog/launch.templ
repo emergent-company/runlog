@@ -1,7 +1,5 @@
 package main
 
-import "net/url"
-
 // LaunchView renders the SSE-connected log viewer after launching a test.
 templ LaunchView(data launchData) {
 	<div class="mt-4 mb-6" data-testid="launch-view" data-sse-url={ data.SSEURL } data-test-name={ data.TestName }>

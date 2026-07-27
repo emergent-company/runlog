@@ -1,0 +1,23 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// AspectRatioProps configures a container that maintains a fixed aspect ratio.
+type AspectRatioProps struct {
+	Ratio string // CSS ratio, e.g. "16/9", "4/3", "1/1"
+	Class string
+	Attrs templ.Attributes
+}
+
+templ AspectRatio(props ...AspectRatioProps) {
+	{{ var p AspectRatioProps
+	if len(props) > 0 { p = props[0] }
+	if p.Ratio == "" { p.Ratio = "16/9" } }}
+	<div
+		class={ "aspect-[" + p.Ratio + "] relative overflow-hidden", p.Class }
+		{ devmode.Attrs(ctx, "ui/AspectRatio")... }
+		{ p.Attrs... }
+	>
+		{ children... }
+	</div>
+}

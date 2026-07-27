@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 
 	"github.com/emergent-company/go-daisy/components/table"
 )
@@ -48,11 +47,7 @@ templ envTable(entries []envListEntry) {
 						id={ "env-" + e.Name }
 						data-testid={ "env-row-" + e.Name }
 						class="hover cursor-pointer"
-						hx-get={ EnvironmentDetailURL(e.Name) }
-						hx-target="#main-content"
-						hx-swap="innerHTML"
-						hx-push-url="true"
-						hx-sync="#main-content:replace"
+						{ NavRowAttrs(EnvironmentDetailURL(e.Name))... }
 					>
 						@table.TableCell("font-semibold", nil) {
 							@text(e.Name)

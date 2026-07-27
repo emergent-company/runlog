@@ -52,7 +52,7 @@ func (app *WebApp) handleDashboard(c echo.Context) error {
 		allTestNames[n] = true
 	}
 	// Include discovered test functions
-	if discovered := DiscoverTestFunctions(app.workDir); discovered != nil {
+	if discovered := app.discovered; discovered != nil {
 		for _, funcs := range discovered {
 			for _, f := range funcs {
 				allTestNames[f] = true
@@ -360,7 +360,6 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		testTypes = append(testTypes, ts.Name)
 	}
 
-	seen := make(map[string]bool)
 	catMap := make(map[string][]testListEntry)
 	allCatSet := make(map[string]bool)
 	for _, row := range catalog {
@@ -374,10 +373,10 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		if testTypeFilter != "" && testType != testTypeFilter {
 			continue
 		}
-		status := row.LastStatus
-		if status == "" {
-			status = "none"
-		}
+	status := row.LastStatus
+	if status == "" {
+		status = "none"
+	}
 		if statusFilter != "" && status != statusFilter {
 			continue
 		}
@@ -390,54 +389,12 @@ func (app *WebApp) handleTests(c echo.Context) error {
 			LastStatus:  status,
 			LastRunAt:   lastRunAt,
 			RunCount:    row.RunCount,
+			NeverRun:    row.NeverRun,
 			TestType:    row.TestType,
 			Description: row.Description,
 			Tags:        row.Tags,
 		}
 		catMap[cat] = append(catMap[cat], entry)
-		seen[row.TestName] = true
-	}
-
-	// Merge discovered test functions from filesystem
-	if discovered := DiscoverTestFunctions(app.workDir); discovered != nil {
-		for _, funcs := range discovered {
-			for _, f := range funcs {
-				if seen[f] {
-					continue
-				}
-				if statusFilter != "" && statusFilter != "never_run" {
-					continue
-				}
-				cat := "Uncategorized"
-				for dirCat, dirFuncs := range discovered {
-					for _, df := range dirFuncs {
-						if df == f {
-							cat = dirCat
-							break
-						}
-					}
-					if cat != "Uncategorized" {
-						break
-					}
-				}
-				if categoryFilter != "" && cat != categoryFilter {
-					continue
-				}
-				// Discovered-but-never-run tests have no recorded test_type,
-				// so they only belong to the "other" bucket.
-				if testTypeFilter != "" && testTypeFilter != "other" {
-					continue
-				}
-				entry := testListEntry{
-					Name:       f,
-					LastStatus: "never_run",
-					NeverRun:   true,
-				}
-				catMap[cat] = append(catMap[cat], entry)
-				allCatSet[cat] = true
-				seen[f] = true
-			}
-		}
 	}
 
 	var filteredCats []testListCategory
@@ -448,6 +405,69 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		filteredCats = []testListCategory{}
 	}
 
+	// Paginate: single page of pageSize rows, page number in URL.
+	const pageSize = 75
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * pageSize
+
+	// Build a flat list with category index to rebuild groups after slicing.
+	type indexedTest struct {
+		catIdx int
+		entry  testListEntry
+	}
+	var flat []indexedTest
+	for ci, cat := range filteredCats {
+		for _, t := range cat.Tests {
+			flat = append(flat, indexedTest{ci, t})
+		}
+	}
+	sort.Slice(flat, func(i, j int) bool {
+		return flat[i].entry.Name < flat[j].entry.Name
+	})
+	total := len(flat)
+	totalPages := (total + pageSize - 1) / pageSize
+
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	flat = flat[start:end]
+
+	// Rebuild category groups from sliced flat list.
+	type catGroup struct {
+		name  string
+		tests []testListEntry
+	}
+	groups := make(map[int]*catGroup)
+	var order []int
+	for _, it := range flat {
+		if g, ok := groups[it.catIdx]; ok {
+			g.tests = append(g.tests, it.entry)
+		} else {
+			groups[it.catIdx] = &catGroup{filteredCats[it.catIdx].Name, []testListEntry{it.entry}}
+			order = append(order, it.catIdx)
+		}
+	}
+	var displayed []testListCategory
+	for _, ci := range order {
+		g := groups[ci]
+		displayed = append(displayed, testListCategory{Name: g.name, Tests: g.tests})
+	}
+	filteredCats = displayed
+	if filteredCats == nil {
+		filteredCats = []testListCategory{}
+	}
+
+	pageURL := fmt.Sprintf("/ui/tests?category=%s&test_type=%s&status=%s",
+		url.QueryEscape(categoryFilter), url.QueryEscape(testTypeFilter), url.QueryEscape(statusFilter))
+
 	data := testListData{
 		Categories:     filteredCats,
 		AllCategories:  sortedKeys(allCatSet),
@@ -455,6 +475,9 @@ func (app *WebApp) handleTests(c echo.Context) error {
 		StatusFilter:   statusFilter,
 		TestTypeFilter: testTypeFilter,
 		TestTypes:      testTypes,
+		CurrentPage:    page,
+		TotalPages:     totalPages,
+		PaginationURL:  pageURL,
 	}
 
 	render.RenderAuto(c.Response().Writer, c.Request(),
@@ -563,7 +586,7 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 		events = []runlog.EventRow{}
 	}
 
-	timeline, meta, unwrapped := splitRunEvents(events)
+	groups, meta := groupBySection(events)
 
 	showDebug := c.QueryParam("debug") == "1"
 
@@ -573,91 +596,18 @@ func (app *WebApp) handleRunDetail(c echo.Context) error {
 		sseURL = RunStatusSSEURL(id)
 	}
 
-	// Fetch raw stdout/stderr output for the Raw Output tab.
-	var rawOutput string
-	_ = app.db.RawDB().QueryRow(`SELECT raw_output FROM test_runs WHERE id = ?`, id).Scan(&rawOutput)
-
 	data := runDetailData{
-		Run:               *run,
-		TimelineEvents:    timeline,
-		MetaEvents:        meta,
-		UnwrappedChildren: unwrapped,
-		ShowDebug:         showDebug,
-		IsActive:          isActive,
-		SSEURL:            sseURL,
-		RawOutput:         run.RawOutput,
+		Run:           *run,
+		SectionGroups: groups,
+		MetaEvents:    meta,
+		ShowDebug:     showDebug,
+		IsActive:      isActive,
+		SSEURL:        sseURL,
+		RawOutput:     run.RawOutput,
 	}
 	render.RenderAuto(c.Response().Writer, c.Request(),
 		RunDetailPage(data), RunDetailContent(data))
 	return nil
-}
-
-func (app *WebApp) handleRunEventsTable(c echo.Context) error {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid run id")
-	}
-
-	run := fetchRunByID(app.db.RawDB(), id)
-	if run == nil {
-		return echo.NewHTTPError(http.StatusNotFound, "run not found")
-	}
-
-	events, err := app.db.ListEvents(id)
-	if err != nil {
-		return fmt.Errorf("list events: %w", err)
-	}
-	if events == nil {
-		events = []runlog.EventRow{}
-	}
-
-	timeline, meta, unwrapped := splitRunEvents(events)
-
-	showDebug := c.QueryParam("debug") == "1"
-
-	data := runDetailData{
-		Run:               *run,
-		TimelineEvents:    timeline,
-		MetaEvents:        meta,
-		UnwrappedChildren: unwrapped,
-		ShowDebug:         showDebug,
-		RawOutput:         run.RawOutput,
-	}
-	render.RenderPartial(c.Response().Writer, c.Request(), eventsSection(data))
-	return nil
-}
-
-func (app *WebApp) handleEventChildren(c echo.Context) error {
-	idStr := c.Param("id")
-	eventIDStr := c.Param("eventID")
-
-	runID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid run id")
-	}
-	eventID, err := strconv.ParseInt(eventIDStr, 10, 64)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "invalid event id")
-	}
-
-	events, err := app.db.ListEvents(runID)
-	if err != nil {
-		return fmt.Errorf("list events: %w", err)
-	}
-
-	for _, e := range events {
-		if e.ID == eventID {
-			data := eventChildrenData{EventID: eventID, Children: e.Children, Kind: e.Kind}
-			if e.Details != nil {
-				data.Details = *e.Details
-			}
-			render.RenderPartial(c.Response().Writer, c.Request(),
-				EventChildrenPartial(data))
-			return nil
-		}
-	}
-	return echo.NewHTTPError(http.StatusNotFound, "event not found")
 }
 
 func (app *WebApp) handleExperiments(c echo.Context) error {
@@ -774,11 +724,15 @@ func (app *WebApp) handleLaunchTest(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "create run: "+err.Error())
 	}
 
+	// Look up work_dir from the most recent active daemon batch.
+	// This ensures "rerun" spawns go test from the same directory as the original run.
+	var workDir string
+	_ = app.db.RawDB().QueryRow(`SELECT work_dir FROM daemon_runs ORDER BY started_at DESC LIMIT 1`).Scan(&workDir)
+
 	env := map[string]string{
-		"RUNLOG_RUN_ID":     fmt.Sprintf("%d", runID),
 		"_RUNLOG_DAEMON_DB": app.db.Path(),
 	}
-	if _, err := app.lm.Launch(testName, runID, env); err != nil {
+	if _, err := app.lm.Launch(testName, runID, workDir, env); err != nil {
 		// Launch failed — clean up the pre-created run row.
 		_, _ = app.db.RawDB().Exec(`DELETE FROM test_runs WHERE id = ?`, runID)
 		w := c.Response().Writer
@@ -878,15 +832,42 @@ func (app *WebApp) handleRunStatusSSE(c echo.Context) error {
 	ctx := c.Request().Context()
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
+
+	initialized := false
+	lastEventID := int64(0)
+	lastSection := ""
+
 	for {
 		select {
 		case <-ticker.C:
-			html, err := app.buildEventsTableHTML(ctx, id)
-			if err == nil {
-				data, _ := json.Marshal(map[string]string{"html": html})
-				_, _ = io.WriteString(w, fmt.Sprintf("event: events-table\ndata: %s\n\n", data))
-				flusher.Flush()
+			if !initialized {
+				html, err := app.buildEventsTableHTML(ctx, id)
+				if err == nil {
+					data, _ := json.Marshal(map[string]string{"html": html, "full": "true"})
+					_, _ = io.WriteString(w, fmt.Sprintf("event: events-table\ndata: %s\n\n", data))
+					flusher.Flush()
+					initialized = true
+
+					events, _ := app.db.ListEvents(id)
+					for i := len(events) - 1; i >= 0; i-- {
+						if !metaRunEventKinds[events[i].Kind] {
+							lastEventID = events[i].ID
+							lastSection = events[i].Section
+							break
+						}
+					}
+				}
+			} else {
+				deltaHTML, newLastID, newSection, err := app.buildEventDeltaRows(ctx, id, lastEventID, lastSection, false)
+				if err == nil && deltaHTML != "" {
+					lastEventID = newLastID
+					lastSection = newSection
+					data, _ := json.Marshal(map[string]string{"html": deltaHTML})
+					_, _ = io.WriteString(w, fmt.Sprintf("event: events-table\ndata: %s\n\n", data))
+					flusher.Flush()
+				}
 			}
+
 			if doneCh == nil {
 				r := fetchRunByID(app.db.RawDB(), id)
 				if r == nil || r.FinishedAt != nil {
@@ -898,7 +879,7 @@ func (app *WebApp) handleRunStatusSSE(c echo.Context) error {
 		case <-doneCh:
 			html, err := app.buildEventsTableHTML(ctx, id)
 			if err == nil {
-				data, _ := json.Marshal(map[string]string{"html": html})
+				data, _ := json.Marshal(map[string]string{"html": html, "full": "true"})
 				_, _ = io.WriteString(w, fmt.Sprintf("event: events-table\ndata: %s\n\n", data))
 				flusher.Flush()
 			}
@@ -923,20 +904,51 @@ func (app *WebApp) buildEventsTableHTML(ctx context.Context, runID int64) (strin
 	if events == nil {
 		events = []runlog.EventRow{}
 	}
-	timeline, meta, unwrapped := splitRunEvents(events)
+	groups, meta := groupBySection(events)
 	data := runDetailData{
-		Run:               *run,
-		TimelineEvents:    timeline,
-		MetaEvents:        meta,
-		UnwrappedChildren: unwrapped,
-		IsActive:          run.FinishedAt == nil,
-		RawOutput:         run.RawOutput,
+		Run:           *run,
+		SectionGroups: groups,
+		MetaEvents:    meta,
+		IsActive:      run.FinishedAt == nil,
+		RawOutput:     run.RawOutput,
 	}
 	var buf strings.Builder
 	if err := eventsSection(data).Render(ctx, &buf); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func (app *WebApp) buildEventDeltaRows(ctx context.Context, runID int64, lastEventID int64, lastSection string, showDebug bool) (html string, newLastID int64, newSection string, err error) {
+	newSection = lastSection
+	newLastID = lastEventID
+
+	events, err := app.db.ListEventsSince(runID, lastEventID)
+	if err != nil || len(events) == 0 {
+		return "", lastEventID, lastSection, nil
+	}
+
+	var buf strings.Builder
+	for _, e := range events {
+		newLastID = e.ID
+		isMeta := metaRunEventKinds[e.Kind]
+
+		if isMeta && !showDebug {
+			continue
+		}
+
+		if !isMeta && e.Section != "" && e.Section != newSection {
+			newSection = e.Section
+			if err := sectionHeaderOOB(e.Section).Render(ctx, &buf); err != nil {
+				return "", lastEventID, lastSection, err
+			}
+		}
+
+		if err := eventRowOOB(e).Render(ctx, &buf); err != nil {
+			return "", lastEventID, lastSection, err
+		}
+	}
+	return buf.String(), newLastID, newSection, nil
 }
 
 func queryRunsForTest(rawDB *sql.DB, testName string, limit, offset int, tagFilter string) ([]runlog.RunRow, error) {

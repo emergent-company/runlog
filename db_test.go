@@ -194,7 +194,7 @@ func TestRunDB_InsertEvent(t *testing.T) {
 	id, _ := db.InsertRun("TestEvents", now, "host", "env", nil, "")
 
 	t.Run("insert basic event", func(t *testing.T) {
-		err := db.InsertEvent(id, 1, now, 0.5, "log", "hello world", nil)
+		err := db.InsertEvent(id, 1, now, 0.5, "log", "hello world", nil, "")
 		if err != nil {
 			t.Fatalf("InsertEvent: %v", err)
 		}
@@ -217,11 +217,11 @@ func TestRunDB_InsertEvent(t *testing.T) {
 	})
 
 	t.Run("sequential seq numbers", func(t *testing.T) {
-		err := db.InsertEvent(id, 2, now, 0.3, "state_change", "started", nil)
+		err := db.InsertEvent(id, 2, now, 0.3, "state_change", "started", nil, "")
 		if err != nil {
 			t.Fatalf("InsertEvent: %v", err)
 		}
-		err = db.InsertEvent(id, 3, now, 1.0, "cli", "go build", nil)
+		err = db.InsertEvent(id, 3, now, 1.0, "cli", "go build", nil, "")
 		if err != nil {
 			t.Fatalf("InsertEvent: %v", err)
 		}
@@ -233,7 +233,7 @@ func TestRunDB_InsertEvent(t *testing.T) {
 
 	t.Run("event with details JSON", func(t *testing.T) {
 		details := map[string]any{"key": "value", "count": 42}
-		err := db.InsertEvent(id, 4, now, 0.1, "http_call", "GET /health", details)
+		err := db.InsertEvent(id, 4, now, 0.1, "http_call", "GET /health", details, "")
 		if err != nil {
 			t.Fatalf("InsertEvent with details: %v", err)
 		}
@@ -271,21 +271,24 @@ func TestRunDB_InsertGroupEvent(t *testing.T) {
 	}
 
 	events, _ := db.ListEvents(id)
-	if len(events) == 0 {
-		t.Fatal("expected at least 1 event")
+	if len(events) < 3 {
+		t.Fatalf("expected at least 3 events (parent + 2 children), got %d", len(events))
 	}
-	found := false
+	foundParent := false
+	childCount := 0
 	for _, e := range events {
 		if e.Kind == "section" && e.Message == "Setup" {
-			found = true
-			if len(e.Children) == 0 {
-				t.Error("expected children on section event")
-			}
-			break
+			foundParent = true
+		}
+		if e.Kind == "log" && e.Section == "Setup" {
+			childCount++
 		}
 	}
-	if !found {
+	if !foundParent {
 		t.Error("section event not found")
+	}
+	if childCount < 2 {
+		t.Errorf("expected 2 child events, got %d", childCount)
 	}
 }
 
@@ -302,7 +305,7 @@ func TestRunDB_HasSkipEvent(t *testing.T) {
 	})
 
 	t.Run("skip event returns true", func(t *testing.T) {
-		db.InsertEvent(id, 1, now, 0, "skip", "not applicable", nil)
+		db.InsertEvent(id, 1, now, 0, "skip", "not applicable", nil, "")
 		if !db.HasSkipEvent(id) {
 			t.Error("expected true after inserting skip event")
 		}
@@ -583,5 +586,185 @@ func TestRunDB_NonExistentRun(t *testing.T) {
 	err := db.FinishRun(99999, time.Now(), OutcomePass, "")
 	if err != nil {
 		t.Errorf("expected no error for non-existent run, got %v", err)
+	}
+}
+
+func TestRunDB_ListEventsSince(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Now().UTC()
+
+	id, _ := db.InsertRun("TestEventsSince", now, "host", "env", nil, "")
+
+	db.InsertEvent(id, 1, now, 0.1, "log", "first", nil, "")
+	db.InsertEvent(id, 2, now, 0.2, "cli", "go build", nil, "")
+	db.InsertEvent(id, 3, now, 0.3, "http_call", "GET /api", nil, "")
+
+	t.Run("all events when sinceID is 0", func(t *testing.T) {
+		events, err := db.ListEventsSince(id, 0)
+		if err != nil {
+			t.Fatalf("ListEventsSince: %v", err)
+		}
+		if len(events) != 3 {
+			t.Errorf("want 3 events, got %d", len(events))
+		}
+	})
+
+	t.Run("only events after first", func(t *testing.T) {
+		all, _ := db.ListEvents(id)
+		if len(all) < 1 {
+			t.Fatal("no events")
+		}
+		sinceID := all[0].ID
+		events, err := db.ListEventsSince(id, sinceID)
+		if err != nil {
+			t.Fatalf("ListEventsSince: %v", err)
+		}
+		if len(events) != 2 {
+			t.Errorf("want 2 events after first, got %d", len(events))
+		}
+	})
+
+	t.Run("empty after last event", func(t *testing.T) {
+		all, _ := db.ListEvents(id)
+		if len(all) == 0 {
+			t.Fatal("no events")
+		}
+		sinceID := all[len(all)-1].ID
+		events, err := db.ListEventsSince(id, sinceID)
+		if err != nil {
+			t.Fatalf("ListEventsSince: %v", err)
+		}
+		if len(events) != 0 {
+			t.Errorf("want 0 events after last, got %d", len(events))
+		}
+	})
+
+	t.Run("no events for wrong run", func(t *testing.T) {
+		events, err := db.ListEventsSince(99999, 0)
+		if err != nil {
+			t.Fatalf("ListEventsSince: %v", err)
+		}
+		if len(events) != 0 {
+			t.Errorf("want 0 events for non-existent run, got %d", len(events))
+		}
+	})
+}
+
+func TestCatalog_PositionStableAfterRunning(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	find := func(cat []TestCatalogRow, name string) *TestCatalogRow {
+		for i := range cat {
+			if cat[i].TestName == name {
+				return &cat[i]
+			}
+		}
+		return nil
+	}
+
+	// Seed definitions (simulates filesystem discovery).
+	if err := db.UpsertDefinition("TestZZZ_Last", "api", "e2e"); err != nil {
+		t.Fatalf("UpsertDefinition: %v", err)
+	}
+	if err := db.UpsertDefinition("TestAAA_First", "cli", "e2e"); err != nil {
+		t.Fatalf("UpsertDefinition: %v", err)
+	}
+
+	// Before running: both appear as never_run, each exactly once.
+	catalog, err := db.ListTestCatalog()
+	if err != nil {
+		t.Fatalf("ListTestCatalog: %v", err)
+	}
+	a := find(catalog, "TestAAA_First")
+	z := find(catalog, "TestZZZ_Last")
+	if a == nil || z == nil {
+		t.Fatalf("definitions not in catalog: a=%v z=%v", a != nil, z != nil)
+	}
+	if !a.NeverRun {
+		t.Errorf("TestAAA_First: expected NeverRun=true before any runs")
+	}
+	if !z.NeverRun {
+		t.Errorf("TestZZZ_Last: expected NeverRun=true before any runs")
+	}
+
+	// Run TestZZZ_Last.
+	rid, err := db.InsertRun("TestZZZ_Last", now, "host", "", nil, "e2e")
+	if err != nil {
+		t.Fatalf("InsertRun: %v", err)
+	}
+	if rid <= 0 {
+		t.Fatalf("expected positive run id, got %d", rid)
+	}
+
+	// After running: TestZZZ_Last is NOT never_run, TestAAA_First still is.
+	catalog2, err := db.ListTestCatalog()
+	if err != nil {
+		t.Fatalf("ListTestCatalog after run: %v", err)
+	}
+	a2 := find(catalog2, "TestAAA_First")
+	z2 := find(catalog2, "TestZZZ_Last")
+	if a2 == nil || z2 == nil {
+		t.Fatalf("tests missing after run: a=%v z=%v", a2 != nil, z2 != nil)
+	}
+	if !a2.NeverRun {
+		t.Errorf("TestAAA_First: still NeverRun=true after other test runs, got NeverRun=%v", a2.NeverRun)
+	}
+	if z2.NeverRun {
+		t.Errorf("TestZZZ_Last: expected NeverRun=false after running, got NeverRun=%v", z2.NeverRun)
+	}
+	if z2.RunCount != 1 {
+		t.Errorf("TestZZZ_Last: expected RunCount=1, got %d", z2.RunCount)
+	}
+
+	// Alphabetical order must be preserved: AAA before ZZZ.
+	posA, posZ := -1, -1
+	for i, row := range catalog2 {
+		if row.TestName == "TestAAA_First" { posA = i }
+		if row.TestName == "TestZZZ_Last" { posZ = i }
+	}
+	if posA < 0 || posZ < 0 || posA >= posZ {
+		t.Errorf("alphabetical order broken: AAA at %d, ZZZ at %d", posA, posZ)
+	}
+
+	// Run TestAAA_First too.
+	if _, err := db.InsertRun("TestAAA_First", now.Add(time.Second), "host", "", nil, "e2e"); err != nil {
+		t.Fatalf("InsertRun AAA: %v", err)
+	}
+	catalog3, _ := db.ListTestCatalog()
+	a3 := find(catalog3, "TestAAA_First")
+	if a3 == nil || a3.NeverRun {
+		t.Errorf("TestAAA_First: expected NeverRun=false after its own run")
+	}
+	posA2, posZ2 := -1, -1
+	for i, row := range catalog3 {
+		if row.TestName == "TestAAA_First" { posA2 = i }
+		if row.TestName == "TestZZZ_Last" { posZ2 = i }
+	}
+	if posA2 < 0 || posZ2 < 0 || posA2 >= posZ2 {
+		t.Errorf("position drifted: AAA=%d ZZZ=%d", posA2, posZ2)
+	}
+
+	// Run TestZZZ_Last again — count increases, no duplicates.
+	if _, err := db.InsertRun("TestZZZ_Last", now.Add(2*time.Second), "docker", "", nil, "e2e"); err != nil {
+		t.Fatalf("InsertRun ZZZ again: %v", err)
+	}
+	catalog4, _ := db.ListTestCatalog()
+	z4 := find(catalog4, "TestZZZ_Last")
+	if z4 == nil {
+		t.Fatal("TestZZZ_Last missing after second run")
+	}
+	if z4.RunCount != 2 {
+		t.Errorf("TestZZZ_Last: expected RunCount=2, got %d", z4.RunCount)
+	}
+	// Count entries — must be exactly 1 per test.
+	for _, name := range []string{"TestZZZ_Last", "TestAAA_First"} {
+		n := 0
+		for _, row := range catalog4 {
+			if row.TestName == name { n++ }
+		}
+		if n != 1 {
+			t.Errorf("%s appears %d times in catalog (want 1)", name, n)
+		}
 	}
 }

@@ -5,33 +5,42 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+// pageHeaderStep renders a single breadcrumb step inside PageHeader.
+templ pageHeaderStep(step BreadcrumbItem) {
+	if step.Href != "" {
+		<a
+			href={ templ.SafeURL(step.Href) }
+			class={ "inline-flex items-center gap-1 text-base-content hover:text-primary transition-colors truncate", templ.KV("font-medium text-base-content", step.Active) }
+		>
+			if step.Icon != "" {
+				@ui.IconSpan(step.Icon, "size-4")
+			}
+			{ step.Label }
+		</a>
+	} else {
+		<span class="text-base-content/50 truncate">{ step.Label }</span>
+	}
+}
+
 // PageHeader renders the standard page header with a breadcrumb trail on the
-// left and an optional action slot on the right.
+// left and an optional action slot on the right. Uses the same BreadcrumbItem
+// type as Breadcrumbs for consistency.
 //
 // Use nav.Crumbs() to build the steps slice cleanly:
 //
 //	@nav.PageHeader(nav.Crumbs("Sessions")) { ... }
 //	@nav.PageHeader(nav.Crumbs("Sessions", "/dashboard/sessions", "Detail")) { ... }
 // attrs is optional; pass nil when not needed.
-templ PageHeader(steps []BreadcrumbStep, attrs templ.Attributes) {
+templ PageHeader(steps []BreadcrumbItem, attrs templ.Attributes) {
 	<div class="flex items-center justify-between px-6 py-0 h-16 bg-base-100 border-b border-base-200 shrink-0" { devmode.Attrs(ctx, "nav/PageHeader")... } { attrs... }>
-		<!-- Breadcrumb -->
 		<nav class="flex items-center gap-2 text-xl font-semibold overflow-x-hidden min-w-0" aria-label="Breadcrumb">
 			for i, step := range steps {
 				if i > 0 {
 					@ui.IconSpan("lucide--chevron-right", "w-4 h-4 shrink-0 text-base-content/30")
 				}
-				if step.URL != "" {
-					<a
-						href={ templ.SafeURL(step.URL) }
-						class="text-base-content hover:text-primary transition-colors truncate"
-					>{ step.Label }</a>
-				} else {
-					<span class="text-base-content/50 truncate">{ step.Label }</span>
-				}
+				@devmode.ElementBoundary("BreadcrumbItem", pageHeaderStep(step), step)
 			}
 		</nav>
-		<!-- Actions -->
 		<div class="flex items-center gap-2 shrink-0 ml-4">
 			{ children... }
 		</div>

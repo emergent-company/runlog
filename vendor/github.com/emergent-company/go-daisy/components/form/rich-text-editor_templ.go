@@ -188,36 +188,15 @@ func RichTextEditor(props RichTextEditorProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = quillScript().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func quillScript() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var10 == nil {
-			templ_7745c5c3_Var10 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script>\n\tif (!window._quillInit) {\n\t  window._quillInit = true;\n\n\t  window.initQuill = function(el) {\n\t    if (typeof Quill === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js';\n\t      s.onload = function() { initQuillElement(el); };\n\t      document.head.appendChild(s);\n\t      var l = document.createElement('link');\n\t      l.rel = 'stylesheet';\n\t      l.href = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.' + (el.dataset.theme || 'snow') + '.css';\n\t      document.head.appendChild(l);\n\t    } else {\n\t      initQuillElement(el);\n\t    }\n\t  };\n\n\t  function initQuillElement(el) {\n\t    if (el._quill) return;\n\t    try {\n\t      var theme = el.dataset.theme || 'snow';\n\t      var placeholder = el.dataset.placeholder || 'Write something...';\n\t      el._quill = new Quill(el, {\n\t        theme: theme,\n\t        placeholder: placeholder,\n\t        readOnly: el.dataset.readonly === 'true',\n\t        modules: theme === 'snow' ? {\n\t          toolbar: [\n\t            [{ 'header': [1,2,3,false] }],\n\t            ['bold','italic','underline','strike'],\n\t            [{ 'list': 'ordered' }, { 'list': 'bullet' }],\n\t            ['link','image','code-block'],\n\t            ['clean']\n\t          ]\n\t        } : undefined\n\t      });\n\t      // Set initial content\n\t      var val = el.dataset.value;\n\t      if (val) {\n\t        try { el._quill.clipboard.dangerouslyPasteHTML(val); } catch(e) {}\n\t      }\n\t      // Sync to hidden input on change\n\t      var hidden = document.getElementById(el.id + '-hidden');\n\t      if (!hidden) {\n\t        hidden = document.createElement('input');\n\t        hidden.type = 'hidden';\n\t        hidden.name = el.id;\n\t        hidden.id = el.id + '-hidden';\n\t        el.parentNode.appendChild(hidden);\n\t      }\n\t      el._quill.on('text-change', function() {\n\t        hidden.value = el._quill.root.innerHTML;\n\t      });\n\t    } catch(e) { console.warn('Quill init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-quill]').forEach(initQuillElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-quill]:not(._ql-initialized)').forEach(function(el) {\n\t      el.classList.add('_ql-initialized');\n\t      initQuillElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Err = LazyLoadScript(LazyLoadConfig{
+			GuardName:  "_quill",
+			LibVarName: "Quill",
+			ScriptURL:  "https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js",
+			StyleURL:   "'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.' + (el.dataset.theme || 'snow') + '.css'",
+			Selector:   "[data-quill]",
+			InitFunc:   "var theme = el.dataset.theme || 'snow'; var placeholder = el.dataset.placeholder || 'Write something...'; var q = new Quill(el, {theme: theme, placeholder: placeholder, readOnly: el.dataset.readonly === 'true', modules: theme === 'snow' ? { toolbar: [[{ 'header': [1,2,3,false] }], ['bold','italic','underline','strike'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['link','image','code-block'], ['clean']] } : undefined}); var val = el.dataset.value; if (val) try { q.clipboard.dangerouslyPasteHTML(val); } catch(e) {} var hidden = document.getElementById(el.id + '-hidden'); if (!hidden) { hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = el.id; hidden.id = el.id + '-hidden'; el.parentNode.appendChild(hidden); } q.on('text-change', function() { hidden.value = q.root.innerHTML; })",
+			FnSuffix:   "Quill",
+		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

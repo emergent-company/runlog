@@ -52,3 +52,40 @@ func SidebarDenseWithBoundary(props SidebarDenseProps) templ.Component {
 		"appName": props.AppName,
 	})
 }
+
+// AppShellWithNavWithBoundary wraps AppShellWithNav with a dev-mode component boundary annotation.
+// gallery:token appName,groups
+// gallery:hint appName:default(MyApp)
+func AppShellWithNavWithBoundary(appName string, groups []SidebarGroup) templ.Component {
+	return devmode.ComponentBoundary("AppShellWithNav", AppShellWithNav(appName, groups), map[string]any{
+		"appName":    appName,
+		"groupCount": len(groups),
+	})
+}
+
+// AppShellContentWithBoundary wraps AppShellContent with a dev-mode component boundary annotation.
+func AppShellContentWithBoundary() templ.Component {
+	return devmode.ComponentBoundary("AppShellContent", AppShellContent())
+}
+
+// PageWithBoundary wraps Page with a dev-mode component boundary annotation.
+// gallery:token title,themeAttr
+// gallery:hint title:default(go-daisy)
+func PageWithBoundary(title string, themeAttr string) templ.Component {
+	return devmode.ComponentBoundary("Page", Page(title, themeAttr), map[string]any{
+		"title":     title,
+		"themeAttr": themeAttr,
+	})
+}
+
+// ViewMenuWithBoundary wraps ViewMenu with a dev-mode component boundary annotation.
+func ViewMenuWithBoundary() templ.Component {
+	return devmode.ComponentBoundary("ViewMenu", ViewMenu())
+}
+
+// ViewMenuLabelWithBoundary wraps ViewMenuLabel with a dev-mode component boundary annotation.
+// gallery:token label
+// gallery:hint label:default(Navigation)
+func ViewMenuLabelWithBoundary(label string) templ.Component {
+	return devmode.ComponentBoundary("ViewMenuLabel", ViewMenuLabel(label), map[string]any{"label": label})
+}

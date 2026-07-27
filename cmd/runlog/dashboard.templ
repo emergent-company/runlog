@@ -27,7 +27,7 @@ templ DashboardPage(data dashboardData) {
 						@sectionHeading("Categories")
 						<div class={ statsGridClass(3) } data-testid="category-cards">
 							for _, cat := range data.Categories {
-								<div class="cursor-pointer" hx-get={ TestsCategoryURL(cat.Name) } hx-target="#main-content" hx-swap="innerHTML" hx-push-url="true" hx-sync="#main-content:replace">
+								<div class="cursor-pointer" { NavRowAttrs(TestsCategoryURL(cat.Name))... }>
 									@statItemCard(statItem{Label: cat.Name, Value: fmt.Sprintf("%d tests", cat.TestCount)})
 								</div>
 							}

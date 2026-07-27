@@ -253,6 +253,7 @@ type registerRunRequest struct {
 	StartedAt      string            `json:"started_at,omitempty"`
 	TimeoutSeconds float64           `json:"timeout_seconds,omitempty"`
 	CoveragePct    *float64          `json:"coverage_pct,omitempty"`
+	WorkDir        string            `json:"work_dir,omitempty"`
 }
 
 func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request) {
@@ -274,20 +275,10 @@ func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request)
 	id := newUUID()
 	rawDB := d.db.RawDB()
 
-	runner := req.Runner
-	if runner == "" {
-		runner = "dogfood"
-	}
-
-	startedAt := req.StartedAt
-	if startedAt == "" {
-		startedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-
 	_, err = rawDB.Exec(
-		`INSERT INTO daemon_runs (id, pid, env_profile, server_url, token, status, started_at)
-		 VALUES (?, ?, ?, ?, ?, 'active', strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
-		id, req.PID, req.EnvProfile, req.ServerURL, req.Token,
+		`INSERT INTO daemon_runs (id, pid, env_profile, server_url, token, work_dir, status, started_at)
+		 VALUES (?, ?, ?, ?, ?, ?, 'active', strftime('%Y-%m-%dT%H:%M:%SZ','now'))`,
+		id, req.PID, req.EnvProfile, req.ServerURL, req.Token, req.WorkDir,
 	)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("db insert: %v", err), http.StatusInternalServerError)
@@ -295,6 +286,44 @@ func (d *DaemonServer) handleRegisterRun(w http.ResponseWriter, r *http.Request)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
+}
+
+// handleRegisterFunction creates a per-test-function test_runs row within a daemon
+// batch (POST /runs/:id/functions). Returns {"test_run_id": <int64>}.
+func (d *DaemonServer) handleRegisterFunction(w http.ResponseWriter, r *http.Request, daemonRunID string) {
+	rawDB := d.db.RawDB()
+	var req struct {
+		TestName   string `json:"test_name"`
+		TestType   string `json:"test_type,omitempty"`
+		Experiment string `json:"experiment,omitempty"`
+		Runner     string `json:"runner,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.TestName == "" {
+		http.Error(w, "test_name required", http.StatusBadRequest)
+		return
+	}
+	if req.Runner == "" {
+		req.Runner = "dogfood"
+	}
+
+	var envProfile string
+	_ = rawDB.QueryRow(`SELECT env_profile FROM daemon_runs WHERE id=?`, daemonRunID).Scan(&envProfile)
+
+	result, err := rawDB.Exec(
+		`INSERT INTO test_runs (test_name, started_at, daemon_run_id, runner, env_name, test_type, experiment)
+		 VALUES (?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?, ?)`,
+		req.TestName, daemonRunID, req.Runner, envProfile, req.TestType, req.Experiment,
+	)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
+		return
+	}
+	id, _ := result.LastInsertId()
+	writeJSON(w, http.StatusCreated, map[string]any{"test_run_id": id})
 }
 
 type runListEntry struct {
@@ -375,23 +404,10 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch parts[1] {
-	case "done":
-		if r.Method == http.MethodPut {
-			d.handleMarkRunDone(w, r, runID)
+	case "functions":
+		if r.Method == http.MethodPost {
+			d.handleRegisterFunction(w, r, runID)
 			return
-		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-
-	case "events":
-		if len(parts) == 2 {
-			if r.Method == http.MethodPost {
-				d.handleInsertEvent(w, r, runID)
-				return
-			}
-			if r.Method == http.MethodGet {
-				d.handleGetEvents(w, r, runID)
-				return
-			}
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 
@@ -407,6 +423,31 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 		resourceID := parts[2]
 		if r.Method == http.MethodDelete {
 			d.handleDeregisterResource(w, r, runID, resourceID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "output":
+		if r.Method == http.MethodPut {
+			d.handleSaveRawOutput(w, r, runID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "done":
+		if r.Method == http.MethodPut {
+			d.handleMarkRunDone(w, r, runID)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "events":
+		if r.Method == http.MethodPost {
+			d.handleInsertEvent(w, r, runID)
+			return
+		}
+		if r.Method == http.MethodGet {
+			d.handleGetEvents(w, r, runID)
 			return
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -439,20 +480,6 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 
-	case "version":
-		if r.Method == http.MethodPut {
-			d.handleUpdateRunVersion(w, r, runID)
-			return
-		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-
-	case "timeout":
-		if r.Method == http.MethodPut {
-			d.handleUpdateRunField(w, r, runID, "timeout_seconds")
-			return
-		}
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-
 	case "test_type":
 		if r.Method == http.MethodPut {
 			d.handleUpdateRunField(w, r, runID, "test_type")
@@ -460,9 +487,9 @@ func (d *DaemonServer) handleRunsPath(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 
-	case "output":
+	case "version":
 		if r.Method == http.MethodPut {
-			d.handleSaveRawOutput(w, r, runID)
+			d.handleUpdateRunVersion(w, r, runID)
 			return
 		}
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -619,8 +646,18 @@ func (d *DaemonServer) handleMarkRunDone(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, map[string]string{"status": "done"})
 }
 
+// daemonAllowedFields mirrors the whitelist in the runlog library's UpdateRunField.
+var daemonAllowedFields = map[string]bool{
+	"test_type": true, "category": true, "experiment": true,
+	"description": true, "app_version": true, "test_version": true,
+}
+
 // handleUpdateRunField updates a single text field on the linked test_runs row.
 func (d *DaemonServer) handleUpdateRunField(w http.ResponseWriter, r *http.Request, runID, field string) {
+	if !daemonAllowedFields[field] {
+		http.Error(w, "unknown field", http.StatusBadRequest)
+		return
+	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
 	if err != nil {
 		http.Error(w, "read body", http.StatusBadRequest)
@@ -761,7 +798,7 @@ func (d *DaemonServer) handleTestRuns(w http.ResponseWriter, r *http.Request) {
 func (d *DaemonServer) handleTestRunsPath(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/test-runs/")
 	path = strings.TrimSuffix(path, "/")
-	parts := strings.SplitN(path, "/", 2)
+	parts := strings.SplitN(path, "/", 3)
 
 	if len(parts) == 0 || parts[0] == "" {
 		http.Error(w, "missing run id", http.StatusBadRequest)
@@ -805,40 +842,302 @@ func (d *DaemonServer) handleTestRunsPath(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if parts[1] == "events" && r.Method == http.MethodGet {
-		rows, err := d.db.RawDB().Query(`
-			SELECT id, seq, occurred_at, elapsed_s, kind, message, COALESCE(details,'{}')
-			FROM run_events WHERE run_id=? ORDER BY seq`, id)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
+	action := strings.TrimSuffix(parts[1], "/")
+	switch action {
+	case "events":
+		if r.Method == http.MethodGet {
+			rows, err := d.db.RawDB().Query(`
+				SELECT id, seq, occurred_at, elapsed_s, kind, message, COALESCE(details,'{}')
+				FROM run_events WHERE run_id=? ORDER BY seq`, id)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("db: %v", err), http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+			type eventSummary struct {
+				ID       int64   `json:"id"`
+				Seq      int     `json:"seq"`
+				Occurred string  `json:"occurred_at"`
+				Elapsed  float64 `json:"elapsed_s"`
+				Kind     string  `json:"kind"`
+				Message  string  `json:"message"`
+				Details  string  `json:"details"`
+			}
+			var events []eventSummary
+			for rows.Next() {
+				var e eventSummary
+				if err := rows.Scan(&e.ID, &e.Seq, &e.Occurred, &e.Elapsed, &e.Kind, &e.Message, &e.Details); err != nil {
+					continue
+				}
+				events = append(events, e)
+			}
+			if events == nil {
+				events = []eventSummary{}
+			}
+			writeJSON(w, http.StatusOK, events)
 			return
 		}
-		defer rows.Close()
-		type eventSummary struct {
-			ID       int64   `json:"id"`
-			Seq      int     `json:"seq"`
-			Occurred string  `json:"occurred_at"`
-			Elapsed  float64 `json:"elapsed_s"`
-			Kind     string  `json:"kind"`
-			Message  string  `json:"message"`
-			Details  string  `json:"details"`
+		if r.Method == http.MethodPost {
+			d.handleInsertEventByID(w, r, id)
+			return
 		}
-		var events []eventSummary
-		for rows.Next() {
-			var e eventSummary
-			if err := rows.Scan(&e.ID, &e.Seq, &e.Occurred, &e.Elapsed, &e.Kind, &e.Message, &e.Details); err != nil {
-				continue
-			}
-			events = append(events, e)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "done":
+		if r.Method == http.MethodPut {
+			d.handleMarkRunDoneByID(w, r, id)
+			return
 		}
-		if events == nil {
-			events = []eventSummary{}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "metadata":
+		if len(parts) < 3 || parts[2] == "" {
+			http.Error(w, "missing metadata field", http.StatusBadRequest)
+			return
 		}
-		writeJSON(w, http.StatusOK, events)
+		field := strings.TrimSuffix(parts[2], "/")
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunFieldByID(w, r, id, field)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "output":
+		if r.Method == http.MethodPut {
+			d.handleSaveRawOutputByID(w, r, id)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "tags":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunTagsByID(w, r, id)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	case "versions":
+		if r.Method == http.MethodPut {
+			d.handleUpdateRunVersionByID(w, r, id)
+			return
+		}
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+
+	default:
+		http.Error(w, "not found", http.StatusNotFound)
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test-runs-level mutation handlers (use test_runs.id directly)
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (d *DaemonServer) handleInsertEventByID(w http.ResponseWriter, r *http.Request, testRunID int64) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 16*1024))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
 		return
 	}
+	var req insertEventRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Kind == "" {
+		http.Error(w, "kind required", http.StatusBadRequest)
+		return
+	}
+	if !knownEventKinds[req.Kind] {
+		log.Printf("daemon: warning: event kind %q is not in the known kind registry (run %d)", req.Kind, testRunID)
+	}
 
-	http.Error(w, "not found", http.StatusNotFound)
+	rawDB := d.db.RawDB()
+	var maxSeq int
+	_ = rawDB.QueryRow(`SELECT COALESCE(MAX(seq),0) FROM run_events WHERE run_id=?`, testRunID).Scan(&maxSeq)
+	seq := maxSeq + 1
+
+	var detailsJSON *string
+	if len(req.Details) > 0 {
+		b, err := json.Marshal(req.Details)
+		if err == nil {
+			s := string(b)
+			detailsJSON = &s
+		}
+	}
+	_, err = rawDB.Exec(
+		`INSERT INTO run_events (run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details)
+		 VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?, ?)`,
+		testRunID, seq, req.Elapsed, req.DurationMs, req.Kind, req.Message, detailsJSON,
+	)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("db insert: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"seq": seq})
+}
+
+func (d *DaemonServer) handleMarkRunDoneByID(w http.ResponseWriter, r *http.Request, testRunID int64) {
+	rawDB := d.db.RawDB()
+
+	finishedAt := time.Now().UTC().Format(time.RFC3339)
+	passed := true
+	var skipped *bool
+	var reason string
+	var inputTokens, outputTokens *int64
+	var costUSD, coveragePct *float64
+	var coverageData *string
+
+	if r.Body != nil {
+		var req markDoneRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.Passed != nil {
+				passed = *req.Passed
+			}
+			skipped = req.Skipped
+			reason = req.Reason
+			if req.FinishedAt != "" {
+				finishedAt = req.FinishedAt
+			}
+			inputTokens = req.InputTokens
+			outputTokens = req.OutputTokens
+			costUSD = req.CostUSD
+			coveragePct = req.CoveragePct
+			coverageData = req.CoverageData
+		}
+	}
+
+	q := `UPDATE test_runs SET finished_at=?, passed=?`
+	args := []any{finishedAt, passed}
+
+	if skipped != nil {
+		if *skipped {
+			q += `, skipped=1`
+		} else {
+			q += `, skipped=0`
+		}
+	}
+	if reason != "" {
+		q += `, reason=?`
+		args = append(args, reason)
+	}
+	if inputTokens != nil {
+		q += `, input_tokens=?`
+		args = append(args, *inputTokens)
+	}
+	if outputTokens != nil {
+		q += `, output_tokens=?`
+		args = append(args, *outputTokens)
+	}
+	if costUSD != nil {
+		q += `, cost_usd=?`
+		args = append(args, *costUSD)
+	}
+	if coveragePct != nil {
+		q += `, coverage_pct=?`
+		args = append(args, *coveragePct)
+	}
+	if coverageData != nil {
+		q += `, coverage_data=?`
+		args = append(args, *coverageData)
+	}
+
+	q += ` WHERE id=?`
+	args = append(args, testRunID)
+	_, _ = rawDB.Exec(q, args...)
+
+	// Also mark the parent daemon_runs as done if all test_runs under it are done.
+	rawDB.Exec(`UPDATE daemon_runs SET status='done', finished_at=? WHERE id=(SELECT daemon_run_id FROM test_runs WHERE id=?) AND status='active'`, finishedAt, testRunID)
+
+	select {
+	case d.sweepCh <- struct{}{}:
+	default:
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "done"})
+}
+
+func (d *DaemonServer) handleUpdateRunFieldByID(w http.ResponseWriter, r *http.Request, testRunID int64, field string) {
+	if !daemonAllowedFields[field] {
+		http.Error(w, "unknown field", http.StatusBadRequest)
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_, _ = d.db.RawDB().Exec(
+		fmt.Sprintf(`UPDATE test_runs SET %s=? WHERE id=?`, field),
+		req.Value, testRunID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (d *DaemonServer) handleSaveRawOutputByID(w http.ResponseWriter, r *http.Request, testRunID int64) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 5<<20))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_, _ = d.db.RawDB().Exec(
+		`UPDATE test_runs SET raw_output = raw_output || ? WHERE id = ?`,
+		req.Output, testRunID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (d *DaemonServer) handleUpdateRunTagsByID(w http.ResponseWriter, r *http.Request, testRunID int64) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		Tags []string `json:"tags"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	b, _ := json.Marshal(req.Tags)
+	_, _ = d.db.RawDB().Exec(
+		`UPDATE test_runs SET tags=? WHERE id=?`, string(b), testRunID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (d *DaemonServer) handleUpdateRunVersionByID(w http.ResponseWriter, r *http.Request, testRunID int64) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4096))
+	if err != nil {
+		http.Error(w, "read body", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		AppVersion  string `json:"app_version,omitempty"`
+		TestVersion string `json:"test_version,omitempty"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_, _ = d.db.RawDB().Exec(
+		`UPDATE test_runs SET app_version=?, test_version=? WHERE id=?`,
+		req.AppVersion, req.TestVersion, testRunID,
+	)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 
 // handleGetEvents returns all events for a daemon run (GET /runs/:id/events).
@@ -864,6 +1163,7 @@ type insertEventRequest struct {
 	Elapsed    float64        `json:"elapsed_s"`
 	DurationMs *float64       `json:"duration_ms,omitempty"`
 	Details    map[string]any `json:"details,omitempty"`
+	TestName   string         `json:"test_name,omitempty"`
 }
 
 // knownEventKinds is the registry of event kinds the daemon/UI knows how to
@@ -942,9 +1242,9 @@ func (d *DaemonServer) handleInsertEvent(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	_, err = rawDB.Exec(
-		`INSERT INTO run_events (run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details)
-		 VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?, ?)`,
-		testRunID, seq, req.Elapsed, req.DurationMs, req.Kind, req.Message, detailsJSON,
+		`INSERT INTO run_events (run_id, seq, occurred_at, elapsed_s, duration_ms, kind, message, details, test_name)
+		 VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%SZ','now'), ?, ?, ?, ?, ?, ?)`,
+		testRunID, seq, req.Elapsed, req.DurationMs, req.Kind, req.Message, detailsJSON, req.TestName,
 	)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("db insert: %v", err), http.StatusInternalServerError)

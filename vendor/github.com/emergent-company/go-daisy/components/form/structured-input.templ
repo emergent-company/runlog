@@ -1,0 +1,145 @@
+package form
+
+import (
+	"strconv"
+
+	alpine "github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StructuredColumnType is the input type for a structured input column.
+type StructuredColumnType string
+
+const (
+	StructuredColumnText   StructuredColumnType = "text"
+	StructuredColumnSelect StructuredColumnType = "select"
+)
+
+// StructuredColumn defines a column in a structured input row.
+type StructuredColumn struct {
+	Key         string
+	Label       string
+	Placeholder string
+	Separator   string
+	Type        StructuredColumnType
+	Options     []StructuredOption
+}
+
+// StructuredOption is a select option for a structured input column.
+type StructuredOption struct {
+	Value string
+	Label string
+}
+
+// StructuredEntry is a single row of key-value pairs.
+type StructuredEntry map[string]string
+
+// StructuredInputProps configures a structured input component.
+type StructuredInputProps struct {
+	ID             string
+	Name           string
+	Columns        []StructuredColumn
+	Entries        []StructuredEntry
+	AddActionLabel string
+	Disabled       bool
+	Class          string
+	Attrs          templ.Attributes
+}
+
+func structuredAddLabel(label string) string {
+	if label == "" {
+		return "Add row"
+	}
+	return label
+}
+
+func structuredRowCols(cols []StructuredColumn) string {
+	return strconv.Itoa(len(cols))
+}
+
+templ structuredInputColumn(col StructuredColumn, rowIdx int, props StructuredInputProps) {
+	<div class="flex items-center gap-2">
+		if col.Label != "" {
+			<span class="text-sm font-medium text-base-content/70">{ col.Label }</span>
+		}
+		if col.Type == StructuredColumnSelect {
+			<select
+				class={ "select select-sm select-bordered flex-1", templ.KV("opacity-50", props.Disabled) }
+				x-model={ "rows[" + strconv.Itoa(rowIdx) + "]['" + col.Key + "']" }
+				if props.Disabled {
+					disabled
+				}
+			>
+				<option value="">{ col.Placeholder }</option>
+				for _, opt := range col.Options {
+					<option value={ opt.Value }>{ opt.Label }</option>
+				}
+			</select>
+		} else {
+			<input
+				type="text"
+				class={ "input input-sm input-bordered flex-1", templ.KV("opacity-50", props.Disabled) }
+				placeholder={ col.Placeholder }
+				x-model={ "rows[" + strconv.Itoa(rowIdx) + "]['" + col.Key + "']" }
+				if props.Disabled {
+					disabled
+				}
+			/>
+		}
+	</div>
+}
+
+templ structuredInputHiddenInputs(props StructuredInputProps) {
+	<template x-for="(row, rowIdx) in rows" :key="rowIdx">
+		for _, col := range props.Columns {
+			<input
+				type="hidden"
+				:name={ "`" + props.Name + "[${rowIdx}][" + col.Key + "]`" }
+				:value={ "row['" + col.Key + "'] || ''" }
+			/>
+		}
+	</template>
+}
+
+// StructuredInput renders repeatable key-value rows with Alpine.js add/remove.
+templ StructuredInput(props StructuredInputProps) {
+	<div
+		class={ "form-control w-full space-y-2", templ.KV(props.Class, props.Class != "") }
+		x-data={ alpine.XData(alpine.StructuredInputState(entriesToMaps(props.Entries))) }
+		x-init={ alpine.StructuredInputInit() }
+		{ devmode.Attrs(ctx, "form/StructuredInput")... }
+		{ props.Attrs... }
+	>
+		<template x-for="(row, rowIdx) in rows" :key="rowIdx">
+			<div class="flex items-center gap-2">
+				for i, col := range props.Columns {
+					@structuredInputColumn(col, 0, props)
+					if col.Separator != "" && i < len(props.Columns)-1 {
+						<span class="text-sm text-base-content/50 px-1">{ col.Separator }</span>
+					}
+				}
+				if !props.Disabled {
+					<button
+						type="button"
+						class="btn btn-ghost btn-xs btn-circle flex-shrink-0"
+						@click="removeRow(rowIdx)"
+						aria-label="Remove row"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+					</button>
+				}
+			</div>
+		</template>
+		if !props.Disabled {
+			<button
+				type="button"
+				class="btn btn-sm btn-outline"
+				@click="addRow()"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+				{ structuredAddLabel(props.AddActionLabel) }
+			</button>
+		}
+		@structuredInputHiddenInputs(props)
+	</div>
+}

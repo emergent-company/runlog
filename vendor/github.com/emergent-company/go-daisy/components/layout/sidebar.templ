@@ -7,6 +7,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var sidebarScriptOnce = templ.NewOnceHandle()
+
 // SidebarItem represents a single navigation item in the sidebar.
 type SidebarItem struct {
 	Label  string
@@ -56,7 +58,10 @@ templ Sidebar(appName string, groups []SidebarGroup, logo ...templ.Component) {
 			</div>
 		</div>
 	</div>
-	<script>
+	@sidebarScriptOnce.Once() {
+		<script>
+		if (window._sidebarInit) return;
+		window._sidebarInit = true;
 		(function() {
 			var sidebar = document.getElementById('_layout-sidebar');
 			if (!sidebar) return;
@@ -94,6 +99,7 @@ templ Sidebar(appName string, groups []SidebarGroup, logo ...templ.Component) {
 			});
 		})();
 	</script>
+	}
 }
 
 // sidebarIndicatorID generates a valid HTML id for the nav spinner indicator.

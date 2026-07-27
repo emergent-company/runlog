@@ -56,7 +56,7 @@ templ Pagination(currentPage int, totalPages int, baseURL string, targetID strin
 				}
 				aria-label="Previous page"
 			>
-				<span class="iconify lucide--arrow-left size-4"></span>
+				@IconSpan("lucide--arrow-left", "size-4")
 			</a>
 			for p := 1; p <= totalPages; p++ {
 				<a
@@ -83,7 +83,7 @@ templ Pagination(currentPage int, totalPages int, baseURL string, targetID strin
 				}
 				aria-label="Next page"
 			>
-				<span class="iconify lucide--arrow-right size-4"></span>
+				@IconSpan("lucide--arrow-right", "size-4")
 			</a>
 		</div>
 	}
@@ -124,7 +124,7 @@ templ PaginationCircle(currentPage int, totalPages int, baseURL string, targetID
 				}
 				aria-label="Previous page"
 			>
-				<span class="iconify lucide--chevron-left" aria-hidden="true"></span>
+				@IconSpan("lucide--chevron-left", "")
 			</a>
 			for p := 1; p <= totalPages; p++ {
 				<a
@@ -154,7 +154,7 @@ templ PaginationCircle(currentPage int, totalPages int, baseURL string, targetID
 				}
 				aria-label="Next page"
 			>
-				<span class="iconify lucide--chevron-right" aria-hidden="true"></span>
+				@IconSpan("lucide--chevron-right", "")
 			</a>
 		</div>
 	}

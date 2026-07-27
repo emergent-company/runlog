@@ -16,6 +16,8 @@ import (
 	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
+var spinnerScriptOnce = templ.NewOnceHandle()
+
 // InputSpinner renders a numeric increment/decrement input with +/− buttons.
 // It includes a small inline <script> to handle button clicks — no library needed.
 // id must be unique on the page.
@@ -70,7 +72,7 @@ func InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCla
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerDecrement", id)}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerDecrement", id), Attrs: templ.Attributes{"aria-label": "Decrement"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -86,7 +88,7 @@ func InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCla
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 20, Col: 10}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 22, Col: 10}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -99,7 +101,7 @@ func InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCla
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(value))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 22, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 24, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -117,7 +119,7 @@ func InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCla
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(min))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 24, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 26, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -130,7 +132,7 @@ func InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCla
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(max))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 25, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/spinner.templ`, Line: 27, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -176,7 +178,7 @@ func InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCla
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerIncrement", id)}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerIncrement", id), Attrs: templ.Attributes{"aria-label": "Increment"}}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -214,7 +216,25 @@ func spinnerScript() templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<script>\n\tif (!window._spinnerInit) {\n\t  window._spinnerInit = true;\n\t  window.spinnerGet = function(id) { return document.getElementById(id); };\n\t  window.spinnerIncrement = function(id, step) {\n\t    var el = spinnerGet(id); if (!el) return;\n\t    var v = parseFloat(el.value)||0, s = step||1;\n\t    var max = el.max !== '' ? parseFloat(el.max) : Infinity;\n\t    el.value = Math.min(v + s, max);\n\t  };\n\t  window.spinnerDecrement = function(id, step) {\n\t    var el = spinnerGet(id); if (!el) return;\n\t    var v = parseFloat(el.value)||0, s = step||1;\n\t    var min = el.min !== '' ? parseFloat(el.min) : -Infinity;\n\t    el.value = Math.max(v - s, min);\n\t  };\n\t}\n\t</script>")
+		templ_7745c5c3_Var11 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<script>\n\tif (!window._spinnerInit) {\n\t  window._spinnerInit = true;\n\t  window.spinnerGet = function(id) { return document.getElementById(id); };\n\t  window.spinnerIncrement = function(id, step) {\n\t    var el = spinnerGet(id); if (!el) return;\n\t    var v = parseFloat(el.value)||0, s = step||1;\n\t    var max = el.max !== '' ? parseFloat(el.max) : Infinity;\n\t    el.value = Math.min(v + s, max);\n\t  };\n\t  window.spinnerDecrement = function(id, step) {\n\t    var el = spinnerGet(id); if (!el) return;\n\t    var v = parseFloat(el.value)||0, s = step||1;\n\t    var min = el.min !== '' ? parseFloat(el.min) : -Infinity;\n\t    el.value = Math.max(v - s, min);\n\t  };\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = spinnerScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

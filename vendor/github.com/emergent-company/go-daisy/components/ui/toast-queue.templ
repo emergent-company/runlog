@@ -1,0 +1,57 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// ToastQueue renders a fixed-position toast notification area with Alpine.js
+// queue management, auto-dismiss, enter/leave transitions, and click-to-dismiss.
+//
+// Push a toast from server via hx-swap-oob:
+//
+//	<div hx-swap-oob="afterbegin" id="toast-queue-dispatch">
+//	  <script>
+//	    var q = document.querySelector('[x-data]')._x_dataStack[0];
+//	    q.add({type:'success', message:'Saved.', duration:4000});
+//	  </script>
+//	</div>
+//
+// Or from client-side JS:
+//
+//	var q = document.querySelector('[x-data]')._x_dataStack[0];
+//	q.add({type:'error', message:'Failed.', duration:6000});
+templ ToastQueue() {
+	<div
+		id="toast-container"
+		class="fixed top-4 right-4 z-70 flex flex-col-reverse gap-2 w-80 max-w-[calc(100vw-2rem)]"
+		aria-live="polite"
+		aria-atomic="false"
+		{ alpine.XData(alpine.ToastQueueState())... }
+		x-init={ alpine.ToastQueueInit() }
+		{ devmode.Attrs(ctx, "ui/ToastQueue")... }
+	>
+		<template x-for="t in toasts" :key="t.id">
+			<div
+				class="alert shadow-lg cursor-pointer"
+				:class="'alert-' + t.type"
+				x-show="true"
+				x-transition:enter="transition ease-out duration-300"
+				x-transition:enter-start="opacity-0 -translate-y-2"
+				x-transition:enter-end="opacity-100 translate-y-0"
+				x-transition:leave="transition ease-in duration-200"
+				x-transition:leave-start="opacity-100 translate-y-0"
+				x-transition:leave-end="opacity-0 -translate-y-2"
+				@click="dismiss(t.id)"
+				role="alert"
+			>
+				<span x-text="t.message"></span>
+				<template x-if="t.action">
+					<a class="btn btn-xs btn-ghost" x-text="t.action"
+					   @click.stop></a>
+				</template>
+			</div>
+		</template>
+		<div id="toast-queue-dispatch" style="display:none"></div>
+	</div>
+}

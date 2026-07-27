@@ -1,0 +1,71 @@
+package form
+
+import (
+	alpine "github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// TagListProps configures an Alpine-managed tag input with add/remove.
+// Submits as name[0], name[1], ... hidden inputs.
+type TagListProps struct {
+	ID             string
+	Name           string
+	Values         []string
+	Placeholder    string
+	AddActionLabel string
+	Disabled       bool
+	Class          string
+	Attrs          templ.Attributes
+}
+
+templ TagList(props TagListProps) {
+	{{
+		placeholder := props.Placeholder
+		if placeholder == "" {
+			placeholder = "Add a tag..."
+		}
+		addLabel := props.AddActionLabel
+		if addLabel == "" {
+			addLabel = "Add"
+		}
+	}}
+	<div
+		{ alpine.XData(alpine.TagListState(props.Values))... }
+		x-init={ alpine.TagListInit() }
+		class={ templ.KV(props.Class, props.Class != "") }
+		{ devmode.Attrs(ctx, "form/TagList")... }
+		{ props.Attrs... }
+	>
+		<div class="flex flex-wrap gap-1.5 mb-2">
+			<template x-for="(tag, idx) in tags" :key="idx">
+				<span class="badge badge-sm gap-1 pr-0.5">
+					<span x-text="tag"></span>
+					<button
+						type="button"
+						class="btn btn-xs btn-ghost btn-square p-0 w-4 h-4 min-h-0"
+						@click="removeTag(idx)"
+						aria-label="Remove tag"
+					>&times;</button>
+					<input type="hidden" x-bind:name={ props.Name + "[idx]" } x-model="tag"/>
+				</span>
+			</template>
+		</div>
+		if !props.Disabled {
+			<div class="flex gap-2">
+				<input
+					type="text"
+					id={ props.ID }
+					class="input input-bordered input-sm flex-1"
+					x-model="input"
+					placeholder={ placeholder }
+					@keydown="handleKeydown($event)"
+				/>
+				<button
+					type="button"
+					class="btn btn-sm btn-outline"
+					@click="addTag()"
+				>{ addLabel }</button>
+			</div>
+		}
+	</div>
+}

@@ -1,0 +1,40 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/components/stimulus"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StimulusAccordionItem renders a single collapse item with Stimulus controller.
+templ StimulusAccordionItem(title string, open bool, key string) {
+	{{ if key == "" { key = strconv.FormatBool(open) } }}
+	<div
+		data-accordion-target="item"
+		data-key={ key }
+		class={ "collapse collapse-arrow border border-base-200 bg-base-100", templ.KV("collapse-open", open) }
+		{ devmode.Attrs(ctx, "ui/StimulusAccordionItem")... }
+	>
+		<div
+			class="collapse-title text-xl font-medium cursor-pointer"
+			{ stimulus.Action("click", "accordion", "toggle")... }
+		>
+			{ title }
+		</div>
+		<div class="collapse-content">
+			{ children... }
+		</div>
+	</div>
+}
+
+// StimulusAccordion wraps multiple StimulusAccordionItems.
+templ StimulusAccordion() {
+	<div
+		{ stimulus.Controller("accordion")... }
+		class="join join-vertical w-full"
+		{ devmode.Attrs(ctx, "ui/StimulusAccordion")... }
+	>
+		{ children... }
+	</div>
+}

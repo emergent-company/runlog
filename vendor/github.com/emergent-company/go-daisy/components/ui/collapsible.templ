@@ -1,0 +1,36 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// CollapsibleProps configures a single-item animated collapse/expand panel.
+type CollapsibleProps struct {
+	ID    string
+	Title string
+	Open  bool
+	Icon  string
+	Class string
+	Attrs templ.Attributes
+}
+
+templ Collapsible(props ...CollapsibleProps) {
+	{{ var p CollapsibleProps
+	if len(props) > 0 { p = props[0] } }}
+	<div
+		class={ "collapse collapse-arrow border border-base-200 bg-base-100", p.Class }
+		{ devmode.Attrs(ctx, "ui/Collapsible")... }
+		{ p.Attrs... }
+	>
+		<input type="checkbox" id={ p.ID } checked?={ p.Open } />
+		<div class="collapse-title text-lg font-medium flex items-center gap-2">
+			if p.Icon != "" {
+				@IconSpan(iconNameToSpan(p.Icon), "size-4")
+			}
+			<label for={ p.ID }>{ p.Title }</label>
+		</div>
+		<div class="collapse-content">
+			{ children... }
+		</div>
+	</div>
+}

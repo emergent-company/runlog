@@ -1,0 +1,38 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/components/stimulus"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StimulusThemeToggle renders a sun/moon theme toggle using Stimulus controller.
+templ StimulusThemeToggle() {
+	<div
+		{ stimulus.Controller("theme")... }
+		{ devmode.Attrs(ctx, "ui/StimulusThemeToggle")... }
+	>
+		<label
+			class="swap swap-rotate cursor-pointer"
+			aria-label="Toggle theme"
+			{ stimulus.Action("click", "theme", "toggle")... }
+		>
+			<input type="checkbox" class="hidden" data-theme-target="checkbox"/>
+			@themeToggleVisual()
+		</label>
+	</div>
+}
+
+// StimulusClipboardButton renders a copy-to-clipboard button using Stimulus.
+templ StimulusClipboardButton(text string, label string) {
+	<button
+		type="button"
+		{ stimulus.Controller("clipboard")... }
+		{ stimulus.Action("click", "clipboard", "copy")... }
+		{ stimulus.Value("clipboard", "text", text)... }
+		class="btn btn-sm btn-ghost"
+		{ devmode.Attrs(ctx, "ui/StimulusClipboardButton")... }
+	>
+		@IconSpan("lucide--copy", "size-4")
+		<span>{ label }</span>
+	</button>
+}

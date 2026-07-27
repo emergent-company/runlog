@@ -263,7 +263,7 @@ func (p *TracePoller) emitTrace(tr tempoTraceResult, isNew bool) { //nolint:dead
 
 	elapsed := time.Since(p.startedAt).Seconds()
 	seq := 0 // sequence is best-effort for trace events
-	_ = p.db.InsertEvent(p.runID, seq, time.Now(), elapsed, "trace_span", msg, details)
+	_ = p.db.InsertEvent(p.runID, seq, time.Now(), elapsed, "trace_span", msg, details, "")
 }
 
 // fetch performs an authenticated GET to the Memory server's Tempo proxy.

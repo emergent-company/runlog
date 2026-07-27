@@ -30,12 +30,12 @@ func TestRunLog_RecordTokenUsage(t *testing.T) {
 		t.Errorf("costUSD = %f, want ~0.15", rl.costUSD)
 	}
 
-	r := dc.CreateRun(t, CreateRunOpts{
+	r := dc.CreateTestRun(t, CreateRunOpts{
 		EnvProfile:  "TestCost",
 		Category:    "cost",
 		Description: "Verify token/cost accumulation and DB round-trip",
-	})
-	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{
+	}, t.Name())
+	dc.MarkDone(t, r.TestRunID, MarkDoneOpts{
 		Passed:       boolPtr(true),
 		InputTokens:  int64Ptr(3000),
 		OutputTokens: int64Ptr(1500),
@@ -59,12 +59,12 @@ func TestRunLog_RecordTokenUsage_ZeroValues(t *testing.T) {
 
 	_, dc := StartTestDaemon(t)
 
-	r := dc.CreateRun(t, CreateRunOpts{
+	r := dc.CreateTestRun(t, CreateRunOpts{
 		EnvProfile:  "TestCostZero",
 		Category:    "cost",
 		Description: "Verify zero-cost run stores NULL token columns",
-	})
-	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{Passed: boolPtr(true)})
+	}, t.Name())
+	dc.MarkDone(t, r.TestRunID, MarkDoneOpts{Passed: boolPtr(true)})
 
 	run := dc.MustGetTestRun(t, r.TestRunID)
 	if run == nil {
@@ -83,13 +83,13 @@ func TestRunLog_RecordTokenUsage_WithFile(t *testing.T) {
 
 	_, dc := StartTestDaemon(t)
 
-	r := dc.CreateRun(t, CreateRunOpts{
+	r := dc.CreateTestRun(t, CreateRunOpts{
 		EnvProfile:  t.Name(),
 		Category:    "cost",
 		Description: "Token usage recording with HTTP daemon",
-	})
-	dc.AddEvent(t, r.DaemonID, "token_usage", "5000 in / 2500 out  $0.250000")
-	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{
+	}, t.Name())
+	dc.AddEvent(t, r.TestRunID, "token_usage", "5000 in / 2500 out  $0.250000")
+	dc.MarkDone(t, r.TestRunID, MarkDoneOpts{
 		Passed:       boolPtr(true),
 		InputTokens:  int64Ptr(5000),
 		OutputTokens: int64Ptr(2500),

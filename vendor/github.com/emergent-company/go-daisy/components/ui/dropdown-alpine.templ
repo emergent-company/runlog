@@ -1,0 +1,63 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// AlpineDropdown renders a dropdown with Alpine.js keyboard navigation,
+// smooth transitions, and outside-click dismiss.
+templ AlpineDropdown(align DropdownAlign) {
+	<div
+		{ alpine.XData(alpine.DropdownState(false))... }
+		{ alpine.Escape("open = false")... }
+		class={ "dropdown", templ.KV(string(align), align != "") }
+		{ devmode.Attrs(ctx, "ui/AlpineDropdown")... }
+	>
+		{ children... }
+	</div>
+}
+
+// AlpineDropdownTrigger renders a dropdown trigger that toggles the AlpineDropdown.
+templ AlpineDropdownTrigger(label string, variant string) {
+	<button
+		type="button"
+		{ alpine.On("click", "open = !open")... }
+		{ alpine.ClassBinding("{ 'btn-active': open }")... }
+		{ alpine.BooleanBinding("aria-expanded", "open")... }
+		aria-haspopup="true"
+		class={ "btn btn-sm m-1", variant }
+		{ devmode.Attrs(ctx, "ui/AlpineDropdownTrigger")... }
+	>
+		{ label }
+		@IconSpan("lucide--chevron-down", "size-3.5")
+	</button>
+}
+
+// AlpineDropdownMenu renders the dropdown content with keyboard navigation.
+templ AlpineDropdownMenu() {
+	<ul
+		x-show="open"
+		{ alpine.Transition()... }
+		{ alpine.On("click.outside", "open = false")... }
+		role="menu"
+		class="dropdown-content z-[1] menu menu-sm p-1 bg-base-100 border border-base-200 rounded-box shadow-lg w-40 mt-1"
+		{ devmode.Attrs(ctx, "ui/AlpineDropdownMenu")... }
+		style="display:none"
+	>
+		{ children... }
+	</ul>
+}
+
+// AlpineDropdownItem renders a menu item that closes the dropdown on click.
+templ AlpineDropdownItem(active bool, danger bool) {
+	<li role="presentation" { devmode.Attrs(ctx, "ui/AlpineDropdownItem")... }>
+		<a
+			role="menuitem"
+			{ alpine.On("click", "open = false")... }
+			class={ templ.KV("active", active), templ.KV("text-error", danger) }
+		>
+			{ children... }
+		</a>
+	</li>
+}

@@ -1,6 +1,6 @@
 ---
 name: runlog-guide
-description: Comprehensive reference for the runlog Go library and CLI. Covers architecture, all three API tiers (RunLog/TestContext/Fixture), chainable assertions, event model, SQLite schema, config file, CLI commands, and common workflows. Load this when writing tests, inspecting runs, auditing quality, or extending runlog.
+description: Comprehensive reference for the runlog Go library and CLI. Covers architecture, all four API tiers (RunLog/TestContext/Fixture/DogfoodRun), chainable assertions, event model, SQLite schema, config file, CLI commands, and common workflows. Load this when writing tests, inspecting runs, auditing quality, or extending runlog.
 metadata:
   author: emergent
   version: "1.1"
@@ -301,7 +301,51 @@ fx.Section(name string)
 
 ---
 
-## 4. CLIResult Assertions (chainable)
+## 4. DogfoodRun — Daemon-Only Test Logging
+
+For tests that can't run the full in-process library (e.g. daemon integration tests, package `main` tests), `DogfoodRun` posts events directly to the daemon HTTP API. No-op when `RUNLOG_DAEMON_URL` is unset.
+
+```go
+df := runlog.NewDogfoodRun(t, "category-name")
+defer df.Done()
+df.Describe("One-line summary", "bullet 1", "bullet 2")
+
+df.Event("log", "setup complete")
+df.EventHTTP("GET", "http://localhost:7430/health", 200, "", "")
+df.RunCLI("echo hello")           // runs command, logs cli event
+df.HTTPCall("GET", "/health", 200, "", "ok")
+
+df.Fail("assertion failed")       // marks run as failed
+```
+
+### DogfoodRun methods
+
+| Method | Purpose |
+|--------|---------|
+| `df.Event(kind, message string, details ...map[string]any)` | Custom structured event |
+| `df.Eventf(kind, format string, args ...any)` | Formatted event (like Printf) |
+| `df.EventHTTP(method, url string, statusCode int, reqBody, respBody string)` | HTTP call event |
+| `df.EventAssertion(label string, expected, actual any, extra map[string]any)` | Assertion event |
+| `df.HTTPCall(method, url string, statusCode int, reqBody, respBody string)` | Like EventHTTP |
+| `df.RunCLI(args ...string) string` | Runs a command + logs CLI event |
+| `df.Describe(summary string, bullets ...string)` | Set run description |
+| `df.Fail(format string, args ...any)` | Mark run as failed, record reason |
+| `df.Done()` | Finalize run — must be deferred |
+
+### DogfoodRun fields
+
+```go
+df.Active bool      // true when daemon URL is set and connected
+df.URL    string    // daemon base URL
+df.RunID  string    // daemon batch UUID
+df.Seq    int       // auto-incrementing event sequence
+```
+
+**Important:** DogfoodRun runs are **daemon-backed** — they don't use the in-process SQLite writer. Events go over HTTP. The daemon must be running. Prefer `RunLog`/`TestContext`/`Fixture` for library-import tests; use `DogfoodRun` only for `package main` tests and daemon integration tests.
+
+---
+
+## 5. CLIResult Assertions (chainable)
 
 All assertions log the check result to RunLog. Failure calls `rl.Failf`.
 
@@ -321,7 +365,7 @@ All assertions log the check result to RunLog. Failure calls `rl.Failf`.
 
 ---
 
-## 5. HTTPResult Assertions (chainable)
+## 6. HTTPResult Assertions (chainable)
 
 ```go
 .Status(n int) *HTTPResult                        // status code equals n
@@ -336,7 +380,7 @@ All assertions log the check result to RunLog. Failure calls `rl.Failf`.
 
 ---
 
-## 6. Event Model
+## 7. Event Model
 
 All events stored in `run_events`. The `details` column is a JSON blob — no schema migration needed for new event kinds.
 
@@ -413,7 +457,7 @@ package-level doc comment.
 
 ---
 
-## 7. SQLite Schema
+## 8. SQLite Schema
 
 Database: `.runlog/runs.db` (WAL mode, single writer connection).
 
@@ -476,7 +520,7 @@ Database: `.runlog/runs.db` (WAL mode, single writer connection).
 
 ---
 
-## 8. Configuration: `.runlog/config.yaml`
+## 9. Configuration: `.runlog/config.yaml`
 
 All fields optional. File is searched in priority order:
 1. `$RUNLOG_CONFIG` env var (exact path)
@@ -566,7 +610,7 @@ categories:
 
 ---
 
-## 9. CLI Reference
+## 10. CLI Reference
 
 ```
 runlog [flags]                      open interactive TUI
@@ -628,7 +672,7 @@ What it does:
 
 ---
 
-## 10. Environment Variables
+## 11. Environment Variables
 
 | Variable | Description |
 |----------|-------------|
@@ -650,7 +694,7 @@ What it does:
 
 ---
 
-## 11. Installation
+## 12. Installation
 
 ```bash
 # As a CLI binary (TUI + runlog test + skills)
@@ -665,7 +709,7 @@ curl -fsSL https://raw.githubusercontent.com/emergent-company/runlog/main/instal
 
 ---
 
-## 12. Embedded Skills System
+## 13. Embedded Skills System
 
 Five skills are bundled inside the `runlog` binary and can be installed into AI agent tool directories:
 
@@ -699,7 +743,7 @@ runlog skills install --all --force   # overwrite existing
 
 ---
 
-## 13. Key Go Types (quick reference)
+## 14. Key Go Types (quick reference)
 
 ```go
 // RunLog — core structured logger
@@ -801,7 +845,7 @@ type Config struct {
 
 ---
 
-## 14. Common Workflows
+## 15. Common Workflows
 
 ### Write a new test
 
@@ -912,7 +956,7 @@ runlog trace <run-id>                          # replay stored conversation
 
 ---
 
-## 15. Anti-Patterns
+## 16. Anti-Patterns
 
 | Anti-pattern | Fix |
 |-------------|-----|
@@ -928,7 +972,7 @@ runlog trace <run-id>                          # replay stored conversation
 
 ---
 
-## 16. Web UI (built into `runlog` binary)
+## 17. Web UI (built into `runlog` binary)
 
 The `runlog` binary serves a web UI at port 4099 (configurable). Access via `http://<hostname>:4099`.
 

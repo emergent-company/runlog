@@ -49,20 +49,25 @@ func avatarInitials(name string) string {
 // Avatar renders a circular avatar.
 // Priority: src (image) > icon (icon placeholder) > name initials.
 // Set icon to a Lucide icon suffix, e.g. "lucide--building-2" for a company avatar.
+// Set mask to a DaisyUI mask class (e.g. "mask mask-squircle") to override the default rounded shape.
 // attrs is optional; pass nil when not needed.
-templ Avatar(name string, src string, icon string, size AvatarSize, attrs templ.Attributes) {
+templ Avatar(name string, src string, icon string, size AvatarSize, mask string, attrs templ.Attributes) {
 	{{ sc := avatarSizeClass(size) }}
+	{{ shape := "rounded-full" }}
+	if mask != "" {
+		{{ shape = mask }}
+	}
 	<div class="avatar" { devmode.Attrs(ctx, "ui/Avatar")... } { attrs... }>
 		if src != "" {
-			<div class={ sc + " rounded-full overflow-hidden" }>
+			<div class={ sc, shape, "overflow-hidden" }>
 				<img src={ src } alt={ name } class="object-cover w-full h-full"/>
 			</div>
 		} else if icon != "" {
-			<div class={ sc + " avatar-placeholder rounded-full bg-base-300 flex items-center justify-center text-base-content/60" }>
+			<div class={ sc, "avatar-placeholder", shape, "bg-base-300 flex items-center justify-center text-base-content/60" }>
 				<span class={ "iconify size-[55%] " + icon }></span>
 			</div>
 		} else {
-			<div class={ sc + " avatar-placeholder rounded-full bg-primary flex items-center justify-center font-semibold text-primary-content" }>
+			<div class={ sc, "avatar-placeholder", shape, "bg-primary flex items-center justify-center font-semibold text-primary-content" }>
 				{ avatarInitials(name) }
 			</div>
 		}
@@ -72,7 +77,7 @@ templ Avatar(name string, src string, icon string, size AvatarSize, attrs templ.
 // PlaceholderAvatar is a backwards-compatible alias for Avatar with an icon.
 // Deprecated: use Avatar("", "", icon, size, nil) directly.
 templ PlaceholderAvatar(icon string, size AvatarSize) {
-	@Avatar("", "", icon, size, nil)
+	@Avatar("", "", icon, size, "", nil)
 }
 
 // PersonChipContact holds optional contact details shown in the PersonChip hover card.

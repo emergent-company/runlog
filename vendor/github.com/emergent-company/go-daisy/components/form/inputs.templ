@@ -35,24 +35,23 @@ templ TextareaInput(name string, label string, value string, errMsg string, rows
 	}
 }
 
-// CheckboxInput renders a labeled checkbox.
+// checkableInput renders a checkbox/toggle/radio with label.
+// The inputClass parameter controls daisyUI styling (checkbox, toggle, radio).
+// The componentName parameter is for devmode attrs.
+templ checkableInput(name string, checked bool, label string, inputClass string, required bool, disabled bool, attrs templ.Attributes, componentName string) {
+	<label class="cursor-pointer label justify-start gap-3" { devmode.Attrs(ctx, componentName)... }>
+		<input type="checkbox" name={ name } class={ inputClass } checked?={ checked } required?={ required } disabled?={ disabled } { attrs... }/>
+		if label != "" {
+			<span class="label-text">{ label }</span>
+		}
+	</label>
+}
+
+// CheckboxInput renders a labeled checkbox with error display.
 templ CheckboxInput(name string, label string, checked bool, errMsg string) {
 	<div class="form-control mb-3" { devmode.Attrs(ctx, "form/CheckboxInput")... }>
-		<label class="label cursor-pointer justify-start gap-3">
-			<input
-				id={ name }
-				name={ name }
-				type="checkbox"
-				checked?={ checked }
-				class="checkbox checkbox-sm"
-			/>
-			<span class="label-text">{ label }</span>
-		</label>
-		if errMsg != "" {
-			<div class="label pt-1">
-				<span class="label-text-alt text-error">{ errMsg }</span>
-			</div>
-		}
+		@checkableInput(name, checked, label, "checkbox checkbox-sm", false, false, templ.Attributes{"id": name}, "")
+		@FieldError(errMsg)
 	</div>
 }
 
@@ -93,7 +92,7 @@ templ SearchInput(name string, value string, placeholder string, hxTarget string
 			class="grow"
 			if hxGet != "" && hxTarget != "" {
 				hx-get={ hxGet }
-				hx-target={ hxTarget }
+				hx-target={ "#" + hxTarget }
 				hx-trigger="input delay:300ms, search"
 				hx-include="closest form"
 			}
@@ -117,32 +116,12 @@ templ DateInput(name string, value string, hasError bool) {
 
 // Checkbox renders a DaisyUI checkbox.
 templ Checkbox(name string, checked bool, label string) {
-	<label class="cursor-pointer label justify-start gap-3" { devmode.Attrs(ctx, "form/Checkbox")... }>
-		<input
-			type="checkbox"
-			name={ name }
-			class="checkbox checkbox-primary"
-			checked?={ checked }
-		/>
-		if label != "" {
-			<span class="label-text">{ label }</span>
-		}
-	</label>
+	@checkableInput(name, checked, label, "checkbox checkbox-primary", false, false, nil, "form/Checkbox")
 }
 
 // Toggle renders a DaisyUI toggle switch.
 templ Toggle(name string, checked bool, label string) {
-	<label class="cursor-pointer label justify-start gap-3" { devmode.Attrs(ctx, "form/Toggle")... }>
-		<input
-			type="checkbox"
-			name={ name }
-			class="toggle toggle-primary"
-			checked?={ checked }
-		/>
-		if label != "" {
-			<span class="label-text">{ label }</span>
-		}
-	</label>
+	@checkableInput(name, checked, label, "toggle toggle-primary", false, false, nil, "form/Toggle")
 }
 
 // FilterSelect renders a compact, HTMX-aware select for table filter toolbars.

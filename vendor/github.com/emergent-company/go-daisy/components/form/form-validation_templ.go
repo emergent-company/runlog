@@ -14,6 +14,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var formValidationOnce = templ.NewOnceHandle()
+
 // ValidationRule defines a single field validation rule.
 type ValidationRule struct {
 	Field      string // field name
@@ -59,7 +61,7 @@ func FormValidation(props FormValidationProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var2 = []any{props.Class}
+		var templ_7745c5c3_Var2 = []any{templ.KV(props.Class, props.Class != "")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -71,7 +73,7 @@ func FormValidation(props FormValidationProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/form-validation.templ`, Line: 35, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/form-validation.templ`, Line: 37, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -97,7 +99,7 @@ func FormValidation(props FormValidationProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(validationRulesJSON(props.Rules)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/form-validation.templ`, Line: 38, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/form-validation.templ`, Line: 40, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -136,7 +138,7 @@ func FormValidation(props FormValidationProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.SubmitText)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/form-validation.templ`, Line: 48, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/form-validation.templ`, Line: 50, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -184,7 +186,25 @@ func formValidationScript() templ.Component {
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<script>\n\tif (!window._formValidationInit) {\n\t  window._formValidationInit = true;\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-form-validation]').forEach(attachValidation);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-form-validation]:not(._fv-initialized)').forEach(function(el) {\n\t      el.classList.add('_fv-initialized');\n\t      attachValidation(el);\n\t    });\n\t  });\n\n\t  function attachValidation(form) {\n\t    var rules = [];\n\t    try { rules = JSON.parse(form.dataset.rules || '[]'); } catch(e) { rules = []; }\n\n\t    form.addEventListener('submit', function(e) {\n\t      var errors = [];\n\n\t      for (var i = 0; i < rules.length; i++) {\n\t        var r = rules[i];\n\t        var el = form.querySelector('[name=\"' + r.field + '\"]');\n\t        if (!el) continue;\n\t        var val = el.value || '';\n\t        var label = r.label || r.field;\n\n\t        if (r.required && !val.trim()) {\n\t          errors.push(label + ' is required');\n\t          showFieldError(el, label + ' is required');\n\t          continue;\n\t        }\n\t        if (r.minLength > 0 && val.length < r.minLength) {\n\t          errors.push(label + ' must be at least ' + r.minLength + ' characters');\n\t          showFieldError(el, label + ' must be at least ' + r.minLength + ' characters');\n\t          continue;\n\t        }\n\t        if (r.maxLength > 0 && val.length > r.maxLength) {\n\t          errors.push(label + ' must be at most ' + r.maxLength + ' characters');\n\t          showFieldError(el, label + ' must be at most ' + r.maxLength + ' characters');\n\t          continue;\n\t        }\n\t        if (r.pattern && val && !new RegExp(r.pattern).test(val)) {\n\t          errors.push(r.patternMsg || label + ' format is invalid');\n\t          showFieldError(el, r.patternMsg || label + ' format is invalid');\n\t          continue;\n\t        }\n\t        if (r.type === 'email' && val && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(val)) {\n\t          errors.push(label + ' must be a valid email');\n\t          showFieldError(el, label + ' must be a valid email');\n\t          continue;\n\t        }\n\t        if (r.match) {\n\t          var matchEl = form.querySelector('[name=\"' + r.match + '\"]');\n\t          if (matchEl && val !== matchEl.value) {\n\t            errors.push(label + ' does not match');\n\t            showFieldError(el, label + ' does not match');\n\t            continue;\n\t          }\n\t        }\n\t        clearFieldError(el);\n\t      }\n\n\t      if (errors.length > 0) {\n\t        e.preventDefault();\n\t        showFormError(form, errors[0]);\n\t      }\n\t    });\n\t  }\n\n\t  function showFieldError(el, msg) {\n\t    el.classList.add('input-error', 'textarea-error', 'select-error');\n\t    var err = el.parentNode.querySelector('.field-error');\n\t    if (!err) {\n\t      err = document.createElement('span');\n\t      err.className = 'field-error text-error text-xs mt-1';\n\t      el.parentNode.appendChild(err);\n\t    }\n\t    err.textContent = msg;\n\t  }\n\n\t  function clearFieldError(el) {\n\t    el.classList.remove('input-error', 'textarea-error', 'select-error');\n\t    var err = el.parentNode.querySelector('.field-error');\n\t    if (err) err.remove();\n\t  }\n\n\t  function showFormError(form, msg) {\n\t    var err = form.querySelector('.form-error-msg');\n\t    if (!err) {\n\t      err = document.createElement('div');\n\t      err.className = 'form-error-msg alert alert-error text-sm mb-4';\n\t      form.insertBefore(err, form.firstChild);\n\t    }\n\t    err.textContent = msg;\n\t    err.style.display = 'flex';\n\t    setTimeout(function() { err.style.display = 'none'; }, 5000);\n\t  }\n\t}\n\t</script>")
+		templ_7745c5c3_Var8 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<script>\n\tif (!window._formValidationInit) {\n\t  window._formValidationInit = true;\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-form-validation]').forEach(attachValidation);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-form-validation]:not(._fv-initialized)').forEach(function(el) {\n\t      el.classList.add('_fv-initialized');\n\t      attachValidation(el);\n\t    });\n\t  });\n\n\t  function attachValidation(form) {\n\t    var rules = [];\n\t    try { rules = JSON.parse(form.dataset.rules || '[]'); } catch(e) { rules = []; }\n\n\t    form.addEventListener('submit', function(e) {\n\t      var errors = [];\n\n\t      for (var i = 0; i < rules.length; i++) {\n\t        var r = rules[i];\n\t        var el = form.querySelector('[name=\"' + r.field + '\"]');\n\t        if (!el) continue;\n\t        var val = el.value || '';\n\t        var label = r.label || r.field;\n\n\t        if (r.required && !val.trim()) {\n\t          errors.push(label + ' is required');\n\t          showFieldError(el, label + ' is required');\n\t          continue;\n\t        }\n\t        if (r.minLength > 0 && val.length < r.minLength) {\n\t          errors.push(label + ' must be at least ' + r.minLength + ' characters');\n\t          showFieldError(el, label + ' must be at least ' + r.minLength + ' characters');\n\t          continue;\n\t        }\n\t        if (r.maxLength > 0 && val.length > r.maxLength) {\n\t          errors.push(label + ' must be at most ' + r.maxLength + ' characters');\n\t          showFieldError(el, label + ' must be at most ' + r.maxLength + ' characters');\n\t          continue;\n\t        }\n\t        if (r.pattern && val && !new RegExp(r.pattern).test(val)) {\n\t          errors.push(r.patternMsg || label + ' format is invalid');\n\t          showFieldError(el, r.patternMsg || label + ' format is invalid');\n\t          continue;\n\t        }\n\t        if (r.type === 'email' && val && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(val)) {\n\t          errors.push(label + ' must be a valid email');\n\t          showFieldError(el, label + ' must be a valid email');\n\t          continue;\n\t        }\n\t        if (r.match) {\n\t          var matchEl = form.querySelector('[name=\"' + r.match + '\"]');\n\t          if (matchEl && val !== matchEl.value) {\n\t            errors.push(label + ' does not match');\n\t            showFieldError(el, label + ' does not match');\n\t            continue;\n\t          }\n\t        }\n\t        clearFieldError(el);\n\t      }\n\n\t      if (errors.length > 0) {\n\t        e.preventDefault();\n\t        showFormError(form, errors[0]);\n\t      }\n\t    });\n\t  }\n\n\t  function showFieldError(el, msg) {\n\t    el.classList.add('input-error', 'textarea-error', 'select-error');\n\t    var err = el.parentNode.querySelector('.field-error');\n\t    if (!err) {\n\t      err = document.createElement('span');\n\t      err.className = 'field-error text-error text-xs mt-1';\n\t      el.parentNode.appendChild(err);\n\t    }\n\t    err.textContent = msg;\n\t  }\n\n\t  function clearFieldError(el) {\n\t    el.classList.remove('input-error', 'textarea-error', 'select-error');\n\t    var err = el.parentNode.querySelector('.field-error');\n\t    if (err) err.remove();\n\t  }\n\n\t  function showFormError(form, msg) {\n\t    var err = form.querySelector('.form-error-msg');\n\t    if (!err) {\n\t      err = document.createElement('div');\n\t      err.className = 'form-error-msg alert alert-error text-sm mb-4';\n\t      form.insertBefore(err, form.firstChild);\n\t    }\n\t    err.textContent = msg;\n\t    err.style.display = 'flex';\n\t    setTimeout(function() { err.style.display = 'none'; }, 5000);\n\t  }\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = formValidationOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

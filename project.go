@@ -40,9 +40,6 @@ func CreateProject(t *testing.T, home, srv, name string) string { //nolint:deadc
 	setOut := MustRunCLIInDirWithHome(t, "", home, setArgs...)
 	logCLISuccessIfActive(t, "memory "+strings.Join(setArgs, " "), setOut)
 
-	// Register with daemon for orphan tracking (best-effort).
-	daemonRegisterResource(projectID)
-
 	return projectID
 }
 
@@ -76,8 +73,6 @@ func DeleteProjectOnCleanup(t *testing.T, home, projectID string) { //nolint:dea
 			t.Logf("warn: failed to delete project %s: %v\n%s", projectID, err, out)
 		} else {
 			t.Logf("deleted project %s", projectID)
-			// Deregister from daemon — best-effort, failure is non-fatal.
-			daemonDeregisterResource(projectID)
 		}
 	})
 }
@@ -113,48 +108,56 @@ func RevokeTokenOnCleanup(t *testing.T, rl *RunLog, home, tokenID string) { //no
 // ProviderFromEnv returns the LLM provider type, API key, and generative model
 // name by inspecting environment variables in priority order:
 //
+//	OPENAI_API_KEY    → provider "openai",  model from OPENAI_MODEL
 //	DEEPSEEK_API_KEY  → provider "deepseek", model from DEEPSEEK_MODEL
 //	GOOGLE_AI_API_KEY → provider "google",   model from GOOGLE_AI_MODEL
-//	OPENAI_API_KEY    → provider "openai",   model from OPENAI_MODEL
 //
 // model is empty when the corresponding *_MODEL variable is not set; callers
 // should then omit --generative-model so the server auto-selects from its
 // model catalog.  All three strings are empty when no provider is configured.
 func ProviderFromEnv() (provider, apiKey, model string) { //nolint:deadcode
+	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
+		return "openai", key, os.Getenv("OPENAI_MODEL")
+	}
 	if key := os.Getenv("DEEPSEEK_API_KEY"); key != "" {
 		return "deepseek", key, os.Getenv("DEEPSEEK_MODEL")
 	}
 	if key := os.Getenv("GOOGLE_AI_API_KEY"); key != "" {
 		return "google", key, os.Getenv("GOOGLE_AI_MODEL")
 	}
-	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
-		return "openai", key, os.Getenv("OPENAI_MODEL")
-	}
 	return "", "", ""
 }
 
-// ConfigureProvider configures an LLM provider via the memory CLI.
-// provider is the provider type (e.g. "deepseek", "google", "openai").
-// model is the generative model name; when empty --generative-model is omitted
-// and the server picks from its catalog automatically.
-func ConfigureProvider(t *testing.T, home, provider, apiKey, model string) { //nolint:deadcode
+// ConfigureProvider configures an LLM provider at the project level via
+// `memory provider configure-project`. provider is the provider type
+// (e.g. "openai-compatible", "google", "google-vertex"). model is the generative
+// model name; when empty --generative-model is omitted and the server picks
+// from its catalog automatically.
+func ConfigureProvider(t *testing.T, home, projectID, provider, apiKey, model string) { //nolint:deadcode
 	t.Helper()
-	args := []string{"provider", "configure", provider, "--api-key", apiKey}
+	args := []string{"provider", "configure-project", provider, "--project", projectID, "--api-key", apiKey}
+	if baseURL := providerBaseURL(); baseURL != "" {
+		args = append(args, "--base-url", baseURL)
+	}
 	if model != "" {
 		args = append(args, "--generative-model", model)
 	}
 	out := MustRunCLIInDirWithHome(t, "", home, args...)
-	t.Logf("provider configure %s:\n%s", provider, out)
+	t.Logf("provider configure-project %s:\n%s", provider, out)
 }
 
 // SetupTestProvider configures whichever LLM provider is available from
-// environment variables (see ProviderFromEnv for priority order).
+// environment variables (see ProviderFromEnv for priority order) at the
+// project level via `memory provider configure-project`.
+// projectID is required — callers must create the project first.
 // If no provider env vars are set the test is skipped via t.Skip.
 // If rl is non-nil the configure step is recorded in the RunLog.
-// The function falls back to "provider test" if configure fails, which is
-// useful when credentials are already stored on the server.
-func SetupTestProvider(t *testing.T, rl *RunLog, home string) { //nolint:deadcode
+func SetupTestProvider(t *testing.T, rl *RunLog, home, projectID string) { //nolint:deadcode
 	t.Helper()
+
+	if projectID == "" {
+		DoSkipf(t, rl, "no project ID for provider setup — create project first")
+	}
 
 	provider, apiKey, model := ProviderFromEnv()
 	if provider == "" {
@@ -162,30 +165,42 @@ func SetupTestProvider(t *testing.T, rl *RunLog, home string) { //nolint:deadcod
 			"no LLM provider configured — set DEEPSEEK_API_KEY, GOOGLE_AI_API_KEY, or OPENAI_API_KEY")
 	}
 
-	label := "memory provider configure " + provider
+	label := "memory provider configure-project " + provider
 	if rl != nil {
 		rl.Section("Configure LLM provider")
 	}
 
-	args := []string{"provider", "configure", provider, "--api-key", apiKey}
+	// When OPENAI_BASE_URL is set, use HTTP API directly because the CLI
+	// `configure-project openai` does not accept --base-url.
+	baseURL := providerBaseURL()
+	if baseURL != "" && provider == "openai" {
+		err := configureProviderHTTP(t, projectID, provider, apiKey, model, baseURL, rl)
+		if err == nil {
+			return
+		}
+		// Fall through to CLI or test.
+	}
+
+	args := []string{"provider", "configure-project", provider, "--project", projectID, "--api-key", apiKey}
+	if baseURL != "" {
+		args = append(args, "--base-url", baseURL)
+	}
 	if model != "" {
 		args = append(args, "--generative-model", model)
 	}
-	args = append(args, OrgIDArgs()...)
 
 	out, err := RunCLIInDirWithHome(t, "", home, args...)
 	if rl != nil {
-		rl.CLIErr(label, out, err)
+		rl.CLIErr(label, out, err, 0)
 	} else {
 		t.Logf("%s:\n%s", label, out)
 	}
 
 	if err != nil {
-		// Configure may fail if credentials are already stored; verify via test.
-		testArgs := append([]string{"provider", "test"}, OrgIDArgs()...)
+		testArgs := []string{"provider", "test", "--project", projectID}
 		testOut, testErr := RunCLIInDirWithHome(t, "", home, testArgs...)
 		if rl != nil {
-			rl.CLIErr("memory provider test", testOut, testErr)
+			rl.CLIErr("memory provider test", testOut, testErr, 0)
 		}
 		if testErr != nil {
 			if rl != nil {
@@ -197,11 +212,92 @@ func SetupTestProvider(t *testing.T, rl *RunLog, home string) { //nolint:deadcod
 	}
 }
 
-// ConfigureGoogleProvider configures the Google AI provider.
-// Deprecated: use ConfigureProvider(t, home, "google", apiKey, model) instead.
-func ConfigureGoogleProvider(t *testing.T, home, apiKey, model string) { //nolint:deadcode
+// configureProviderHTTP configures a provider via the HTTP API directly.
+// Used when the CLI cannot express the full config (e.g. openai with custom base URL).
+func configureProviderHTTP(t *testing.T, projectID, provider, apiKey, model, baseURL string, rl *RunLog) error {
 	t.Helper()
-	ConfigureProvider(t, home, "google", apiKey, model)
+	srv := os.Getenv("MEMORY_TEST_SERVER")
+	token := os.Getenv("MEMORY_TEST_TOKEN")
+	if srv == "" || token == "" {
+		return fmt.Errorf("MEMORY_TEST_SERVER or MEMORY_TEST_TOKEN not set")
+	}
+	orgID := OrgID()
+	if orgID == "" {
+		return fmt.Errorf("no org ID for provider config")
+	}
+
+	provCfg := map[string]any{"apiKey": apiKey}
+	if baseURL != "" {
+		provCfg["baseUrl"] = baseURL
+	}
+	if model != "" {
+		provCfg["generativeModel"] = model
+	}
+	body, _ := json.Marshal(provCfg)
+	req, err := http.NewRequest("PUT",
+		srv+"/api/v1/projects/"+projectID+"/providers/"+provider,
+		bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Org-ID", orgID)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	// Configure model-config.
+	modelCfg, _ := json.Marshal(map[string]any{"generativeModel": provider + "/" + model})
+	req2, _ := http.NewRequest("PUT",
+		srv+"/api/v1/projects/"+projectID+"/model-config",
+		bytes.NewReader(modelCfg))
+	req2.Header.Set("Content-Type", "application/json")
+	req2.Header.Set("Authorization", "Bearer "+token)
+	req2.Header.Set("X-Org-ID", orgID)
+	resp2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		return err
+	}
+	resp2.Body.Close()
+
+	if rl != nil {
+		rl.Printf("configured provider %s via HTTP for project %s", provider, projectID)
+	} else {
+		t.Logf("configured provider %s via HTTP for project %s", provider, projectID)
+	}
+	return nil
+}
+
+// ProviderFromEnvBaseURL returns the base URL for OpenAI-compatible providers
+// from environment variables.
+func ProviderFromEnvBaseURL() string { //nolint:deadcode
+	return providerBaseURL()
+}
+
+// providerBaseURL returns the base URL for OpenAI-compatible providers.
+// Uses DEEPSEEK_BASE_URL or OPENAI_BASE_URL env vars. Does not return a URL
+// for "deepseek" — the server knows the default DeepSeek API endpoint.
+func providerBaseURL() string {
+	if u := os.Getenv("DEEPSEEK_BASE_URL"); u != "" {
+		return u
+	}
+	if u := os.Getenv("OPENAI_BASE_URL"); u != "" {
+		return u
+	}
+	return ""
+}
+
+// ConfigureGoogleProvider configures the Google AI provider at the project level.
+// Deprecated: use ConfigureProvider(t, home, projectID, "google", apiKey, model) instead.
+func ConfigureGoogleProvider(t *testing.T, home, projectID, apiKey, model string) { //nolint:deadcode
+	t.Helper()
+	ConfigureProvider(t, home, projectID, "google", apiKey, model)
 }
 
 // InstallBlueprint runs `memory blueprints <blueprintURL> --project <name> --upgrade`
@@ -262,49 +358,4 @@ func stringContains(s, substr string) bool { //nolint:deadcode
 // Daemon integration helpers (best-effort, fail-open)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// daemonRegisterResource registers a project with the local runlog daemon.
-// Called after CreateProject succeeds. No-op if RUNLOG_RUN_ID or
-// RUNLOG_DAEMON_URL are not set. All errors are silently ignored.
-func daemonRegisterResource(projectID string) { //nolint:deadcode
-	runID := os.Getenv("RUNLOG_RUN_ID")
-	dURL := os.Getenv("RUNLOG_DAEMON_URL")
-	if runID == "" || dURL == "" {
-		return
-	}
 
-	body, _ := json.Marshal(map[string]string{
-		"resource_id":   projectID,
-		"resource_type": "project",
-	})
-
-	client := &http.Client{Timeout: 500 * time.Millisecond}
-	url := strings.TrimRight(dURL, "/") + "/runs/" + runID + "/resources"
-	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return
-	}
-	_ = resp.Body.Close()
-}
-
-// daemonDeregisterResource deregisters a project from the local runlog daemon
-// after it has been successfully deleted from the server.
-// Called after DeleteProjectOnCleanup succeeds. All errors are silently ignored.
-func daemonDeregisterResource(projectID string) { //nolint:deadcode
-	runID := os.Getenv("RUNLOG_RUN_ID")
-	dURL := os.Getenv("RUNLOG_DAEMON_URL")
-	if runID == "" || dURL == "" {
-		return
-	}
-
-	client := &http.Client{Timeout: 500 * time.Millisecond}
-	url := strings.TrimRight(dURL, "/") + "/runs/" + runID + "/resources/" + projectID
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
-	if err != nil {
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	_ = resp.Body.Close()
-}

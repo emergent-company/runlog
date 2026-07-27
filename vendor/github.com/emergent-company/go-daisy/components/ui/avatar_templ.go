@@ -57,8 +57,9 @@ func avatarInitials(name string) string {
 // Avatar renders a circular avatar.
 // Priority: src (image) > icon (icon placeholder) > name initials.
 // Set icon to a Lucide icon suffix, e.g. "lucide--building-2" for a company avatar.
+// Set mask to a DaisyUI mask class (e.g. "mask mask-squircle") to override the default rounded shape.
 // attrs is optional; pass nil when not needed.
-func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.Attributes) templ.Component {
+func Avatar(name string, src string, icon string, size AvatarSize, mask string, attrs templ.Attributes) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -80,6 +81,10 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 		}
 		ctx = templ.ClearChildren(ctx)
 		sc := avatarSizeClass(size)
+		shape := "rounded-full"
+		if mask != "" {
+			shape = mask
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"avatar\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -97,7 +102,7 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 			return templ_7745c5c3_Err
 		}
 		if src != "" {
-			var templ_7745c5c3_Var2 = []any{sc + " rounded-full overflow-hidden"}
+			var templ_7745c5c3_Var2 = []any{sc, shape, "overflow-hidden"}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -122,7 +127,7 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(src)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 58, Col: 18}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 63, Col: 18}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -135,7 +140,7 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 58, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 63, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -146,7 +151,7 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 				return templ_7745c5c3_Err
 			}
 		} else if icon != "" {
-			var templ_7745c5c3_Var6 = []any{sc + " avatar-placeholder rounded-full bg-base-300 flex items-center justify-center text-base-content/60"}
+			var templ_7745c5c3_Var6 = []any{sc, "avatar-placeholder", shape, "bg-base-300 flex items-center justify-center text-base-content/60"}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -191,7 +196,7 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 				return templ_7745c5c3_Err
 			}
 		} else {
-			var templ_7745c5c3_Var10 = []any{sc + " avatar-placeholder rounded-full bg-primary flex items-center justify-center font-semibold text-primary-content"}
+			var templ_7745c5c3_Var10 = []any{sc, "avatar-placeholder", shape, "bg-primary flex items-center justify-center font-semibold text-primary-content"}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var10...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -216,7 +221,7 @@ func Avatar(name string, src string, icon string, size AvatarSize, attrs templ.A
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(avatarInitials(name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 66, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 71, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -258,7 +263,7 @@ func PlaceholderAvatar(icon string, size AvatarSize) templ.Component {
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = Avatar("", "", icon, size, nil).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Avatar("", "", icon, size, "", nil).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -340,7 +345,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(avatarInitials(name))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 119, Col: 153}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 124, Col: 153}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -353,7 +358,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 120, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 125, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -410,7 +415,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(avatarInitials(name))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 124, Col: 169}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 129, Col: 169}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -423,7 +428,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 126, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 131, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -441,7 +446,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(contact.Role)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 128, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 133, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -464,7 +469,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(contact.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 136, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 141, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -506,7 +511,7 @@ func PersonChip(name string, avatarColor string, textColor string, gradientFrom 
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(contact.BadgeLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 142, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/avatar.templ`, Line: 147, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {

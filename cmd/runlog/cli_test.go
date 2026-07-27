@@ -87,8 +87,8 @@ func newTestDBWithRuns(t *testing.T) (*runlog.RunDB, *runlog.DaemonClient, map[s
 		{"TestBeta", false},
 		{"TestGamma", true},
 	} {
-		r := dc.CreateRun(t, runlog.CreateRunOpts{EnvProfile: tc.name})
-		dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: &tc.passed})
+		r := dc.CreateTestRun(t, runlog.CreateRunOpts{EnvProfile: tc.name}, tc.name)
+		dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: &tc.passed})
 		runs[tc.name] = r.TestRunID
 	}
 
@@ -98,17 +98,14 @@ func newTestDBWithRuns(t *testing.T) (*runlog.RunDB, *runlog.DaemonClient, map[s
 		name, _ := tr["test_name"].(string)
 		if name == "TestAlpha" {
 			id, _ := tr["id"].(float64)
-			run := dc.MustGetTestRun(t, int64(id))
-			daemonID, _ := run["daemon_run_id"].(string)
-			if daemonID != "" {
-				for _, ev := range []struct{ kind, msg string }{
-					{"state_change", "test started"},
-					{"log", "running setup"},
-					{"cli", "go build ./..."},
-					{"state_change", "test finished"},
-				} {
-					dc.AddEvent(t, daemonID, ev.kind, ev.msg)
-				}
+			testRunID := int64(id)
+			for _, ev := range []struct{ kind, msg string }{
+				{"state_change", "test started"},
+				{"log", "running setup"},
+				{"cli", "go build ./..."},
+				{"state_change", "test finished"},
+			} {
+				dc.AddEvent(t, testRunID, ev.kind, ev.msg)
 			}
 			break
 		}

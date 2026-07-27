@@ -318,12 +318,12 @@ func TestFooterPoller_PublishesStatusEvent(t *testing.T) {
 	_, app, dc, df := newWebTest(t, "sse", "Footer poller publishes status event with correct counts")
 	df.Event("log", "Seeding 3 runs via daemon for footer poller")
 	for i := 0; i < 3; i++ {
-		r := dc.CreateRun(t, runlog.CreateRunOpts{
+		r := dc.CreateTestRun(t, runlog.CreateRunOpts{
 			EnvProfile:  fmt.Sprintf("TestPoller_%d", i),
 			Category:    "sse",
 			Description: "Footer poller run count verification",
-		})
-		dc.MarkDone(t, r.DaemonID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
+		}, t.Name()+fmt.Sprintf("_%d", i))
+		dc.MarkDone(t, r.TestRunID, runlog.MarkDoneOpts{Passed: boolPtr(true)})
 	}
 
 	broker := newSSEBroker(app.db)
@@ -420,4 +420,131 @@ func TestFooterPoller_EmptyDB(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timeout")
 	}
+}
+
+func TestSSECommand_JSONMarshal(t *testing.T) {
+	ec := 1
+	cmd := SSECommand{
+		Cmd:      "linter-done",
+		Name:     "gofmt",
+		Status:   "failed",
+		ExitCode: &ec,
+	}
+	got := testMarshalCmd(t, cmd)
+	if !containsStr(got, `"cmd":"linter-done"`) {
+		t.Errorf("missing cmd: %s", got)
+	}
+	if !containsStr(got, `"name":"gofmt"`) {
+		t.Errorf("missing name: %s", got)
+	}
+	if !containsStr(got, `"status":"failed"`) {
+		t.Errorf("missing status: %s", got)
+	}
+	if !containsStr(got, `"exit_code":1`) {
+		t.Errorf("missing exit_code: %s", got)
+	}
+}
+
+func TestSSECommand_ReplaceHTML(t *testing.T) {
+	cmd := SSECommand{
+		Cmd:    "replace-html",
+		Target: "#footer-status",
+		HTML:   "ok",
+	}
+	got := testMarshalCmd(t, cmd)
+	if !containsStr(got, `"cmd":"replace-html"`) {
+		t.Error("missing cmd field")
+	}
+	if !containsStr(got, `"target":"#footer-status"`) {
+		t.Error("missing target field")
+	}
+	if !containsStr(got, `"html":"ok"`) {
+		t.Errorf("missing html field: %s", got)
+	}
+}
+
+func TestSSEBroker_PublishCmd(t *testing.T) {
+	df := runlog.NewDogfoodRun(t, "sse")
+	defer df.Done()
+	df.Describe("PublishCmd publishes structured SSECommand")
+	df.Event("log", "PublishCmd test")
+
+	b := newSSEBroker(nil)
+	ch := b.Subscribe("test-cmd")
+	defer b.Unsubscribe("test-cmd", ch)
+
+	ec := 0
+	b.PublishCmd("test-cmd", "cmd", SSECommand{
+		Cmd:      "linter-done",
+		Name:     "lint-test",
+		Status:   "passed",
+		ExitCode: &ec,
+	})
+
+	select {
+	case evt := <-ch:
+		if evt.Event != "cmd" {
+			t.Errorf("event: got %s, want cmd", evt.Event)
+		}
+		if !containsStr(evt.Data, `"cmd":"linter-done"`) {
+			t.Errorf("data missing cmd: %s", evt.Data)
+		}
+		if !containsStr(evt.Data, `"name":"lint-test"`) {
+			t.Errorf("data missing name: %s", evt.Data)
+		}
+		if !containsStr(evt.Data, `"status":"passed"`) {
+			t.Errorf("data missing status: %s", evt.Data)
+		}
+		if !containsStr(evt.Data, `"exit_code":0`) {
+			t.Errorf("data missing exit_code: %s", evt.Data)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for PublishCmd event")
+	}
+}
+
+func TestSSEBroker_PublishCmd_Refresh(t *testing.T) {
+	b := newSSEBroker(nil)
+	ch := b.Subscribe("refresh-topic")
+	defer b.Unsubscribe("refresh-topic", ch)
+
+	b.PublishCmd("refresh-topic", "cmd", SSECommand{Cmd: "refresh"})
+
+	select {
+	case evt := <-ch:
+		if !containsStr(evt.Data, `"cmd":"refresh"`) {
+			t.Errorf("expected refresh cmd, got: %s", evt.Data)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+	}
+}
+
+func testMarshalCmd(t *testing.T, cmd SSECommand) string {
+	t.Helper()
+	b := newSSEBroker(nil)
+	ch := b.Subscribe("marshal-test")
+	defer b.Unsubscribe("marshal-test", ch)
+
+	b.PublishCmd("marshal-test", "cmd", cmd)
+	select {
+	case evt := <-ch:
+		return evt.Data
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+		return ""
+	}
+}
+
+func containsStr(s, sub string) bool {
+	return len(s) >= len(sub) && strIdx(s, sub) >= 0
+}
+
+func strIdx(s, sub string) int {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return i
+		}
+	}
+	return -1
 }

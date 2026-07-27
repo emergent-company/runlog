@@ -35,12 +35,12 @@ func TestEnvVarsIntegration(t *testing.T) {
 
 	_, dc := StartTestDaemon(t)
 
-	r := dc.CreateRun(t, CreateRunOpts{
+	r := dc.CreateTestRun(t, CreateRunOpts{
 		EnvProfile: t.Name(),
 		Category:   "env",
 		EnvVars:    testVars,
-	})
-	dc.MarkDone(t, r.DaemonID, MarkDoneOpts{Passed: boolPtr(true)})
+	}, t.Name())
+	dc.MarkDone(t, r.TestRunID, MarkDoneOpts{Passed: boolPtr(true)})
 
 	run := dc.MustGetTestRun(t, r.TestRunID)
 	if run == nil {
