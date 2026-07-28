@@ -4,6 +4,7 @@
 package runlog
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -197,7 +198,7 @@ func SkipIfEndpointMissing(t *testing.T, path string, bearerToken string, rl ...
 	ctx, cancel := cancelCtx(5 * time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", srv+path, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", srv+path, bytes.NewReader([]byte("{}")))
 	if err != nil {
 		DoSkipf(t, runlog, "cannot build request for %s%s: %v", srv, path, err)
 	}
