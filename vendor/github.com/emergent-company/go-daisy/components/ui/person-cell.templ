@@ -6,7 +6,7 @@ import "github.com/emergent-company/go-daisy/devmode"
 type PersonCellProps struct {
 	// Name is the primary label (also drives avatar initials when no Src/Icon is set).
 	Name string
-	// Subtitle is optional secondary text (e.g. email, role, department).
+	// Subtitle is optional secondary text (e.g. email, role, department). In compact mode, used as the role.
 	Subtitle string
 	// Src is an optional avatar image URL.
 	Src string
@@ -14,20 +14,114 @@ type PersonCellProps struct {
 	Icon string
 	// Size controls the avatar size. Defaults to AvatarSM when zero-value.
 	Size AvatarSize
+	// Compact enables PersonChip-style inline chip with hover card. Defaults to false.
+	Compact bool
+
+	// ---- Compact-mode fields (PersonChip-style) ----
+	// AvatarColor is a Tailwind bg-* class for the initials avatar (e.g. "bg-primary").
+	AvatarColor string
+	// TextColor is a Tailwind text-* class for the initials contrast (e.g. "text-primary-content").
+	TextColor string
+	// GradientFrom is a Tailwind from-* class for the card header gradient (e.g. "from-primary/20").
+	GradientFrom string
+	// GradientTo is a Tailwind to-* class for the card header gradient (e.g. "to-primary/5").
+	GradientTo string
+	// Email is shown in the hover card contact details.
+	Email string
+	// BadgeLabel is the text shown in the status badge (e.g. "Active", "On leave").
+	BadgeLabel string
+	// BadgeClass is the DaisyUI badge modifier classes (e.g. "badge-success badge-soft").
+	BadgeClass string
+	// ProfileHref is the optional "View profile" link URL.
+	ProfileHref string
 }
 
 // PersonCell renders an avatar next to a name and optional subtitle as a
 // horizontal flex unit. It can be used as a ListRow Leading slot, a table
 // cell, or anywhere a compact person identity block is needed.
+//
+// When Compact is true, renders as an inline chip with a CSS-only hover card
+// revealing contact details (PersonChip-style).
 templ PersonCell(p PersonCellProps) {
+	if p.Compact {
+		@PersonCellCompact(p)
+		return
+	}
 	{{ size := p.Size; if size == "" { size = AvatarSM } }}
 	<div class="flex items-center gap-3" { devmode.Attrs(ctx, "ui/PersonCell")... }>
-		@Avatar(p.Name, p.Src, p.Icon, size, nil)
+		@Avatar(p.Name, p.Src, p.Icon, size, "", nil)
 		<div class="min-w-0">
 			<div class="font-medium text-sm leading-tight truncate">{ p.Name }</div>
 			if p.Subtitle != "" {
 				<div class="text-xs text-base-content/50 leading-tight truncate">{ p.Subtitle }</div>
 			}
+		</div>
+	</div>
+}
+
+templ PersonCellCompact(p PersonCellProps) {
+	{{ avatarColor := p.AvatarColor; if avatarColor == "" { avatarColor = "bg-primary" } }}
+	{{ textColor := p.TextColor; if textColor == "" { textColor = "text-primary-content" } }}
+	{{ gradientFrom := p.GradientFrom; if gradientFrom == "" { gradientFrom = "from-primary/20" } }}
+	{{ gradientTo := p.GradientTo; if gradientTo == "" { gradientTo = "to-primary/5" } }}
+	<style>
+		.person-chip .person-card {
+			opacity: 0;
+			pointer-events: none;
+			transform: translateY(4px) scale(0.98);
+			transition: opacity 120ms ease, transform 120ms ease;
+		}
+		.person-chip .person-card::before {
+			content: '';
+			display: block;
+			position: absolute;
+			top: -8px;
+			left: 0;
+			right: 0;
+			height: 8px;
+		}
+		.person-chip:hover .person-card,
+		.person-chip:focus-within .person-card {
+			opacity: 1;
+			pointer-events: auto;
+			transform: translateY(0) scale(1);
+		}
+	</style>
+	<div class="relative person-chip inline-flex items-center gap-1.5 rounded-full px-2 py-1 cursor-default select-none hover:bg-base-200 transition-colors" { devmode.Attrs(ctx, "ui/PersonCell")... }>
+		<div class={ "size-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0", avatarColor, textColor }>{ avatarInitials(p.Name) }</div>
+		<span class="text-sm font-medium text-base-content leading-none">{ p.Name }</span>
+		<div class="person-card absolute left-[-8px] top-full z-50 w-64 rounded-2xl border border-base-200 bg-base-100 shadow-xl overflow-hidden">
+			<div class={ "h-10 bg-gradient-to-r", gradientFrom, gradientTo }></div>
+			<div class="px-4 pb-3 -mt-5 flex items-end gap-3">
+				<div class={ "size-10 rounded-full flex items-center justify-center text-sm font-bold ring-2 ring-base-100 shrink-0", avatarColor, textColor }>{ avatarInitials(p.Name) }</div>
+				<div class="pb-0.5 min-w-0">
+					<p class="text-sm font-semibold text-base-content leading-tight truncate">{ p.Name }</p>
+					if p.Subtitle != "" {
+						<p class="text-xs text-base-content/50 leading-tight">{ p.Subtitle }</p>
+					}
+				</div>
+			</div>
+			<div class="px-4 pb-4 space-y-2">
+				if p.Email != "" {
+					<div class="flex items-center gap-2 text-xs text-base-content/60">
+						<svg class="size-3.5 shrink-0 text-base-content/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+						<span class="truncate">{ p.Email }</span>
+					</div>
+				}
+				if p.BadgeLabel != "" || p.ProfileHref != "" {
+					<div class="flex items-center justify-between pt-1">
+						if p.BadgeLabel != "" {
+							<span class={ "badge badge-sm", p.BadgeClass }>{ p.BadgeLabel }</span>
+						}
+						if p.ProfileHref != "" {
+							@Button(ButtonProps{Type: ButtonTypeLink, Href: p.ProfileHref, Variant: ButtonGhost, Size: ButtonXS, ExtraClass: "text-primary gap-1 px-2"}) {
+								View profile
+								<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+							}
+						}
+					</div>
+				}
+			</div>
 		</div>
 	</div>
 }

@@ -1,0 +1,46 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// SheetSide controls which edge the sheet slides in from.
+type SheetSide string
+
+const (
+	SheetLeft   SheetSide = "left"
+	SheetRight  SheetSide = "right"
+)
+
+// SheetProps configures a floating slide-out panel using DaisyUI drawer overlay.
+type SheetProps struct {
+	ID    string
+	Side  SheetSide
+	Open  bool
+	Class string
+	Attrs templ.Attributes
+}
+
+// Sheet renders a floating slide-out panel positioned over page content.
+// The { children... } slot is the panel body.
+templ Sheet(props ...SheetProps) {
+	{{ var p SheetProps
+	if len(props) > 0 { p = props[0] }
+	if p.Side == "" { p.Side = SheetLeft } }}
+	<div
+		class={
+			"drawer fixed inset-0 z-50 pointer-events-none",
+			templ.KV("drawer-end", p.Side == SheetRight),
+			p.Class,
+		}
+		{ devmode.Attrs(ctx, "ui/Sheet")... }
+		{ p.Attrs... }
+	>
+		<input id={ p.ID } type="checkbox" class="drawer-toggle" checked?={ p.Open } />
+		<div class="drawer-content pointer-events-none h-full"></div>
+		<div class="drawer-side pointer-events-auto">
+			<label for={ p.ID } aria-label="close" class="drawer-overlay"></label>
+			<div class="bg-base-100 h-full w-80 p-0 shadow-xl">
+				{ children... }
+			</div>
+		</div>
+	</div>
+}

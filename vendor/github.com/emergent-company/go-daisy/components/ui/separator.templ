@@ -1,0 +1,30 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// SeparatorProps configures a horizontal or vertical visual separator.
+type SeparatorProps struct {
+	Orientation string // "horizontal" (default) or "vertical"
+	Class       string
+	Attrs       templ.Attributes
+}
+
+templ Separator(props ...SeparatorProps) {
+	{{ var p SeparatorProps
+	if len(props) > 0 { p = props[0] } }}
+	if p.Orientation == "vertical" {
+		<div
+			role="separator" aria-orientation="vertical"
+			class={ "w-px h-full bg-base-200 shrink-0", p.Class }
+			{ devmode.Attrs(ctx, "ui/Separator")... }
+			{ p.Attrs... }
+		></div>
+	} else {
+		<div
+			role="separator" aria-orientation="horizontal"
+			class={ "h-px w-full bg-base-200 shrink-0", p.Class }
+			{ devmode.Attrs(ctx, "ui/Separator")... }
+			{ p.Attrs... }
+		></div>
+	}
+}

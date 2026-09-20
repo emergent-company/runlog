@@ -1,0 +1,61 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// SectionProps configures the optional aspects of a Section.
+type SectionProps struct {
+	// Margin is the section wrapper's margin class, e.g. "mt-6" (detail pages)
+	// or "mb-8" (list pages). Default "" (no margin).
+	Margin string
+	// CardClass is the card wrapper's class. Default "card-border".
+	CardClass string
+	// BodyClass is the card body's padding class, e.g. "p-0" (lists) or "p-5"
+	// (forms). Default "".
+	BodyClass string
+	// Empty switches the section to the empty-state branch: when true, the
+	// ui.Empty card (default "card-border", no padding) is rendered instead of
+	// the children. Gate it on the caller's own condition, e.g.
+	// Empty: len(items) == 0. When false, the children render in the card.
+	Empty bool
+	// EmptyIcon, EmptyTitle and EmptyDesc populate the empty-state card when
+	// Empty is true. Ignored otherwise.
+	EmptyIcon  string
+	EmptyTitle string
+	EmptyDesc  string
+	// Raw renders the children directly in the <section> without the CardRaw
+	// wrapper — for sections whose branches are not carded (e.g. an error
+	// Alert). Ignored when Empty is true.
+	Raw bool
+}
+
+// Section renders a titled card section: an <h2> header followed by a DaisyUI
+// card body. This is the standard title+box layout used across Alfred's
+// gateway pages:
+//
+//	@ui.Section("Object types", ui.SectionProps{
+//		Margin:    "mt-6",
+//		CardClass: "card-border overflow-hidden",
+//		BodyClass: "p-0",
+//		Empty:     len(types) == 0,
+//		EmptyIcon: "lucide--box", EmptyTitle: "No object types", EmptyDesc: "None compiled yet.",
+//	}) { rows }
+//
+// When Empty is true the section renders ui.Empty instead of its children.
+templ Section(title string, props SectionProps) {
+	<section class={ templ.KV(props.Margin, props.Margin != "") } { devmode.Attrs(ctx, "ui/Section")... }>
+		<h2 class="mb-3 text-lg font-semibold tracking-tight">{ title }</h2>
+		if props.Empty {
+			@CardRaw("card-border", "", nil) {
+				@Empty(props.EmptyIcon, props.EmptyTitle, props.EmptyDesc)
+			}
+		} else if props.Raw {
+			{ children... }
+		} else {
+			{{ cardClass := "card-border"
+			if props.CardClass != "" { cardClass = props.CardClass } }}
+			@CardRaw(cardClass, props.BodyClass, nil) {
+				{ children... }
+			}
+		}
+	</section>
+}

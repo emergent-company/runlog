@@ -15,6 +15,9 @@ type LabelProps struct {
 // Label renders a DaisyUI label with optional primary and alt text.
 // Use it to wrap form inputs and provide accessible field labeling.
 // Children (the input element) are rendered below the top label row.
+//
+// Deprecated: use FormControl instead. FormControl is the canonical form
+// wrapper with label, hint, error, and positioning support.
 templ Label(props LabelProps) {
 	<div class="form-control" { devmode.Attrs(ctx, "form/Label")... }>
 		if props.Text != "" || props.AltText != "" {
@@ -38,6 +41,8 @@ templ Label(props LabelProps) {
 
 // LabelAlt renders a bottom label row — typically used for hints or error text below an input.
 // text appears on the left (hint), altText appears on the right (e.g. character count or secondary note).
+//
+// Deprecated: use FormControl instead. Pass hint text via FormControl hint parameter.
 templ LabelAlt(text string, altText string) {
 	<div class="label" { devmode.Attrs(ctx, "form/LabelAlt")... }>
 		if text != "" {

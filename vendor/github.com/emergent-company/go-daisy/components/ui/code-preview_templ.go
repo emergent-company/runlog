@@ -10,17 +10,20 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/emergent-company/go-daisy/devmode"
 
+var codePreviewScriptOnce = templ.NewOnceHandle()
+var codePreviewCopyOnce = templ.NewOnceHandle()
+
 // CodeTab represents a single code block in a tabbed code preview.
 type CodeTab struct {
 	Label string // display name, e.g. "Go", "JavaScript"
-	Lang  string // highlight.js language, e.g. "go", "javascript"
+	Lang  string // language identifier, e.g. "go", "javascript"
 	Code  string // code content
 }
 
 // CodePreview displays code blocks with optional tab switching.
 // Single tab: renders a clean code block.
 // Multiple tabs: renders daisyUI tabs-lift with radio-based switching.
-// Uses highlight.js for syntax highlighting and styling.
+// For syntax highlighting, use CodeBlock with the Highlight field (server-side chroma).
 func CodePreview(tabs []CodeTab) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -71,7 +74,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var2).String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 1, Col: 0}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 1, Col: 0}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -84,7 +87,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(tabs[0].Code)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 19, Col: 207}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 23, Col: 207}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -108,7 +111,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue("cp-" + tabs[0].Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 24, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 28, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 					if templ_7745c5c3_Err != nil {
@@ -121,7 +124,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(tab.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 24, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 28, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 					if templ_7745c5c3_Err != nil {
@@ -139,7 +142,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue("cp-" + tabs[0].Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 26, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 30, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 					if templ_7745c5c3_Err != nil {
@@ -152,7 +155,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(tab.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 26, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 30, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 					if templ_7745c5c3_Err != nil {
@@ -179,7 +182,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var9).String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 1, Col: 0}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 1, Col: 0}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 				if templ_7745c5c3_Err != nil {
@@ -192,7 +195,7 @@ func CodePreview(tabs []CodeTab) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(tab.Code)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `vendor/github.com/emergent-company/go-daisy/components/ui/code-preview.templ`, Line: 29, Col: 202}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/code-preview.templ`, Line: 33, Col: 202}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -208,7 +211,29 @@ func CodePreview(tabs []CodeTab) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" data-testid=\"code-preview-copy\" data-tip=\"Copy\" style=\"position:absolute;top:0.25rem;right:0.5rem;z-index:10;opacity:0.6;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:var(--radius-field);cursor:pointer;color:inherit;background:transparent;border:none;padding:0\" class=\"tooltip tooltip-left\" onclick=\"copyCode(this)\" onmouseover=\"this.style.opacity='1'\" onmouseout=\"this.style.opacity='0.6'\" aria-label=\"Copy to clipboard\"><svg fill=\"currentColor\" style=\"width:1rem;height:1rem\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><path d=\"M 16 3 C 14.742188 3 13.847656 3.890625 13.40625 5 L 6 5 L 6 28 L 26 28 L 26 5 L 18.59375 5 C 18.152344 3.890625 17.257813 3 16 3 Z M 16 5 C 16.554688 5 17 5.445313 17 6 L 17 7 L 20 7 L 20 9 L 12 9 L 12 7 L 15 7 L 15 6 C 15 5.445313 15.445313 5 16 5 Z M 8 7 L 10 7 L 10 11 L 22 11 L 22 7 L 24 7 L 24 26 L 8 26 Z\"></path></svg></button></div><script>\n\t\t(function() {\n\t\t\tif (window._hljsLoaded) return;\n\t\t\twindow._hljsLoaded = true;\n\t\t\tvar _hljsCbs = [];\n\t\t\twindow._hljsHighlightAll = function() {\n\t\t\t\tif (typeof hljs !== 'undefined') { hljs.highlightAll(); return; }\n\t\t\t\t_hljsCbs.push(function() { hljs.highlightAll(); });\n\t\t\t};\n\t\t\tfunction flushCbs() {\n\t\t\t\tif (typeof hljs === 'undefined') return;\n\t\t\t\thljs.highlightAll();\n\t\t\t\tfor (var i = 0; i < _hljsCbs.length; i++) _hljsCbs[i]();\n\t\t\t\t_hljsCbs = [];\n\t\t\t}\n\t\t\tif (typeof hljs !== 'undefined') { flushCbs(); return; }\n\t\t\tvar l = document.createElement('link');\n\t\t\tl.rel = 'stylesheet';\n\t\t\tl.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';\n\t\t\tdocument.head.appendChild(l);\n\t\t\tvar s = document.createElement('script');\n\t\t\ts.src = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js';\n\t\t\ts.onload = flushCbs;\n\t\t\tdocument.head.appendChild(s);\n\t\t\tdocument.addEventListener('htmx:after:settle', function() {\n\t\t\t\tif (typeof hljs !== 'undefined') hljs.highlightAll();\n\t\t\t});\n\t\t})();\n\t</script><script>\n\t\t(function() {\n\t\t\tif (window._cpCopyLoaded) return;\n\t\t\twindow._cpCopyLoaded = true;\n\t\t\tfunction cpShowCopied(btn) {\n\t\t\t\tbtn._origTip = btn._origTip || btn.getAttribute('data-tip');\n\t\t\t\tbtn.setAttribute('data-tip', 'Copied!');\n\t\t\t\tsetTimeout(function() { btn.setAttribute('data-tip', btn._origTip || 'Copy'); }, 2000);\n\t\t\t}\n\t\t\twindow.copyCode = function(btn) {\n\t\t\t\tvar c = btn.parentElement;\n\t\t\t\tvar r = c.querySelector('input[type=\"radio\"]:checked');\n\t\t\t\tvar el;\n\t\t\t\tif (r) {\n\t\t\t\t\tel = r.nextElementSibling && r.nextElementSibling.querySelector('code');\n\t\t\t\t} else {\n\t\t\t\t\tel = c.querySelector('code');\n\t\t\t\t}\n\t\t\t\tif (!el) return;\n\t\t\t\tvar t = el.innerText;\n\t\t\t\tif (navigator.clipboard && navigator.clipboard.writeText) {\n\t\t\t\t\tnavigator.clipboard.writeText(t).then(function() { cpShowCopied(btn); }).catch(function() {});\n\t\t\t\t} else {\n\t\t\t\t\tvar ta = document.createElement('textarea');\n\t\t\t\t\tta.value = t;\n\t\t\t\t\tta.style.position = 'fixed';\n\t\t\t\t\tta.style.left = '-9999px';\n\t\t\t\t\tdocument.body.appendChild(ta);\n\t\t\t\t\tta.select();\n\t\t\t\t\ttry { document.execCommand('copy'); cpShowCopied(btn); } catch(e) {}\n\t\t\t\t\tdocument.body.removeChild(ta);\n\t\t\t\t}\n\t\t\t};\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<button type=\"button\" data-testid=\"code-preview-copy\" data-tip=\"Copy\" style=\"position:absolute;top:0.25rem;right:0.5rem;z-index:10;opacity:0.6;display:inline-flex;align-items:center;justify-content:center;width:1.5rem;height:1.5rem;border-radius:var(--radius-field);cursor:pointer;color:inherit;background:transparent;border:none;padding:0\" class=\"tooltip tooltip-left\" onclick=\"copyCode(this)\" onmouseover=\"this.style.opacity='1'\" onmouseout=\"this.style.opacity='0.6'\" aria-label=\"Copy to clipboard\"><svg fill=\"currentColor\" style=\"width:1rem;height:1rem\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"><path d=\"M 16 3 C 14.742188 3 13.847656 3.890625 13.40625 5 L 6 5 L 6 28 L 26 28 L 26 5 L 18.59375 5 C 18.152344 3.890625 17.257813 3 16 3 Z M 16 5 C 16.554688 5 17 5.445313 17 6 L 17 7 L 20 7 L 20 9 L 12 9 L 12 7 L 15 7 L 15 6 C 15 5.445313 15.445313 5 16 5 Z M 8 7 L 10 7 L 10 11 L 22 11 L 22 7 L 24 7 L 24 26 L 8 26 Z\"></path></svg></button></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var12 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<script>\n\t\t(function() {\n\t\t\tif (window._cpCopyLoaded) return;\n\t\t\twindow._cpCopyLoaded = true;\n\t\t\tfunction cpShowCopied(btn) {\n\t\t\t\tbtn._origTip = btn._origTip || btn.getAttribute('data-tip');\n\t\t\t\tbtn.setAttribute('data-tip', 'Copied!');\n\t\t\t\tsetTimeout(function() { btn.setAttribute('data-tip', btn._origTip || 'Copy'); }, 2000);\n\t\t\t}\n\t\t\twindow.copyCode = function(btn) {\n\t\t\t\tvar c = btn.parentElement;\n\t\t\t\tvar r = c.querySelector('input[type=\"radio\"]:checked');\n\t\t\t\tvar el;\n\t\t\t\tif (r) {\n\t\t\t\t\tel = r.nextElementSibling && r.nextElementSibling.querySelector('code');\n\t\t\t\t} else {\n\t\t\t\t\tel = c.querySelector('code');\n\t\t\t\t}\n\t\t\t\tif (!el) return;\n\t\t\t\tvar t = el.innerText;\n\t\t\t\tif (navigator.clipboard && navigator.clipboard.writeText) {\n\t\t\t\t\tnavigator.clipboard.writeText(t).then(function() { cpShowCopied(btn); }).catch(function() {});\n\t\t\t\t} else {\n\t\t\t\t\tvar ta = document.createElement('textarea');\n\t\t\t\t\tta.value = t;\n\t\t\t\t\tta.style.position = 'fixed';\n\t\t\t\t\tta.style.left = '-9999px';\n\t\t\t\t\tdocument.body.appendChild(ta);\n\t\t\t\t\tta.select();\n\t\t\t\t\ttry { document.execCommand('copy'); cpShowCopied(btn); } catch(e) {}\n\t\t\t\t\tdocument.body.removeChild(ta);\n\t\t\t\t}\n\t\t\t};\n\t\t})();\n\t\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = codePreviewCopyOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

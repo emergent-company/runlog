@@ -1,0 +1,24 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+templ Icon(props ...IconProps) {
+	{{ var p IconProps
+	if len(props) > 0 { p = props[0] } }}
+	if p.Label != "" {
+		<span
+			role="img"
+			aria-label={ p.Label }
+			class={ "iconify inline-block", iconNameToSpan(p.Name), iconSizeClass(p.Size), p.Class }
+			{ devmode.Attrs(ctx, "ui/Icon")... }
+			{ p.Attrs... }
+		></span>
+	} else {
+		<span
+			aria-hidden="true"
+			class={ "iconify inline-block", iconNameToSpan(p.Name), iconSizeClass(p.Size), p.Class }
+			{ devmode.Attrs(ctx, "ui/Icon")... }
+			{ p.Attrs... }
+		></span>
+	}
+}

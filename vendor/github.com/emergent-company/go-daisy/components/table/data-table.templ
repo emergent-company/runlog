@@ -8,6 +8,8 @@ import (
 	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
+var dataTableScriptOnce = templ.NewOnceHandle()
+
 // DataTableColumn defines a single column in a data table.
 type DataTableColumn struct {
 	ID         string // unique key for sorting/filtering
@@ -128,9 +130,9 @@ templ DataTable(props DataTableProps) {
 				<span x-text="'Showing ' + ((currentPage - 1) * pageSize + 1) + '–' + Math.min(currentPage * pageSize, filteredRows.length) + ' of ' + filteredRows.length"></span>
 			</div>
 			<div class="join">
-				<button class="join-item btn btn-sm" :disabled="currentPage === 1" @click="currentPage--; filterRows()">&laquo;</button>
+				<button class="join-item btn btn-sm" :disabled="currentPage === 1" @click="currentPage--; filterRows()" aria-label="Previous page">&laquo;</button>
 				<button class="join-item btn btn-sm" x-text="currentPage"></button>
-				<button class="join-item btn btn-sm" :disabled="currentPage >= totalPages" @click="currentPage++; filterRows()">&raquo;</button>
+				<button class="join-item btn btn-sm" :disabled="currentPage >= totalPages" @click="currentPage++; filterRows()" aria-label="Next page">&raquo;</button>
 			</div>
 		</div>
 	</div>
@@ -166,7 +168,8 @@ func pageSizeOptionsJSON(opts []int) string {
 }
 
 templ dataTableAlpineScript(id string) {
-	<script>
+	@dataTableScriptOnce.Once() {
+		<script>
 	if (!window._dataTableInit) {
 	  window._dataTableInit = true;
 
@@ -254,4 +257,5 @@ templ dataTableAlpineScript(id string) {
 	  }
 	}
 	</script>
+	}
 }

@@ -1,0 +1,11 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Aura wraps children in a DaisyUI 5 aura effect — a soft, animated border
+// glow that responds to cursor position.
+templ Aura() {
+	<div class="aura" { devmode.Attrs(ctx, "ui/Aura")... }>
+		{ children... }
+	</div>
+}

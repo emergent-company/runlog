@@ -78,7 +78,7 @@ func Rating(name string, value int, max int, shape RatingShape, color string, si
 			return templ_7745c5c3_Err
 		}
 		for i := 1; i <= max; i++ {
-			var templ_7745c5c3_Var4 = []any{"mask", string(shape), color}
+			var templ_7745c5c3_Var4 = []any{"mask", templ.KV(string(shape), shape != ""), templ.KV(color, color != "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

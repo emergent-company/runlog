@@ -8,12 +8,14 @@ import (
 	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
+var spinnerScriptOnce = templ.NewOnceHandle()
+
 // InputSpinner renders a numeric increment/decrement input with +/− buttons.
 // It includes a small inline <script> to handle button clicks — no library needed.
 // id must be unique on the page.
 templ InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnClass string, inputClass string) {
 	<div class="flex items-center gap-3" { devmode.Attrs(ctx, "form/InputSpinner")... }>
-		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerDecrement", id)}) {
+		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerDecrement", id), Attrs: templ.Attributes{"aria-label": "Decrement"}}) {
 			@ui.IconSpan("lucide--minus", "size-4")
 		}
 		<input
@@ -26,7 +28,7 @@ templ InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCl
 			}
 			class={ "input input-bordered text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none", inputClass }
 		/>
-		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerIncrement", id)}) {
+		@ui.Button(ui.ButtonProps{Type: ui.ButtonTypeButton, Shape: ui.ButtonShapeSquare, ExtraClass: btnClass, OnClick: templ.JSFuncCall("spinnerIncrement", id), Attrs: templ.Attributes{"aria-label": "Increment"}}) {
 			@ui.IconSpan("lucide--plus", "size-4")
 		}
 	</div>
@@ -35,7 +37,8 @@ templ InputSpinner(id string, value int, min int, max int, hasMinMax bool, btnCl
 
 // spinnerScript emits the shared spinner JS once per page (deduplicated by templ).
 templ spinnerScript() {
-	<script>
+	@spinnerScriptOnce.Once() {
+		<script>
 	if (!window._spinnerInit) {
 	  window._spinnerInit = true;
 	  window.spinnerGet = function(id) { return document.getElementById(id); };
@@ -53,4 +56,5 @@ templ spinnerScript() {
 	  };
 	}
 	</script>
+	}
 }

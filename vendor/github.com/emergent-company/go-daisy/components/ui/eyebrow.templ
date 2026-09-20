@@ -1,0 +1,20 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// EyebrowProps configures an Eyebrow.
+type EyebrowProps struct {
+	// Size is the text size class, e.g. "text-xs". Default "" (inherits).
+	Size string
+	// Margin is the margin class, e.g. "mb-2". Default "" (no margin).
+	Margin string
+}
+
+// Eyebrow renders an uppercase kicker label above a section heading or value.
+//
+//	@ui.Eyebrow("Deployments", ui.EyebrowProps{Size: "text-xs", Margin: "mb-2"})
+templ Eyebrow(text string, props ...EyebrowProps) {
+	{{ var p EyebrowProps
+	if len(props) > 0 { p = props[0] } }}
+	<p class={ "text-base-content/45 font-semibold tracking-[0.16em] uppercase", templ.KV(p.Size, p.Size != ""), templ.KV(p.Margin, p.Margin != "") } { devmode.Attrs(ctx, "ui/Eyebrow")... }>{ text }</p>
+}

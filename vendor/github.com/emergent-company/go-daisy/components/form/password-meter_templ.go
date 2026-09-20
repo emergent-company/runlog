@@ -11,9 +11,10 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"strconv"
 
-	ui "github.com/emergent-company/go-daisy/components/ui"
 	"github.com/emergent-company/go-daisy/devmode"
 )
+
+var passwordMeterOnce = templ.NewOnceHandle()
 
 // PasswordMeterProps configures a password input with strength meter.
 type PasswordMeterProps struct {
@@ -78,7 +79,7 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 			}
 			var templ_7745c5c3_Var3 = []any{"input input-bordered join-item flex-1",
 				templ.KV("input-error", props.Error != ""),
-				props.Class}
+				templ.KV(props.Class, props.Class != "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -90,7 +91,7 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 30, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 31, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -103,7 +104,7 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 31, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 32, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -116,7 +117,7 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 33, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 34, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -129,7 +130,7 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Placeholder)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 34, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 35, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -159,7 +160,7 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(props.MinLength))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 38, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 39, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -196,65 +197,61 @@ func PasswordMeter(props PasswordMeterProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if props.ShowToggle {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<button type=\"button\" class=\"btn btn-outline join-item btn-square\" onclick=\"togglePasswordVisibility(this)\" aria-label=\"Toggle password visibility\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = ui.IconSpan("lucide--eye", "size-4").Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</button>")
+				templ_7745c5c3_Err = passwordToggleButton().Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div><div id=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name + "-meter")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 57, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 51, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"flex items-center gap-2 mt-2\"><progress id=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" class=\"flex items-center gap-2 mt-2\"><progress id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name + "-progress")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 59, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 53, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" class=\"progress progress-ghost flex-1 h-2\" value=\"0\" max=\"4\"></progress> <span id=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" class=\"progress progress-ghost flex-1 h-2\" value=\"0\" max=\"4\"></progress> <span id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name + "-label")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 64, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-meter.templ`, Line: 58, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" class=\"text-xs text-base-content/50 w-16 text-right\">Weak</span></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"text-xs text-base-content/50 w-16 text-right\">Weak</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
 		templ_7745c5c3_Err = Field(props.Label, props.Name, props.Error).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = passwordToggleScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -287,7 +284,25 @@ func passwordMeterScript() templ.Component {
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<script>\n\tif (!window._pwMeterInit) {\n\t  window._pwMeterInit = true;\n\n\t  window.togglePasswordVisibility = function(btn) {\n\t    var input = btn.closest('.join').querySelector('input');\n\t    if (!input) return;\n\t    if (input.type === 'password') {\n\t      input.type = 'text';\n\t      btn.querySelector('.iconify').classList.remove('lucide--eye');\n\t      btn.querySelector('.iconify').classList.add('lucide--eye-off');\n\t    } else {\n\t      input.type = 'password';\n\t      btn.querySelector('.iconify').classList.remove('lucide--eye-off');\n\t      btn.querySelector('.iconify').classList.add('lucide--eye');\n\t    }\n\t  };\n\n\t  window.updatePasswordMeter = function(input) {\n\t    var val = input.value;\n\t    var score = 0;\n\t    if (val.length >= 8) score++;\n\t    if (val.length >= 12) score++;\n\t    if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;\n\t    if (/\\d/.test(val) && /[^A-Za-z0-9]/.test(val)) score++;\n\n\t    var meter = document.getElementById(input.name + '-progress');\n\t    var label = document.getElementById(input.name + '-label');\n\t    if (!meter || !label) return;\n\n\t    meter.value = score;\n\t    var colors = ['progress-ghost', 'progress-error', 'progress-warning', 'progress-info', 'progress-success'];\n\t    for (var i = 0; i < colors.length; i++) meter.classList.toggle(colors[i], i === score);\n\t    var labels = ['Weak', 'Fair', 'Good', 'Strong', 'Very strong'];\n\t    label.textContent = labels[score] || 'Weak';\n\t  };\n\t}\n\t</script>")
+		templ_7745c5c3_Var14 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<script>\n\tif (!window._pwMeterInit) {\n\t  window._pwMeterInit = true;\n\n\t  window.updatePasswordMeter = function(input) {\n\t    var val = input.value;\n\t    var score = 0;\n\t    if (val.length >= 8) score++;\n\t    if (val.length >= 12) score++;\n\t    if (/[A-Z]/.test(val) && /[a-z]/.test(val)) score++;\n\t    if (/\\d/.test(val) && /[^A-Za-z0-9]/.test(val)) score++;\n\n\t    var meter = document.getElementById(input.name + '-progress');\n\t    var label = document.getElementById(input.name + '-label');\n\t    if (!meter || !label) return;\n\n\t    meter.value = score;\n\t    var colors = ['progress-ghost', 'progress-error', 'progress-warning', 'progress-info', 'progress-success'];\n\t    for (var i = 0; i < colors.length; i++) meter.classList.toggle(colors[i], i === score);\n\t    var labels = ['Weak', 'Fair', 'Good', 'Strong', 'Very strong'];\n\t    label.textContent = labels[score] || 'Weak';\n\t  };\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = passwordMeterOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var14), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

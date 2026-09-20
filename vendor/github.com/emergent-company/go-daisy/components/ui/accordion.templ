@@ -4,12 +4,19 @@ import "github.com/emergent-company/go-daisy/devmode"
 
 // AccordionItem renders a single collapse/accordion item (checkbox-based).
 templ AccordionItem(title string, open bool) {
+	{{
+		id := "accordion-" + title
+		if title == "" {
+			id = "accordion-section"
+		}
+		contentID := id + "-content"
+	}}
 	<div class="collapse collapse-arrow border border-base-200 bg-base-100" { devmode.Attrs(ctx, "ui/AccordionItem")... }>
-		<input type="checkbox" checked?={ open } />
+		<input type="checkbox" id={ id } checked?={ open } aria-expanded={ ternary(open, "true", "false") } aria-controls={ contentID } />
 		<div class="collapse-title text-xl font-medium">
-			{ title }
+			<label for={ id }>{ title }</label>
 		</div>
-		<div class="collapse-content">
+		<div id={ contentID } role="region" class="collapse-content">
 			{ children... }
 		</div>
 	</div>

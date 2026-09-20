@@ -1,0 +1,83 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+var codeBlockScriptOnce = templ.NewOnceHandle()
+
+// CodeBlockProps configures a code block with syntax highlighting.
+
+type CodeBlockProps struct {
+	Language  string
+	Code      string
+	Label     string
+	MaxHeight string
+	Highlight string // pre-rendered HTML from Chroma or similar; raw @templ.Raw() passthrough
+	ID        string
+	Class     string
+	Attrs     templ.Attributes
+}
+
+// CodeBlock renders a code block with optional syntax highlighting, copy
+// button, language label, and scrollable max-height.
+//
+// Without Highlight: renders plain <pre><code>.
+//
+// With Highlight: pass pre-rendered HTML from Chroma or similar via
+// Highlight field. Use ui.Highlight(src, lang) to generate
+// server-side highlighted HTML with inline styles.
+templ CodeBlock(props CodeBlockProps) {
+	{{ label := props.Label
+		if label == "" { label = props.Language }
+		if label == "" { label = "Code" } }}
+	<div
+		class={ "code-block-root relative border border-base-200 rounded-box overflow-hidden", templ.KV(props.Class, props.Class != "") }
+		{ devmode.Attrs(ctx, "ui/CodeBlock")... }
+		{ props.Attrs... }
+	>
+		<div class="flex items-center justify-between px-4 py-2 bg-base-200/50 border-b border-base-200">
+			<span class="text-xs font-mono text-base-content/60 select-none">{ label }</span>
+			<button
+				type="button"
+				onclick="copyBlockCode(this)"
+				class="btn btn-xs btn-ghost btn-square tooltip tooltip-left"
+				data-tip="Copy"
+				aria-label="Copy code"
+			>
+				@IconSpan("lucide--clipboard", "size-3.5")
+			</button>
+		</div>
+		<div
+			class="overflow-x-auto"
+			if props.MaxHeight != "" {
+				style={ "max-height:" + props.MaxHeight + ";overflow-y:auto" }
+			}
+		>
+			if props.Highlight != "" {
+				<div style="background:#0d1117;padding:16px">@templ.Raw(props.Highlight)</div>
+			} else {
+				<pre class="text-sm p-4 m-0 bg-base-300/30"><code
+					if props.ID != "" { id={ props.ID } }
+					if props.Language != "" { class={ "language-" + props.Language } }
+				>{ props.Code }</code></pre>
+			}
+		</div>
+	</div>
+	@codeBlockScriptOnce.Once() {
+		<script>
+	if (!window._copyBlockCode) {
+	  window._copyBlockCode = true;
+	  window.copyBlockCode = function(el) {
+	    var pre = el.closest('.code-block-root');
+	    var code = pre ? pre.querySelector('pre') || pre.querySelector('code') : null;
+	    var text = code ? code.textContent : '';
+	    if (navigator.clipboard && navigator.clipboard.writeText) {
+	      navigator.clipboard.writeText(text).then(function() {
+	        el.dataset.tip = 'Copied!';
+	        setTimeout(function() { el.dataset.tip = 'Copy'; }, 1500);
+	      }).catch(function() {});
+	    }
+	  };
+	}
+		</script>
+	}
+}

@@ -6,6 +6,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var sortableScriptOnce = templ.NewOnceHandle()
+
 // SortableOptions configures a SortableJS drag-and-drop list.
 type SortableOptions struct {
 	Animation int               // drag animation duration in ms
@@ -38,6 +40,7 @@ templ SortableItem(extraClass string, attrs templ.Attributes) {
 	<div
 		class={ "rounded-box border border-base-content/10 bg-base-100 px-4 py-3 flex items-center gap-3 cursor-grab active:cursor-grabbing",
 			extraClass }
+		{ devmode.Attrs(ctx, "ui/SortableItem")... }
 		{ attrs... }
 	>
 		{ children... }
@@ -50,7 +53,8 @@ templ SortableHandle() {
 }
 
 templ sortableScript() {
-	<script>
+	@sortableScriptOnce.Once() {
+		<script>
 	if (!window._sortableInit) {
 	  window._sortableInit = true;
 
@@ -87,4 +91,5 @@ templ sortableScript() {
 	  });
 	}
 	</script>
+	}
 }

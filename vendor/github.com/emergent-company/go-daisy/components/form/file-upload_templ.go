@@ -250,36 +250,15 @@ func FileUpload(props FileUploadProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = filepondScript().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func filepondScript() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var13 == nil {
-			templ_7745c5c3_Var13 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<script>\n\tif (!window._filepondInit) {\n\t  window._filepondInit = true;\n\n\t  window.initFilePond = function(el) {\n\t    if (typeof FilePond === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/filepond@4.32.6/dist/filepond.min.js';\n\t      s.onload = function() { initFilePondElement(el); };\n\t      document.head.appendChild(s);\n\t      var l = document.createElement('link');\n\t      l.rel = 'stylesheet';\n\t      l.href = 'https://cdn.jsdelivr.net/npm/filepond@4.32.6/dist/filepond.min.css';\n\t      document.head.appendChild(l);\n\t    } else {\n\t      initFilePondElement(el);\n\t    }\n\t  };\n\n\t  function initFilePondElement(el) {\n\t    if (el._pond) return;\n\t    try {\n\t      var maxFiles = parseInt(el.dataset.maxFiles) || null;\n\t      el._pond = FilePond.create(el, {\n\t        allowMultiple: el.hasAttribute('multiple'),\n\t        maxFiles: maxFiles,\n\t        maxFileSize: el.dataset.maxFileSize || null,\n\t        labelIdle: el.dataset.style === 'avatar'\n\t          ? 'Drag & drop your photo or <span class=\"filepond--label-action\">Browse</span>'\n\t          : 'Drag & drop files or <span class=\"filepond--label-action\">Browse</span>',\n\t        store: null,\n\t      });\n\t    } catch(e) { console.warn('FilePond init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-filepond]').forEach(initFilePondElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-filepond]:not(._fp-initialized)').forEach(function(el) {\n\t      el.classList.add('_fp-initialized');\n\t      initFilePondElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Err = LazyLoadScript(LazyLoadConfig{
+			GuardName:  "_filepond",
+			LibVarName: "FilePond",
+			ScriptURL:  "https://cdn.jsdelivr.net/npm/filepond@4.32.6/dist/filepond.min.js",
+			StyleURL:   "'https://cdn.jsdelivr.net/npm/filepond@4.32.6/dist/filepond.min.css'",
+			Selector:   "[data-filepond]",
+			InitFunc:   "FilePond.create(el, {allowMultiple: el.hasAttribute('multiple'), maxFiles: parseInt(el.dataset.maxFiles) || null, maxFileSize: el.dataset.maxFileSize || null, labelIdle: el.dataset.style === 'avatar' ? 'Drag & drop your photo or <span class=\"filepond--label-action\">Browse</span>' : 'Drag & drop files or <span class=\"filepond--label-action\">Browse</span>', store: null})",
+			FnSuffix:   "FilePond",
+		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

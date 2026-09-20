@@ -1,0 +1,105 @@
+package form
+
+import (
+	alpine "github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// TagListProps configures an Alpine-managed tags-input combobox: inline chips
+// with add/remove plus a suggestion dropdown (filtered as you type, keyboard
+// navigable). Submits as name[0], name[1], ... hidden inputs. Suggestions
+// feeds the dropdown listbox; without it the input stays a plain free-form
+// chip input.
+type TagListProps struct {
+	ID             string
+	Name           string
+	Values         []string
+	Suggestions    []string
+	Placeholder    string
+	AddActionLabel string
+	Disabled       bool
+	Class          string
+	Attrs          templ.Attributes
+}
+
+templ TagList(props TagListProps) {
+	{{
+		placeholder := props.Placeholder
+		if placeholder == "" {
+			placeholder = "Add a tag..."
+		}
+		addLabel := props.AddActionLabel
+		if addLabel == "" {
+			addLabel = "Add"
+		}
+	}}
+	<div
+		x-data={ alpine.TagListData(props.Values, props.Suggestions) }
+		class={ templ.KV(props.Class, props.Class != "") }
+		@click.outside="open = false"
+		{ devmode.Attrs(ctx, "form/TagList")... }
+		{ props.Attrs... }
+	>
+		if !props.Disabled {
+			<div class="relative">
+				<div class="flex flex-wrap items-center gap-1.5 border border-base-300 rounded-box bg-base-100 px-2 py-1.5 focus-within:border-primary">
+					<template x-for="(tag, idx) in tags" :key="idx">
+						<span class="badge badge-sm gap-1 pr-0.5" :style="tagColor(tag)">
+							<span x-text="tag"></span>
+							<button
+								type="button"
+								class="btn btn-xs btn-ghost btn-square p-0 w-4 h-4 min-h-0"
+								@click="removeTag(idx)"
+								aria-label="Remove tag"
+							>&times;</button>
+							<input type="hidden" :name={ "`" + props.Name + "[${idx}]`" } x-model="tag"/>
+						</span>
+					</template>
+					<input
+						type="text"
+						id={ props.ID }
+						class="input input-ghost input-sm flex-1 min-w-24 focus:outline-none"
+						x-model="input"
+						placeholder={ placeholder }
+						@focus="open = true"
+						@input="open = true; activeIndex = -1"
+						@keydown="handleKeydown($event)"
+					/>
+					<button
+						type="button"
+						class="btn btn-sm btn-outline"
+						@click="addTag()"
+					>{ addLabel }</button>
+				</div>
+				if len(props.Suggestions) > 0 {
+					<div
+						class="absolute z-50 mt-1 w-full bg-base-100 border border-base-300 rounded-box shadow-lg max-h-60 overflow-auto p-1"
+						role="listbox"
+						x-show="open && filteredSuggestions.length > 0"
+						style="display:none"
+					>
+						<template x-for="(s, i) in filteredSuggestions" :key="s">
+							<div
+								role="option"
+								class="px-3 py-2 text-sm cursor-pointer hover:bg-base-200"
+								:class={ "{ 'bg-base-200': activeIndex === i }" }
+								@click="selectSuggestion(s)"
+								@mouseenter="activeIndex = i"
+								x-text="s"
+							></div>
+						</template>
+					</div>
+				}
+			</div>
+		} else {
+			<div class="flex flex-wrap gap-1.5">
+				<template x-for="(tag, idx) in tags" :key="idx">
+					<span class="badge badge-sm gap-1 pr-0.5" :style="tagColor(tag)">
+						<span x-text="tag"></span>
+						<input type="hidden" :name={ "`" + props.Name + "[${idx}]`" } x-model="tag"/>
+					</span>
+				</template>
+			</div>
+		}
+	</div>
+}

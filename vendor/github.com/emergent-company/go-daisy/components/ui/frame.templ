@@ -1,0 +1,48 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// Frame wraps content in a scoped navigation context — all links and forms
+// inside target this frame instead of the full page. Equivalent to Turbo Frame.
+// Use with HTMX: the server responds with HTML containing a matching #id element,
+// and HTMX swaps it into place.
+//
+// Src: optional URL to lazy-load the frame content.
+// Loading: "eager" (load immediately) or "lazy" (load when visible).
+templ Frame(id string, src string, loading string) {
+	{{
+		trigger := ""
+		if src != "" {
+			if loading == "lazy" {
+				trigger = "intersect once threshold:0.1"
+			} else {
+				trigger = "load"
+			}
+		}
+	}}
+	<div
+		id={ id }
+		if src != "" {
+			hx-get={ src }
+		}
+		if trigger != "" {
+			hx-trigger={ trigger }
+		}
+		hx-target={ "#" + id }
+		hx-select={ "#" + id }
+		hx-swap="outerHTML"
+		{ devmode.Attrs(ctx, "ui/Frame")... }
+	>
+		{ children... }
+	</div>
+}
+
+// FrameIndicator renders a loading indicator inside a Frame during fetch.
+// Place inside a Frame as the initial/placeholder content.
+templ FrameIndicator() {
+	<div class="htmx-indicator flex items-center justify-center py-6" { devmode.Attrs(ctx, "ui/FrameIndicator")... }>
+		<span class="loading loading-spinner loading-md text-primary"></span>
+	</div>
+}

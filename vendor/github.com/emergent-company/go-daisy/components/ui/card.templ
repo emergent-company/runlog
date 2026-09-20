@@ -26,9 +26,13 @@ templ CardRaw(cardClass string, bodyClass string, attrs templ.Attributes, as ...
 
 // Card renders a DaisyUI card with optional title.
 // attrs is optional; pass nil when not needed.
-templ Card(title string, attrs templ.Attributes) {
+// compact is an optional variadic param — when true, uses tighter padding (p-3 gap-2).
+// Backward-compatible: callers omitting compact default to false.
+templ Card(title string, attrs templ.Attributes, compact ...bool) {
+	{{ isCompact := false
+	if len(compact) > 0 { isCompact = compact[0] } }}
 	<div class="card bg-base-100 border border-base-200 shadow-sm" { devmode.Attrs(ctx, "ui/Card")... } { attrs... }>
-		<div class="card-body p-4">
+		<div class={ "card-body", templ.KV("p-4", !isCompact), templ.KV("p-3 gap-2", isCompact) }>
 			if title != "" {
 				<h2 class="card-title text-base font-semibold text-base-content mb-3">{ title }</h2>
 			}
@@ -48,13 +52,12 @@ templ CardPlaceholder(label string) {
 }
 
 // CardCompact renders a compact DaisyUI card with tighter padding.
+// Deprecated: use Card("", nil, true) instead.
 // attrs is optional; pass nil when not needed.
 templ CardCompact(attrs templ.Attributes) {
-	<div class="card bg-base-100 border border-base-200 shadow-sm" { devmode.Attrs(ctx, "ui/CardCompact")... } { attrs... }>
-		<div class="card-body p-3 gap-2">
-			{ children... }
-		</div>
-	</div>
+	@Card("", attrs, true) {
+		{ children... }
+	}
 }
 
 // StatTrend indicates whether a metric is trending up, down, or neutral.
@@ -97,6 +100,9 @@ type StatCardMinimalItem struct {
 	// Trend direction and percentage label (e.g. "12.3%").
 	Trend      StatTrend
 	TrendLabel string
+	// ComparisonLabel is optional text shown after the trend badge (e.g. "vs. $494.16 last period").
+	// When empty, defaults to "vs last month".
+	ComparisonLabel string
 	// Icon is a Lucide icon suffix, e.g. "lucide--briefcase".
 	// When set, StatCardMinimal renders as StatCardIconCorner style with a
 	// floating icon badge and a soft trend pill; otherwise as the minimal layout.
@@ -119,7 +125,11 @@ templ StatCardMinimal(item StatCardMinimalItem) {
 			if item.TrendLabel != "" {
 				<div class="mt-5 flex items-center gap-2">
 					@BadgeWithBoundary(statTrendIntent(item.Trend), BadgeStyleSoft, BadgeSizeSM, false, statTrendIcon(item.Trend), item.TrendLabel)
-					<p class="text-base-content/60 text-sm">vs last month</p>
+					if item.ComparisonLabel != "" {
+						<p class="text-base-content/60 text-sm">{ item.ComparisonLabel }</p>
+					} else {
+						<p class="text-base-content/60 text-sm">vs last month</p>
+					}
 				</div>
 			}
 		</div>

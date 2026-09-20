@@ -1,0 +1,19 @@
+package ui
+
+// HoverCardProps configures a popover card shown on hover.
+type HoverCardProps struct {
+	Side  string // "top", "bottom", "left", "right"
+	Class string
+	Attrs templ.Attributes
+}
+
+templ HoverCard(props ...HoverCardProps) {
+	{{ var p HoverCardProps
+	if len(props) > 0 { p = props[0] }
+	if p.Side == "" { p.Side = "bottom" } }}
+	@Popover(PopoverRootProps{Attrs: p.Attrs})
+		@PopoverTrigger(PopoverTriggerProps{TriggerType: PopoverTriggerHover, Class: p.Class})
+			{ children... }
+		@PopoverContent(PopoverContentProps{Placement: PopoverPlacement(p.Side), ShowArrow: false, Class: "p-4 w-72"})
+			@CardCompact(nil)
+}

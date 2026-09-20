@@ -18,7 +18,7 @@ templ ChatBubble(sent bool, author string, timestamp string, avatarSrc string, b
 	>
 		if botIcon {
 			<div class="chat-image bg-primary/5 text-primary border-primary/10 flex items-center justify-center rounded-full border p-2">
-				<span class="iconify lucide--bot size-6" aria-hidden="true"></span>
+				@IconSpan("lucide--bot", "size-6")
 			</div>
 		} else if avatarSrc != "" {
 			<div class="chat-image avatar">
@@ -37,10 +37,10 @@ templ ChatBubble(sent bool, author string, timestamp string, avatarSrc string, b
 					@Button(ButtonProps{Type: ButtonTypeButton, Size: ButtonXS}) { Regenerate }
 					@Button(ButtonProps{Type: ButtonTypeButton, Size: ButtonXS}) { Copy }
 					@Button(ButtonProps{Type: ButtonTypeButton, Variant: ButtonError, Size: ButtonXS, Shape: ButtonShapeCircle, ExtraClass: "btn-ghost", Attrs: templ.Attributes{"aria-label": "Dislike"}}) {
-						<span class="iconify lucide--thumbs-down size-3.5" aria-hidden="true"></span>
+						@IconSpan("lucide--thumbs-down", "size-3.5")
 					}
 					@Button(ButtonProps{Type: ButtonTypeButton, Variant: ButtonSuccess, Size: ButtonXS, Shape: ButtonShapeCircle, ExtraClass: "btn-ghost", Attrs: templ.Attributes{"aria-label": "Like"}}) {
-						<span class="iconify lucide--thumbs-up size-3.5" aria-hidden="true"></span>
+						@IconSpan("lucide--thumbs-up", "size-3.5")
 					}
 				</div>
 			}
@@ -90,7 +90,7 @@ templ ChatInput(showAttach bool, placeholder string, attrs templ.Attributes) {
 	>
 		if showAttach {
 			@Button(ButtonProps{Type: ButtonTypeButton, Variant: ButtonGhost, Size: ButtonSM, Shape: ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Attach file"}}) {
-				<span class="iconify lucide--paperclip size-4.5" aria-hidden="true"></span>
+				@IconSpan("lucide--paperclip", "size-4.5")
 			}
 		}
 		<input
@@ -102,7 +102,7 @@ templ ChatInput(showAttach bool, placeholder string, attrs templ.Attributes) {
 			name="message"
 		/>
 		@Button(ButtonProps{Type: ButtonTypeSubmit, Variant: ButtonPrimary, Size: ButtonSM, Shape: ButtonShapeCircle, Attrs: templ.Attributes{"aria-label": "Send message"}}) {
-			<span class="iconify lucide--send-horizontal size-4.5" aria-hidden="true"></span>
+			@IconSpan("lucide--send-horizontal", "size-4.5")
 		}
 	</form>
 }

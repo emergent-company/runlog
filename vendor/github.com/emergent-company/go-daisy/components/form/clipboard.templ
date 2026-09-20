@@ -6,6 +6,8 @@ import (
 	ui "github.com/emergent-company/go-daisy/components/ui"
 )
 
+var clipboardScriptOnce = templ.NewOnceHandle()
+
 // ClipboardCopyItem holds one copy-able field for the ClipboardCopy component.
 type ClipboardCopyItem struct {
 	// ID must be unique on the page.
@@ -66,7 +68,8 @@ func clipboardOnClick(id string, value string, mono bool) templ.ComponentScript 
 }
 
 templ clipboardScript() {
-	<script>
+	@clipboardScriptOnce.Once() {
+		<script>
 	if (!window._clipboardInit) {
 	  window._clipboardInit = true;
 	  window.clipboardCopyInput = function(inputId) {
@@ -90,4 +93,5 @@ templ clipboardScript() {
 	  };
 	}
 	</script>
+	}
 }

@@ -1,6 +1,7 @@
 package form
 
 // SelectInput renders a DaisyUI select dropdown with label.
+// Deprecated: use FormSelect(name, label, selected, options, "", "", "", "", nil) instead.
 // options: [][2]string where [0]=value, [1]=label
 templ SelectInput(name string, label string, selected string, options [][2]string, errMsg string, required bool) {
 	@Field(label, name, errMsg) {

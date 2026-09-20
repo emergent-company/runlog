@@ -110,7 +110,7 @@ func DatePicker(props DatePickerProps) templ.Component {
 		}
 		var templ_7745c5c3_Var4 = []any{"input input-bordered w-full",
 			templ.KV("input-error", props.Error != ""),
-			props.Class}
+			templ.KV(props.Class, props.Class != "")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -290,36 +290,15 @@ func DatePicker(props DatePickerProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = flatpickrScript().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func flatpickrScript() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var16 == nil {
-			templ_7745c5c3_Var16 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<script>\n\tif (!window._flatpickrInit) {\n\t  window._flatpickrInit = true;\n\n\t  window.initFlatpickr = function(el) {\n\t    if (typeof flatpickr === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';\n\t      s.onload = function() { initFlatpickrElement(el); };\n\t      document.head.appendChild(s);\n\t      var l = document.createElement('link');\n\t      l.rel = 'stylesheet';\n\t      l.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';\n\t      document.head.appendChild(l);\n\t    } else {\n\t      initFlatpickrElement(el);\n\t    }\n\t  };\n\n\t  function initFlatpickrElement(el) {\n\t    if (el._fp) return;\n\t    try {\n\t      var config = {\n\t        allowInput: true,\n\t        dateFormat: el.dataset.mode === 'time' ? 'H:i' : 'Y-m-d',\n\t        enableTime: el.dataset.mode === 'time' || el.dataset.mode === 'datetime',\n\t        noCalendar: el.dataset.mode === 'time',\n\t        mode: el.dataset.mode || 'single',\n\t        minDate: el.dataset.minDate || null,\n\t        maxDate: el.dataset.maxDate || null,\n\t        inline: el.dataset.inline === 'true',\n\t        time_24hr: el.dataset.time24h === 'true',\n\t      };\n\t      el._fp = flatpickr(el, config);\n\t    } catch(e) { console.warn('Flatpickr init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-flatpickr]').forEach(initFlatpickrElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-flatpickr]:not(._fp-initialized)').forEach(function(el) {\n\t      el.classList.add('_fp-initialized');\n\t      initFlatpickrElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Err = LazyLoadScript(LazyLoadConfig{
+			GuardName:  "_flatpickr",
+			LibVarName: "flatpickr",
+			ScriptURL:  "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js",
+			StyleURL:   "'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css'",
+			Selector:   "[data-flatpickr]",
+			InitFunc:   "flatpickr(el, {allowInput: true, dateFormat: el.dataset.mode === 'time' ? 'H:i' : 'Y-m-d', enableTime: el.dataset.mode === 'time' || el.dataset.mode === 'datetime', noCalendar: el.dataset.mode === 'time', mode: el.dataset.mode || 'single', minDate: el.dataset.minDate || null, maxDate: el.dataset.maxDate || null, inline: el.dataset.inline === 'true', time_24hr: el.dataset.time24h === 'true'})",
+			FnSuffix:   "Flatpickr",
+		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

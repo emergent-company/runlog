@@ -16,6 +16,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var dataTableScriptOnce = templ.NewOnceHandle()
+
 // DataTableColumn defines a single column in a data table.
 type DataTableColumn struct {
 	ID         string // unique key for sorting/filtering
@@ -73,7 +75,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 42, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 44, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -86,7 +88,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(columnJSON(props.Columns))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 45, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 47, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -99,7 +101,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(rowsJSON(props.Rows))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 46, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 48, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -112,7 +114,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(dataTablePageSize(props.PageSize)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 47, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 49, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -125,7 +127,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(pageSizeOptionsJSON(props.PageSizeOptions))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 48, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 50, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -138,7 +140,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Searchable, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 49, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 51, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -151,7 +153,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Sortable, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 50, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 52, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -164,7 +166,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Striped, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 51, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 53, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -177,7 +179,7 @@ func DataTable(props DataTableProps) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Bordered, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 52, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/table/data-table.templ`, Line: 54, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -237,7 +239,7 @@ func DataTable(props DataTableProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\"><thead><tr><template x-for=\"col in visibleColumns\" :key=\"col.id\"><th x-text=\"col.label\" :class=\"'text-xs uppercase tracking-wider text-base-content/50' + (sortable ? ' cursor-pointer hover:text-base-content' : '') + ' ' + (col.width || '')\" x-on:click=\"if (sortable) sortBy(col.id)\"></th></template></tr></thead> <tbody><template x-if=\"paginatedRows.length === 0\"><tr><td :colspan=\"visibleColumns.length\" class=\"text-center py-8 text-base-content/50\">No results found.</td></tr></template><template x-for=\"(row, ri) in paginatedRows\" :key=\"ri\"><tr><template x-for=\"col in visibleColumns\" :key=\"col.id\"><td x-text=\"row[col.id] || ''\" class=\"text-sm\"></td></template></tr></template></tbody></table></div><div class=\"flex items-center justify-between p-4 border-t border-base-200\"><div class=\"flex items-center gap-2 text-sm text-base-content/60\"><span>Rows per page:</span> <select class=\"select select-xs w-20\" x-model=\"pageSize\" @change=\"currentPage = 1; filterRows()\"><template x-for=\"opt in pageSizeOptions\" :key=\"opt\"><option :value=\"opt\" x-text=\"opt\"></option></template></select> <span x-text=\"'Showing ' + ((currentPage - 1) * pageSize + 1) + '–' + Math.min(currentPage * pageSize, filteredRows.length) + ' of ' + filteredRows.length\"></span></div><div class=\"join\"><button class=\"join-item btn btn-sm\" :disabled=\"currentPage === 1\" @click=\"currentPage--; filterRows()\">&laquo;</button> <button class=\"join-item btn btn-sm\" x-text=\"currentPage\"></button> <button class=\"join-item btn btn-sm\" :disabled=\"currentPage >= totalPages\" @click=\"currentPage++; filterRows()\">&raquo;</button></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\"><thead><tr><template x-for=\"col in visibleColumns\" :key=\"col.id\"><th x-text=\"col.label\" :class=\"'text-xs uppercase tracking-wider text-base-content/50' + (sortable ? ' cursor-pointer hover:text-base-content' : '') + ' ' + (col.width || '')\" x-on:click=\"if (sortable) sortBy(col.id)\"></th></template></tr></thead> <tbody><template x-if=\"paginatedRows.length === 0\"><tr><td :colspan=\"visibleColumns.length\" class=\"text-center py-8 text-base-content/50\">No results found.</td></tr></template><template x-for=\"(row, ri) in paginatedRows\" :key=\"ri\"><tr><template x-for=\"col in visibleColumns\" :key=\"col.id\"><td x-text=\"row[col.id] || ''\" class=\"text-sm\"></td></template></tr></template></tbody></table></div><div class=\"flex items-center justify-between p-4 border-t border-base-200\"><div class=\"flex items-center gap-2 text-sm text-base-content/60\"><span>Rows per page:</span> <select class=\"select select-xs w-20\" x-model=\"pageSize\" @change=\"currentPage = 1; filterRows()\"><template x-for=\"opt in pageSizeOptions\" :key=\"opt\"><option :value=\"opt\" x-text=\"opt\"></option></template></select> <span x-text=\"'Showing ' + ((currentPage - 1) * pageSize + 1) + '–' + Math.min(currentPage * pageSize, filteredRows.length) + ' of ' + filteredRows.length\"></span></div><div class=\"join\"><button class=\"join-item btn btn-sm\" :disabled=\"currentPage === 1\" @click=\"currentPage--; filterRows()\" aria-label=\"Previous page\">&laquo;</button> <button class=\"join-item btn btn-sm\" x-text=\"currentPage\"></button> <button class=\"join-item btn btn-sm\" :disabled=\"currentPage >= totalPages\" @click=\"currentPage++; filterRows()\" aria-label=\"Next page\">&raquo;</button></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -298,7 +300,25 @@ func dataTableAlpineScript(id string) templ.Component {
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<script>\n\tif (!window._dataTableInit) {\n\t  window._dataTableInit = true;\n\n\t  window.dataTable = function() {\n\t    return {\n\t      search: '',\n\t      currentPage: 1,\n\t      pageSize: 10,\n\t      pageSizeOptions: [],\n\t      sortKey: null,\n\t      sortDir: 'asc',\n\t      columns: [],\n\t      allRows: [],\n\t      filteredRows: [],\n\t      paginatedRows: [],\n\t      sortable: false,\n\n\t      get visibleColumns() {\n\t        return this.columns.filter(function(c) { return !c.hidden; });\n\t      },\n\n\t      get totalPages() {\n\t        return Math.max(1, Math.ceil(this.filteredRows.length / this.pageSize));\n\t      },\n\n\t      init: function() {\n\t        var el = this.$el;\n\t        this.columns = JSON.parse(el.dataset.columns || '[]');\n\t        this.allRows = JSON.parse(el.dataset.rows || '[]');\n\t        this.pageSize = parseInt(el.dataset.pageSize) || 10;\n\t        try { this.pageSizeOptions = JSON.parse(el.dataset.pageSizeOptions || '[10,20,50,100]'); } catch(e) { this.pageSizeOptions = [10,20,50,100]; }\n\t        this.sortable = el.dataset.sortable === 'true';\n\t        this.currentPage = 1;\n\t        this.filterRows();\n\t      },\n\n\t      sortBy: function(key) {\n\t        if (this.sortKey === key) {\n\t          this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';\n\t        } else {\n\t          this.sortKey = key;\n\t          this.sortDir = 'asc';\n\t        }\n\t        this.filterRows();\n\t      },\n\n\t      filterRows: function() {\n\t        var self = this;\n\t        var rows = this.allRows.slice();\n\n\t        var q = this.search.toLowerCase().trim();\n\t        if (q) {\n\t          rows = rows.filter(function(row) {\n\t            return Object.keys(row).some(function(k) { return (row[k] || '').toLowerCase().includes(q); });\n\t          });\n\t        }\n\n\t        if (this.sortKey) {\n\t          rows.sort(function(a, b) {\n\t            var va = (a[self.sortKey] || '').toLowerCase();\n\t            var vb = (b[self.sortKey] || '').toLowerCase();\n\t            if (va < vb) return self.sortDir === 'asc' ? -1 : 1;\n\t            if (va > vb) return self.sortDir === 'asc' ? 1 : -1;\n\t            return 0;\n\t          });\n\t        }\n\n\t        this.filteredRows = rows;\n\t        this.currentPage = Math.min(this.currentPage, this.totalPages);\n\t        this.updatePaginated();\n\t      },\n\n\t      updatePaginated: function() {\n\t        var start = (this.currentPage - 1) * this.pageSize;\n\t        this.paginatedRows = this.filteredRows.slice(start, start + this.pageSize);\n\t      },\n\t    };\n\t  };\n\n\t  if (typeof Alpine === 'undefined') {\n\t    var s = document.createElement('script');\n\t    s.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js';\n\t    s.defer = true;\n\t    document.head.appendChild(s);\n\t  }\n\t}\n\t</script>")
+		templ_7745c5c3_Var14 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<script>\n\tif (!window._dataTableInit) {\n\t  window._dataTableInit = true;\n\n\t  window.dataTable = function() {\n\t    return {\n\t      search: '',\n\t      currentPage: 1,\n\t      pageSize: 10,\n\t      pageSizeOptions: [],\n\t      sortKey: null,\n\t      sortDir: 'asc',\n\t      columns: [],\n\t      allRows: [],\n\t      filteredRows: [],\n\t      paginatedRows: [],\n\t      sortable: false,\n\n\t      get visibleColumns() {\n\t        return this.columns.filter(function(c) { return !c.hidden; });\n\t      },\n\n\t      get totalPages() {\n\t        return Math.max(1, Math.ceil(this.filteredRows.length / this.pageSize));\n\t      },\n\n\t      init: function() {\n\t        var el = this.$el;\n\t        this.columns = JSON.parse(el.dataset.columns || '[]');\n\t        this.allRows = JSON.parse(el.dataset.rows || '[]');\n\t        this.pageSize = parseInt(el.dataset.pageSize) || 10;\n\t        try { this.pageSizeOptions = JSON.parse(el.dataset.pageSizeOptions || '[10,20,50,100]'); } catch(e) { this.pageSizeOptions = [10,20,50,100]; }\n\t        this.sortable = el.dataset.sortable === 'true';\n\t        this.currentPage = 1;\n\t        this.filterRows();\n\t      },\n\n\t      sortBy: function(key) {\n\t        if (this.sortKey === key) {\n\t          this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';\n\t        } else {\n\t          this.sortKey = key;\n\t          this.sortDir = 'asc';\n\t        }\n\t        this.filterRows();\n\t      },\n\n\t      filterRows: function() {\n\t        var self = this;\n\t        var rows = this.allRows.slice();\n\n\t        var q = this.search.toLowerCase().trim();\n\t        if (q) {\n\t          rows = rows.filter(function(row) {\n\t            return Object.keys(row).some(function(k) { return (row[k] || '').toLowerCase().includes(q); });\n\t          });\n\t        }\n\n\t        if (this.sortKey) {\n\t          rows.sort(function(a, b) {\n\t            var va = (a[self.sortKey] || '').toLowerCase();\n\t            var vb = (b[self.sortKey] || '').toLowerCase();\n\t            if (va < vb) return self.sortDir === 'asc' ? -1 : 1;\n\t            if (va > vb) return self.sortDir === 'asc' ? 1 : -1;\n\t            return 0;\n\t          });\n\t        }\n\n\t        this.filteredRows = rows;\n\t        this.currentPage = Math.min(this.currentPage, this.totalPages);\n\t        this.updatePaginated();\n\t      },\n\n\t      updatePaginated: function() {\n\t        var start = (this.currentPage - 1) * this.pageSize;\n\t        this.paginatedRows = this.filteredRows.slice(start, start + this.pageSize);\n\t      },\n\t    };\n\t  };\n\n\t  if (typeof Alpine === 'undefined') {\n\t    var s = document.createElement('script');\n\t    s.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js';\n\t    s.defer = true;\n\t    document.head.appendChild(s);\n\t  }\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = dataTableScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var14), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

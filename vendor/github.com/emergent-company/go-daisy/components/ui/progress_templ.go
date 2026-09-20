@@ -49,7 +49,7 @@ func Progress(color ProgressColor, value int, max int, attrs templ.Attributes) t
 		}
 		ctx = templ.ClearChildren(ctx)
 		if value < 0 {
-			var templ_7745c5c3_Var2 = []any{"progress", string(color), "w-full"}
+			var templ_7745c5c3_Var2 = []any{"progress", templ.KV(string(color), color != ""), "w-full"}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -84,7 +84,7 @@ func Progress(color ProgressColor, value int, max int, attrs templ.Attributes) t
 				return templ_7745c5c3_Err
 			}
 		} else {
-			var templ_7745c5c3_Var4 = []any{"progress", string(color), "w-full"}
+			var templ_7745c5c3_Var4 = []any{"progress", templ.KV(string(color), color != ""), "w-full"}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

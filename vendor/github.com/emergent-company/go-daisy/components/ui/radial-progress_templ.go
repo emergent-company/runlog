@@ -63,7 +63,7 @@ func RadialProgress(color ProgressColor, value int, size string, thickness strin
 		}
 		ctx = templ.ClearChildren(ctx)
 		clamped := clampRadialValue(value)
-		var templ_7745c5c3_Var2 = []any{"radial-progress", string(color)}
+		var templ_7745c5c3_Var2 = []any{"radial-progress", templ.KV(string(color), color != "")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

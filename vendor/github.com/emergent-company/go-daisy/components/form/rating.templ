@@ -24,7 +24,7 @@ templ Rating(name string, value int, max int, shape RatingShape, color string, s
 			<input
 				type="radio"
 				name={ name }
-				class={ "mask", string(shape), color }
+				class={ "mask", templ.KV(string(shape), shape != ""), templ.KV(color, color != "") }
 				value={ strconv.Itoa(i) }
 				checked?={ i == value }
 			/>

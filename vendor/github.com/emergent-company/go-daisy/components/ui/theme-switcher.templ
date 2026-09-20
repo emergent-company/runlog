@@ -1,14 +1,16 @@
 package ui
 
+var themeSwitcherScriptOnce = templ.NewOnceHandle()
+
 // ThemeSwitcher renders a 3-way theme dropdown (Light/Dark/System) with
 // localStorage persistence, OS preference detection, iframe sync via
 // contentDocument, and parent-frame postMessage.
 templ ThemeSwitcher() {
 	<div class="dropdown dropdown-end">
-		<label tabindex="0" class="btn btn-sm btn-circle btn-ghost" data-testid="theme-toggle">
-			<span id="theme-icon-light" class="iconify lucide--sun size-4.5"></span>
-			<span id="theme-icon-dark" class="iconify lucide--moon size-4.5" style="display:none"></span>
-			<span id="theme-icon-system" class="iconify lucide--monitor-dot size-4.5" style="display:none"></span>
+		<label tabindex="0" class="btn btn-sm btn-circle btn-ghost" data-testid="theme-toggle" aria-label="Theme switcher">
+			<span id="theme-icon-light" class="iconify lucide--sun size-4.5" aria-hidden="true"></span>
+			<span id="theme-icon-dark" class="iconify lucide--moon size-4.5" style="display:none" aria-hidden="true"></span>
+			<span id="theme-icon-system" class="iconify lucide--monitor-dot size-4.5" style="display:none" aria-hidden="true"></span>
 		</label>
 		<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-36 p-2 shadow-sm" data-testid="theme-dropdown">
 			<li><button data-theme-option="light" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--sun size-4"></span>Light<span id="check-light" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
@@ -16,7 +18,8 @@ templ ThemeSwitcher() {
 			<li><button data-theme-option="system" class="flex items-center gap-2 w-full text-left"><span class="iconify lucide--monitor-dot size-4"></span>System<span id="check-system" class="iconify lucide--check size-4 ms-auto" style="display:none"></span></button></li>
 		</ul>
 	</div>
-	<script>
+	@themeSwitcherScriptOnce.Once() {
+		<script>
 		(function() {
 			var THEMES = { light: 'nord', dark: 'dracula' };
 			var STORAGE_KEY = 'gallery-ui-theme';
@@ -81,13 +84,7 @@ templ ThemeSwitcher() {
 				if (cur === 'system') applyTheme('system');
 			});
 
-			document.addEventListener('htmx:historyRestore', function() {
-				var restored = null;
-				try { restored = localStorage.getItem(STORAGE_KEY); } catch(e) {}
-				if (restored) applyTheme(restored);
-			});
-
-			document.addEventListener('htmx:afterSettle', function() {
+			document.addEventListener('htmx:after:settle', function() {
 				var cur = null;
 				try { cur = localStorage.getItem(STORAGE_KEY); } catch(e) {}
 				if (cur) syncPreviewIframes(cur);
@@ -98,5 +95,6 @@ templ ThemeSwitcher() {
 				if (option) { applyTheme(option.getAttribute('data-theme-option')); }
 			});
 		})();
-	</script>
+		</script>
+	}
 }

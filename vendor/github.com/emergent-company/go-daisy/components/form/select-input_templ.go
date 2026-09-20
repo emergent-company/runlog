@@ -9,6 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 // SelectInput renders a DaisyUI select dropdown with label.
+// Deprecated: use FormSelect(name, label, selected, options, "", "", "", "", nil) instead.
 // options: [][2]string where [0]=value, [1]=label
 func SelectInput(name string, label string, selected string, options [][2]string, errMsg string, required bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -55,7 +56,7 @@ func SelectInput(name string, label string, selected string, options [][2]string
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 8, Col: 12}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 9, Col: 12}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -68,7 +69,7 @@ func SelectInput(name string, label string, selected string, options [][2]string
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 9, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 10, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -109,7 +110,7 @@ func SelectInput(name string, label string, selected string, options [][2]string
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(opt[0])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 15, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 16, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -132,7 +133,7 @@ func SelectInput(name string, label string, selected string, options [][2]string
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(opt[1])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 17, Col: 13}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/select-input.templ`, Line: 18, Col: 13}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {

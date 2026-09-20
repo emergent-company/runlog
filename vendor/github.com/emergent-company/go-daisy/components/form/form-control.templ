@@ -12,8 +12,8 @@ const (
 
 // FormControl wraps an input with a DaisyUI fieldset, label, and optional error/hint.
 templ FormControl(name string, label string, labelPosition LabelPosition, hint string, errMsg string, attrs templ.Attributes) {
-	if labelPosition == LabelLeft && label != "" {
-		<div class="flex items-center gap-3" { devmode.Attrs(ctx, "form/FormControl")... }>
+			if labelPosition == LabelLeft && label != "" {
+		<div class="flex items-center gap-3" { devmode.Attrs(ctx, "form/FormControl")... } { attrs... }>
 			<label for={ name } class="label shrink-0 min-w-24">
 				<span class="label-text font-medium">{ label }</span>
 			</label>
@@ -24,15 +24,11 @@ templ FormControl(name string, label string, labelPosition LabelPosition, hint s
 						<span class="label-text-alt text-base-content/60">{ hint }</span>
 					</p>
 				}
-				if errMsg != "" {
-					<p class="label">
-						<span class="label-text-alt text-error">{ errMsg }</span>
-					</p>
-				}
+				@FieldError(errMsg)
 			</div>
 		</div>
 	} else {
-		<fieldset class="fieldset" { devmode.Attrs(ctx, "form/FormControl")... }>
+		<fieldset class="fieldset" { devmode.Attrs(ctx, "form/FormControl")... } { attrs... }>
 			if label != "" {
 				<legend class="fieldset-legend">{ label }</legend>
 			}
@@ -42,11 +38,7 @@ templ FormControl(name string, label string, labelPosition LabelPosition, hint s
 					<span class="label-text-alt text-base-content/60">{ hint }</span>
 				</p>
 			}
-			if errMsg != "" {
-				<p class="label">
-					<span class="label-text-alt text-error">{ errMsg }</span>
-				</p>
-			}
+			@FieldError(errMsg)
 		</fieldset>
 	}
 }
@@ -88,47 +80,15 @@ templ FormSelect(name string, label string, selected string, options [][2]string
 // FormCheckbox renders a labeled DaisyUI checkbox with optional HTMX attrs.
 templ FormCheckbox(name string, label string, checked bool, errMsg string, attrs templ.Attributes) {
 	<div class="form-control" { devmode.Attrs(ctx, "form/FormCheckbox")... }>
-		<label class="label cursor-pointer justify-start gap-3">
-			<input
-				type="checkbox"
-				id={ name }
-				name={ name }
-				class="checkbox"
-				checked?={ checked }
-				{ attrs... }
-			/>
-			if label != "" {
-				<span class="label-text">{ label }</span>
-			}
-		</label>
-		if errMsg != "" {
-			<p class="label">
-				<span class="label-text-alt text-error">{ errMsg }</span>
-			</p>
-		}
+		@checkableInput(name, checked, label, "checkbox", false, false, attrs, "form/FormCheckbox")
+		@FieldError(errMsg)
 	</div>
 }
 
 // FormToggle renders a labeled DaisyUI toggle switch with optional HTMX attrs.
 templ FormToggle(name string, label string, checked bool, errMsg string, attrs templ.Attributes) {
 	<div class="form-control" { devmode.Attrs(ctx, "form/FormToggle")... }>
-		<label class="label cursor-pointer justify-start gap-3">
-			<input
-				type="checkbox"
-				id={ name }
-				name={ name }
-				class="toggle"
-				checked?={ checked }
-				{ attrs... }
-			/>
-			if label != "" {
-				<span class="label-text">{ label }</span>
-			}
-		</label>
-		if errMsg != "" {
-			<p class="label">
-				<span class="label-text-alt text-error">{ errMsg }</span>
-			</p>
-		}
+		@checkableInput(name, checked, label, "toggle", false, false, attrs, "form/FormToggle")
+		@FieldError(errMsg)
 	</div>
 }

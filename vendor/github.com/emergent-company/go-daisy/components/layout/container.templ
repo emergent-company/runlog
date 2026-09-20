@@ -1,0 +1,23 @@
+package layout
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ContainerSize selects the maximum width of a centered page container.
+type ContainerSize string
+
+const (
+	// ContainerMD is the zero-value default: a medium-width container.
+	ContainerMD ContainerSize = "max-w-4xl"
+	// ContainerLG is a large-width container.
+	ContainerLG ContainerSize = "max-w-6xl"
+)
+
+// Container centers its children in a max-width container with horizontal
+// auto-margins and responsive padding.
+templ Container(size ContainerSize, attrs templ.Attributes) {
+	<div class={ "mx-auto p-6 lg:p-8", string(size) }
+		{ devmode.Attrs(ctx, "layout/Container")... }
+		{ attrs... }>
+		{ children... }
+	</div>
+}
