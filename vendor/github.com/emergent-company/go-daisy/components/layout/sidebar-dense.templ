@@ -5,6 +5,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var sidebarDenseOnce = templ.NewOnceHandle()
+
 // SidebarDenseProps configures a dense/hover-mode sidebar.
 type SidebarDenseProps struct {
 	AppName      string
@@ -64,7 +66,8 @@ templ SidebarDense(props SidebarDenseProps) {
 }
 
 templ sidebarDenseScript() {
-	<script>
+	@sidebarDenseOnce.Once() {
+		<script>
 	(function() {
 	  if (window._sidebarDenseInit) return;
 	  window._sidebarDenseInit = true;
@@ -106,4 +109,5 @@ templ sidebarDenseScript() {
 	  })();
 	})();
 	</script>
+	}
 }

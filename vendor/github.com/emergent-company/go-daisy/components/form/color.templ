@@ -1,0 +1,15 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// ColorInput renders a native color picker input with DaisyUI styling.
+// value is an optional hex color string (e.g. "#0d9488").
+templ ColorInput(id string, value string) {
+	<input
+		type="color"
+		id={ id }
+		value={ value }
+		class="input input-bordered w-16 h-10 cursor-pointer p-1"
+		{ devmode.Attrs(ctx, "form/ColorInput")... }
+	/>
+}

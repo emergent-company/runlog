@@ -10,6 +10,10 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/emergent-company/go-daisy/devmode"
 
+// Carousel is a lightweight DaisyUI scroll-snap carousel with zero JS dependencies.
+// For a SwiperJS-powered alternative with navigation, pagination, autoplay, loop,
+// and transition effects (slide/fade/coverflow/flip), see SwiperCarousel in swiper-carousel.templ.
+
 // CarouselSnap controls scroll-snap alignment on the carousel container.
 type CarouselSnap string
 
@@ -133,7 +137,7 @@ func CarouselItem(id string, itemWidth string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(id)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/carousel.templ`, Line: 38, Col: 10}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/carousel.templ`, Line: 42, Col: 10}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -236,7 +240,7 @@ func CarouselSlide(label string, colorClasses string) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/carousel.templ`, Line: 52, Col: 170}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/carousel.templ`, Line: 56, Col: 170}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {

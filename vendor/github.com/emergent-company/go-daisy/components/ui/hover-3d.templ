@@ -1,36 +1,62 @@
 package ui
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
-// Hover3DCard renders a DaisyUI hover-3d card that tilts and rotates on mouse hover.
-// extraClass is appended to the outer wrapper (e.g. "rounded-2xl w-64 h-40 bg-primary").
-// Children are rendered inside the inner hover-3d-layer element.
-templ Hover3DCard(extraClass string) {
-	<div
-		class={ "hover-3d", templ.KV(extraClass, extraClass != "") }
-		{ devmode.Attrs(ctx, "ui/Hover3DCard")... }
-	>
-		<div class="hover-3d-layer">
-			{ children... }
-		</div>
-	</div>
+// Hover3DLayer represents a single layer in a Hover3DCard. Style is an optional
+// inline CSS style string (e.g. "transform-style: preserve-3d; transform: translateZ(20px)").
+// Content is rendered inside the layer div.
+type Hover3DLayer struct {
+	Content templ.Component
+	Style   string
 }
 
-// Hover3DCardLayered renders a DaisyUI hover-3d card with multiple named layers for
-// parallax depth. Pass one templ.Component per layer; they are rendered as
-// hover-3d-layer-1, hover-3d-layer-2, etc. (up to the number DaisyUI supports).
-// extraClass is appended to the outer wrapper.
+// Hover3DCardProps holds configuration for the Hover3DCard component.
+// When Layers is set, the layered variant is rendered with hover-3d-layer-N classes.
+// When Layers is empty, the component renders children inside a single hover-3d-layer.
+type Hover3DCardProps struct {
+	ExtraClass string
+	Layers     []Hover3DLayer
+}
+
+// Hover3DCard renders a DaisyUI hover-3d card that tilts and rotates on mouse hover.
+// Pass Hover3DCardProps.Layers for multi-layer parallax, or use children for single-layer.
+templ Hover3DCard(props Hover3DCardProps) {
+	if len(props.Layers) > 0 {
+		<div
+			class={ "hover-3d", templ.KV(props.ExtraClass, props.ExtraClass != "") }
+			{ devmode.Attrs(ctx, "ui/Hover3DCard")... }
+		>
+			for i, layer := range props.Layers {
+				<div class={ "hover-3d-layer-" + strconv.Itoa(i+1) } style={ layer.Style }>
+					@layer.Content
+				</div>
+			}
+		</div>
+	} else {
+		<div
+			class={ "hover-3d", templ.KV(props.ExtraClass, props.ExtraClass != "") }
+			{ devmode.Attrs(ctx, "ui/Hover3DCard")... }
+		>
+			<div class="hover-3d-layer">
+				{ children... }
+			</div>
+		</div>
+	}
+}
+
+// Hover3DCardLayered renders a DaisyUI hover-3d card with multiple named layers.
+// Deprecated: use Hover3DCard(Hover3DCardProps{Layers: ...}) directly.
 templ Hover3DCardLayered(extraClass string, layers []templ.Component) {
 	<div
 		class={ "hover-3d", templ.KV(extraClass, extraClass != "") }
 		{ devmode.Attrs(ctx, "ui/Hover3DCardLayered")... }
 	>
 		for i, layer := range layers {
-			<div class={ fmt.Sprintf("hover-3d-layer-%d", i+1) }>
+			<div class={ "hover-3d-layer-" + strconv.Itoa(i+1) }>
 				@layer
 			</div>
 		}

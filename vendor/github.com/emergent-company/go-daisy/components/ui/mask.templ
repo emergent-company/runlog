@@ -19,7 +19,7 @@ const (
 
 // Mask applies a CSS mask shape to its child content.
 templ Mask(shape MaskShape) {
-	<div class={ "mask", string(shape) } { devmode.Attrs(ctx, "ui/Mask")... }>
+	<div class={ "mask", templ.KV(string(shape), shape != "") } { devmode.Attrs(ctx, "ui/Mask")... }>
 		{ children... }
 	</div>
 }

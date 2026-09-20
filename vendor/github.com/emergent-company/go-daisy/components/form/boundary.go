@@ -1,14 +1,13 @@
 package form
 
 import (
-	"context"
-	"io"
-
 	"github.com/a-h/templ"
 	"github.com/emergent-company/go-daisy/devmode"
+	"github.com/emergent-company/go-daisy/shared"
 )
 
 // TextInputWithBoundary wraps TextInput with a dev-mode component boundary annotation.
+// Deprecated: use FormInputWithBoundary(name, label, value, placeholder, "", "", "", nil) instead.
 // gallery:token label,required
 // gallery:hint label:default(Full Name)
 func TextInputWithBoundary(name string, label string, value string, errMsg string, required bool) templ.Component {
@@ -20,6 +19,7 @@ func TextInputWithBoundary(name string, label string, value string, errMsg strin
 }
 
 // TextareaInputWithBoundary wraps TextareaInput with a dev-mode component boundary annotation.
+// Deprecated: use FormInputWithBoundary(name, label, value, placeholder, "", "", "", nil) instead.
 // gallery:token label,rows,required
 // gallery:hint rows:range(2,10,1)
 // gallery:hint label:default(Description)
@@ -33,6 +33,7 @@ func TextareaInputWithBoundary(name string, label string, value string, errMsg s
 }
 
 // CheckboxInputWithBoundary wraps CheckboxInput with a dev-mode component boundary annotation.
+// Deprecated: use FormCheckboxWithBoundary(name, label, checked, "", nil) instead.
 // gallery:token label,checked
 // gallery:hint label:default(Accept terms and conditions)
 func CheckboxInputWithBoundary(name string, label string, checked bool, errMsg string) templ.Component {
@@ -44,6 +45,7 @@ func CheckboxInputWithBoundary(name string, label string, checked bool, errMsg s
 }
 
 // SelectInputWithBoundary wraps SelectInput with a dev-mode component boundary annotation.
+// Deprecated: use FormSelectWithBoundary(name, label, selected, options, "", "", "", "", nil) instead.
 // gallery:token label,required
 // gallery:hint label:default(Country)
 func SelectInputWithBoundary(name string, label string, selected string, options [][2]string, errMsg string, required bool) templ.Component {
@@ -95,7 +97,7 @@ func RangeInputWithBoundary(name string, label string, value int, min int, max i
 // RadioGroupWithBoundary wraps RadioGroup with a dev-mode component boundary annotation.
 // gallery:token color
 // gallery:hint color:default(radio-primary)
-func RadioGroupWithBoundary(name string, selected string, options [][2]string, color string) templ.Component {
+func RadioGroupWithBoundary(name string, selected string, options []SelectOption, color string) templ.Component {
 	return devmode.ComponentBoundary("RadioGroup", RadioGroup(name, selected, options, color), map[string]any{
 		"name":     name,
 		"selected": selected,
@@ -133,6 +135,7 @@ func FileInputWithBoundary(name string, label string, accept string) templ.Compo
 }
 
 // CheckboxWithBoundary wraps Checkbox with a dev-mode component boundary annotation.
+// Deprecated: use FormCheckboxWithBoundary(name, label, checked, "", nil) instead.
 // gallery:token label,checked
 // gallery:hint label:default(Accept terms and conditions)
 func CheckboxWithBoundary(name string, checked bool, label string) templ.Component {
@@ -144,6 +147,7 @@ func CheckboxWithBoundary(name string, checked bool, label string) templ.Compone
 }
 
 // ToggleWithBoundary wraps Toggle with a dev-mode component boundary annotation.
+// Deprecated: use FormToggleWithBoundary(name, label, checked, "", nil) instead.
 // gallery:token label,checked
 // gallery:hint label:default(Enable notifications)
 func ToggleWithBoundary(name string, checked bool, label string) templ.Component {
@@ -156,9 +160,7 @@ func ToggleWithBoundary(name string, checked bool, label string) templ.Component
 
 // FormControlWithBoundary wraps FormControl with a dev-mode component boundary annotation.
 func FormControlWithBoundary(name string, label string, labelPosition LabelPosition, hint string, errMsg string, children templ.Component) templ.Component {
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return FormControl(name, label, labelPosition, hint, errMsg, nil).Render(templ.WithChildren(ctx, children), w)
-	})
+	inner := shared.RenderInto(FormControl(name, label, labelPosition, hint, errMsg, nil), children)
 	return devmode.ComponentBoundary("FormControl", inner, map[string]any{
 		"name":          name,
 		"label":         label,
@@ -263,9 +265,7 @@ func WizardStepperWithBoundary(id string, steps []WizardStep, panels []WizardSte
 
 // LabelWithBoundary wraps Label with a dev-mode component boundary annotation.
 func LabelWithBoundary(props LabelProps, children templ.Component) templ.Component {
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return Label(props).Render(templ.WithChildren(ctx, children), w)
-	})
+	inner := shared.RenderInto(Label(props), children)
 	return devmode.ComponentBoundary("Label", inner, map[string]any{
 		"text":    props.Text,
 		"altText": props.AltText,
@@ -275,9 +275,7 @@ func LabelWithBoundary(props LabelProps, children templ.Component) templ.Compone
 
 // ValidatorInputWithBoundary wraps ValidatorInput with a dev-mode component boundary annotation.
 func ValidatorInputWithBoundary(children templ.Component) templ.Component {
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return ValidatorInput().Render(templ.WithChildren(ctx, children), w)
-	})
+	inner := shared.RenderInto(ValidatorInput(), children)
 	return devmode.ComponentBoundary("ValidatorInput", inner, map[string]any{})
 }
 
@@ -288,9 +286,7 @@ func ValidatorHintWithBoundary(text string) templ.Component {
 
 // ValidatedFieldWithBoundary wraps ValidatedField with a dev-mode component boundary annotation.
 func ValidatedFieldWithBoundary(labelText string, hintText string, inputName string, children templ.Component) templ.Component {
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return ValidatedField(labelText, hintText, inputName).Render(templ.WithChildren(ctx, children), w)
-	})
+	inner := shared.RenderInto(ValidatedField(labelText, hintText, inputName), children)
 	return devmode.ComponentBoundary("ValidatedField", inner, map[string]any{
 		"labelText": labelText,
 		"hintText":  hintText,
@@ -324,9 +320,7 @@ func PasswordMeterWithBoundary(props PasswordMeterProps) templ.Component {
 
 // CalendarWrapperWithBoundary wraps CalendarWrapper with a dev-mode component boundary annotation.
 func CalendarWrapperWithBoundary(variant CalendarVariant, children templ.Component) templ.Component {
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return CalendarWrapper(variant).Render(templ.WithChildren(ctx, children), w)
-	})
+	inner := shared.RenderInto(CalendarWrapper(variant), children)
 	return devmode.ComponentBoundary("CalendarWrapper", inner, map[string]any{
 		"variant": string(variant),
 	})
@@ -383,9 +377,7 @@ func FileUploadWithBoundary(props FileUploadProps) templ.Component {
 // gallery:token submitText
 // gallery:hint submitText:default(Submit)
 func FormValidationWithBoundary(props FormValidationProps, children templ.Component) templ.Component {
-	inner := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		return FormValidation(props).Render(templ.WithChildren(ctx, children), w)
-	})
+	inner := shared.RenderInto(FormValidation(props), children)
 	return devmode.ComponentBoundary("FormValidation", inner, map[string]any{
 		"submitText": props.SubmitText,
 	})
@@ -400,5 +392,110 @@ func CalendarDemoWithBoundary(month string, year string, startWeekday int, daysI
 		"daysInMonth":  daysInMonth,
 		"today":        today,
 		"selected":     selected,
+	})
+}
+
+// OTPInputWithBoundary wraps OTPInput with a dev-mode component boundary annotation.
+func OTPInputWithBoundary(id string, digits int) templ.Component {
+	return devmode.ComponentBoundary("OTPInput", OTPInput(id, digits), map[string]any{
+		"id":     id,
+		"digits": digits,
+	})
+}
+
+// ColorInputWithBoundary wraps ColorInput with a dev-mode component boundary annotation.
+func ColorInputWithBoundary(id string, value string) templ.Component {
+	return devmode.ComponentBoundary("ColorInput", ColorInput(id, value), map[string]any{
+		"id":    id,
+		"value": value,
+	})
+}
+
+// PaletteWithBoundary wraps Palette with a dev-mode component boundary annotation.
+// gallery:token showHex,hideNeutral,hideReset
+func PaletteWithBoundary(props PaletteProps) templ.Component {
+	return devmode.ComponentBoundary("Palette", Palette(props), map[string]any{
+		"hueCount":   len(tailwindHues(props.Hues)),
+		"shadeCount": len(tailwindShades(props.Shades)),
+		"showHex":    props.ShowHex,
+	})
+}
+
+// DatalistInputWithBoundary wraps DatalistInput with a dev-mode component boundary annotation.
+func DatalistInputWithBoundary(id string, placeholder string, options []DatalistOption) templ.Component {
+	return devmode.ComponentBoundary("DatalistInput", DatalistInput(id, placeholder, options), map[string]any{
+		"id":           id,
+		"optionCount":  len(options),
+	})
+}
+
+// FieldsetWithBoundary wraps Fieldset with a dev-mode component boundary annotation.
+// gallery:token legend
+// gallery:hint legend:default(Settings)
+func FormFieldsetWithBoundary(props FieldsetProps) templ.Component {
+	return devmode.ComponentBoundary("Fieldset", Fieldset(props), map[string]any{
+		"legend": props.Legend,
+	})
+}
+
+// SelectShellWithBoundary wraps SelectShell with a dev-mode component boundary annotation.
+// gallery:token triggerLabel
+// gallery:hint triggerLabel:default(Select...)
+func SelectShellWithBoundary(props SelectShellProps) templ.Component {
+	return devmode.ComponentBoundary("SelectShell", SelectShell(props), map[string]any{
+		"label":        props.Label,
+		"triggerLabel": props.TriggerLabel,
+	})
+}
+
+// FormActionsWithBoundary wraps FormActions with a dev-mode component boundary annotation.
+func FormActionsWithBoundary() templ.Component {
+	inner := shared.RenderInto(FormActions("", ""), shared.StrComp(`<button class="btn btn-primary">Save</button>`))
+	return devmode.ComponentBoundary("FormActions", inner, nil)
+}
+
+// FormActionsWithLoadingWithBoundary wraps FormActionsWithLoading with a dev-mode component boundary annotation.
+// gallery:token submitText
+// gallery:hint submitText:default(Save Changes)
+func FormActionsWithLoadingWithBoundary(submitText string) templ.Component {
+	return devmode.ComponentBoundary("FormActionsWithLoading", FormActionsWithLoading(submitText, ""), map[string]any{
+		"submitText": submitText,
+	})
+}
+
+// DateInputWithBoundary wraps DateInput with a dev-mode component boundary annotation.
+// gallery:token name,value
+func DateInputWithBoundary(name string, value string) templ.Component {
+	return devmode.ComponentBoundary("DateInput", DateInput(name, value, false), map[string]any{
+		"name":  name,
+		"value": value,
+	})
+}
+
+// ComboboxWithBoundary wraps Combobox.
+// gallery:token mode,enableSearch,enableClearAll
+func ComboboxWithBoundary(props ComboboxProps) templ.Component {
+	return devmode.ComponentBoundary("Combobox", Combobox(props), map[string]any{
+		"mode":           string(props.Mode),
+		"enableSearch":   props.EnableSearch,
+		"enableClearAll": props.EnableClearAll,
+	})
+}
+
+// StructuredInputWithBoundary wraps StructuredInput.
+// gallery:token addActionLabel
+// gallery:hint addActionLabel:default(Add row)
+func StructuredInputWithBoundary(props StructuredInputProps) templ.Component {
+	return devmode.ComponentBoundary("StructuredInput", StructuredInput(props), map[string]any{
+		"columns": len(props.Columns),
+		"entries": len(props.Entries),
+	})
+}
+
+// TagListWithBoundary wraps TagList with a dev-mode component boundary annotation.
+// gallery:token values
+func TagListWithBoundary(props TagListProps) templ.Component {
+	return devmode.ComponentBoundary("TagList", TagList(props), map[string]any{
+		"values": len(props.Values),
 	})
 }

@@ -1,0 +1,60 @@
+package ui
+
+import (
+	"github.com/emergent-company/go-daisy/components/stimulus"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// StimulusDropdown renders a dropdown with Stimulus controller.
+templ StimulusDropdown(align DropdownAlign) {
+	<div
+		{ stimulus.Controller("dropdown")... }
+		{ stimulus.Action("click@window", "dropdown", "outsideClick")... }
+		{ stimulus.Action("keydown.escape", "dropdown", "escapeClose")... }
+		class={ "dropdown", templ.KV(string(align), align != "") }
+		{ devmode.Attrs(ctx, "ui/StimulusDropdown")... }
+	>
+		{ children... }
+	</div>
+}
+
+// StimulusDropdownTrigger renders a dropdown trigger button.
+templ StimulusDropdownTrigger(label string, variant string) {
+	<button
+		type="button"
+		data-dropdown-target="trigger"
+		{ stimulus.Action("click", "dropdown", "toggle")... }
+		{ stimulus.Action("keydown.arrow-down", "dropdown", "nextItem")... }
+		{ stimulus.Action("keydown.arrow-up", "dropdown", "prevItem")... }
+		{ stimulus.Action("keydown.enter", "dropdown", "selectItem")... }
+		aria-haspopup="true"
+		aria-expanded="false"
+		class={ "btn btn-sm m-1", variant }
+		{ devmode.Attrs(ctx, "ui/StimulusDropdownTrigger")... }
+	>
+		{ label }
+		@IconSpan("lucide--chevron-down", "size-3.5")
+	</button>
+}
+
+// StimulusDropdownMenu renders the dropdown content.
+templ StimulusDropdownMenu() {
+	<ul
+		data-dropdown-target="menu"
+		role="menu"
+		class="dropdown-content z-[1] menu menu-sm p-1 bg-base-100 border border-base-200 rounded-box shadow-lg w-40 mt-1"
+		style="display:none"
+		{ devmode.Attrs(ctx, "ui/StimulusDropdownMenu")... }
+	>
+		{ children... }
+	</ul>
+}
+
+// StimulusDropdownItem renders a menu item.
+templ StimulusDropdownItem(active bool, danger bool) {
+	<li role="presentation" { devmode.Attrs(ctx, "ui/StimulusDropdownItem")... }>
+		<a role="menuitem" class={ templ.KV("active", active), templ.KV("text-error", danger) }>
+			{ children... }
+		</a>
+	</li>
+}

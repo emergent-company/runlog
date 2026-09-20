@@ -6,6 +6,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var formValidationOnce = templ.NewOnceHandle()
+
 // ValidationRule defines a single field validation rule.
 type ValidationRule struct {
 	Field      string // field name
@@ -34,7 +36,7 @@ templ FormValidation(props FormValidationProps) {
 	<form
 		id={ props.ID }
 		data-form-validation
-		class={ props.Class }
+		class={ templ.KV(props.Class, props.Class != "") }
 		data-rules={ string(validationRulesJSON(props.Rules)) }
 		{ devmode.Attrs(ctx, "form/FormValidation")... }
 		{ props.Attrs... }
@@ -62,7 +64,8 @@ func validationRulesJSON(rules []ValidationRule) string {
 }
 
 templ formValidationScript() {
-	<script>
+	@formValidationOnce.Once() {
+		<script>
 	if (!window._formValidationInit) {
 	  window._formValidationInit = true;
 
@@ -163,4 +166,5 @@ templ formValidationScript() {
 	  }
 	}
 	</script>
+	}
 }

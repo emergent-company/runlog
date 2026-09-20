@@ -70,7 +70,7 @@ func FooterVariant(style string, opts FooterVariantOpts) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var2 = []any{"flex w-full flex-wrap items-center justify-between gap-2 border-t border-dashed px-4 py-4 md:px-8 xl:px-12 2xl:px-20", opts.ExtraClass}
+		var templ_7745c5c3_Var2 = []any{"flex w-full flex-wrap items-center justify-between gap-2 border-t border-dashed px-4 py-4 md:px-8 xl:px-12 2xl:px-20", templ.KV(opts.ExtraClass, opts.ExtraClass != "")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

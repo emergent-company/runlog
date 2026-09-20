@@ -1,0 +1,72 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// SkeletonText renders one or more skeleton text lines.
+// widths: Tailwind width classes e.g. "w-full", "w-3/4", "w-1/2".
+templ SkeletonText(widths ...string) {
+	<div class="space-y-2" { devmode.Attrs(ctx, "ui/SkeletonText")... }>
+		for _, w := range widths {
+			<div class={ "skeleton h-4", w }></div>
+		}
+	</div>
+}
+
+// SkeletonCard renders a card-shaped skeleton with image + text placeholder.
+templ SkeletonCard() {
+	<div class="card border border-base-200 shadow-sm" { devmode.Attrs(ctx, "ui/SkeletonCard")... }>
+		<div class="skeleton h-48 w-full rounded-none"></div>
+		<div class="card-body">
+			<div class="skeleton h-6 w-3/4"></div>
+			<div class="skeleton h-4 w-full mt-2"></div>
+			<div class="skeleton h-4 w-2/3"></div>
+		</div>
+	</div>
+}
+
+// SkeletonAvatar renders a circular skeleton for avatars.
+// size: Tailwind size class e.g. "size-10", "size-16".
+templ SkeletonAvatar(size string) {
+	<div
+		class={ "skeleton rounded-full shrink-0", size }
+		{ devmode.Attrs(ctx, "ui/SkeletonAvatar")... }
+	></div>
+}
+
+// SkeletonTableRow renders a skeleton table row with n columns.
+templ SkeletonTableRow(cols int) {
+	<tr { devmode.Attrs(ctx, "ui/SkeletonTableRow")... }>
+		for i := 0; i < cols; i++ {
+			<td><div class="skeleton h-4 w-3/4"></div></td>
+		}
+	</tr>
+}
+
+// SkeletonButton renders a skeleton placeholder for a button.
+templ SkeletonButton() {
+	<div class="skeleton h-10 w-24" { devmode.Attrs(ctx, "ui/SkeletonButton")... }></div>
+}
+
+// SkeletonStats renders skeleton rows for stat cards (icon + text).
+templ SkeletonStats() {
+	<div class="flex items-center gap-4" { devmode.Attrs(ctx, "ui/SkeletonStats")... }>
+		@SkeletonAvatar("size-10")
+		<div class="flex-1 space-y-2">
+			<div class="skeleton h-3 w-1/2"></div>
+			<div class="skeleton h-5 w-3/4"></div>
+		</div>
+	</div>
+}
+
+// SkeletonH1 renders a skeleton heading.
+templ SkeletonH1() {
+	<div class="skeleton h-8 w-1/3" { devmode.Attrs(ctx, "ui/SkeletonH1")... }></div>
+}
+
+// SkeletonFormField renders a skeleton for a form field (label + input).
+templ SkeletonFormField() {
+	<div class="space-y-2" { devmode.Attrs(ctx, "ui/SkeletonFormField")... }>
+		<div class="skeleton h-4 w-1/4"></div>
+		<div class="skeleton h-10 w-full"></div>
+	</div>
+}

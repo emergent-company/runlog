@@ -13,6 +13,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var sidebarDenseOnce = templ.NewOnceHandle()
+
 // SidebarDenseProps configures a dense/hover-mode sidebar.
 type SidebarDenseProps struct {
 	AppName string
@@ -67,7 +69,7 @@ func SidebarDense(props SidebarDenseProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.AppName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 28, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 30, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -99,7 +101,7 @@ func SidebarDense(props SidebarDenseProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 45, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 47, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -136,7 +138,7 @@ func SidebarDense(props SidebarDenseProps) templ.Component {
 				var templ_7745c5c3_Var6 templ.SafeURL
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 50, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 52, Col: 38}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -185,7 +187,7 @@ func SidebarDense(props SidebarDenseProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 56, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/layout/sidebar-dense.templ`, Line: 58, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -230,7 +232,25 @@ func sidebarDenseScript() templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<script>\n\t(function() {\n\t  if (window._sidebarDenseInit) return;\n\t  window._sidebarDenseInit = true;\n\n\t  // Inject CSS\n\t  var css = document.createElement('style');\n\t  css.textContent = [\n\t    '[data-sidebar-dense] { width: 64px; min-width: 64px; }',\n\t    '[data-sidebar-dense]:hover, [data-sidebar-dense].expanded { width: 256px; min-width: 256px; }',\n\t    '[data-sidebar-dense] .sidebar-dense-label { opacity: 0; transition: opacity 0.2s; white-space: nowrap; }',\n\t    '[data-sidebar-dense]:hover .sidebar-dense-label, [data-sidebar-dense].expanded .sidebar-dense-label { opacity: 1; }',\n\t    '[data-sidebar-dense] .sidebar-dense-toggle { opacity: 0; transition: opacity 0.2s; }',\n\t    '[data-sidebar-dense]:hover .sidebar-dense-toggle { opacity: 1; }',\n\t    '[data-sidebar-dense] .menu-item { justify-content: center; padding: 0.5rem; }',\n\t    '[data-sidebar-dense]:hover .menu-item, [data-sidebar-dense].expanded .menu-item { justify-content: flex-start; padding: 0.5rem 0.75rem; }',\n\t    '[data-sidebar-dense] .menu-label { text-align: center; }',\n\t    '[data-sidebar-dense]:hover .menu-label, [data-sidebar-dense].expanded .menu-label { text-align: left; }',\n\t  ].join(' ');\n\t  document.head.appendChild(css);\n\n\t  window.toggleSidebarDense = function() {\n\t    var el = document.getElementById('_layout-sidebar-dense');\n\t    if (!el) return;\n\t    el.classList.toggle('expanded');\n\t    try {\n\t      var cfg = JSON.parse(localStorage.getItem('__GO_DAISY_SIDEBAR__') || '{}');\n\t      cfg.denseExpanded = el.classList.contains('expanded');\n\t      localStorage.setItem('__GO_DAISY_SIDEBAR__', JSON.stringify(cfg));\n\t    } catch(e) {}\n\t  };\n\n\t  (function() {\n\t    var el = document.getElementById('_layout-sidebar-dense');\n\t    if (!el) return;\n\t    try {\n\t      var cfg = JSON.parse(localStorage.getItem('__GO_DAISY_SIDEBAR__') || '{}');\n\t      if (cfg.denseExpanded) el.classList.add('expanded');\n\t    } catch(e) {}\n\t  })();\n\t})();\n\t</script>")
+		templ_7745c5c3_Var11 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<script>\n\t(function() {\n\t  if (window._sidebarDenseInit) return;\n\t  window._sidebarDenseInit = true;\n\n\t  // Inject CSS\n\t  var css = document.createElement('style');\n\t  css.textContent = [\n\t    '[data-sidebar-dense] { width: 64px; min-width: 64px; }',\n\t    '[data-sidebar-dense]:hover, [data-sidebar-dense].expanded { width: 256px; min-width: 256px; }',\n\t    '[data-sidebar-dense] .sidebar-dense-label { opacity: 0; transition: opacity 0.2s; white-space: nowrap; }',\n\t    '[data-sidebar-dense]:hover .sidebar-dense-label, [data-sidebar-dense].expanded .sidebar-dense-label { opacity: 1; }',\n\t    '[data-sidebar-dense] .sidebar-dense-toggle { opacity: 0; transition: opacity 0.2s; }',\n\t    '[data-sidebar-dense]:hover .sidebar-dense-toggle { opacity: 1; }',\n\t    '[data-sidebar-dense] .menu-item { justify-content: center; padding: 0.5rem; }',\n\t    '[data-sidebar-dense]:hover .menu-item, [data-sidebar-dense].expanded .menu-item { justify-content: flex-start; padding: 0.5rem 0.75rem; }',\n\t    '[data-sidebar-dense] .menu-label { text-align: center; }',\n\t    '[data-sidebar-dense]:hover .menu-label, [data-sidebar-dense].expanded .menu-label { text-align: left; }',\n\t  ].join(' ');\n\t  document.head.appendChild(css);\n\n\t  window.toggleSidebarDense = function() {\n\t    var el = document.getElementById('_layout-sidebar-dense');\n\t    if (!el) return;\n\t    el.classList.toggle('expanded');\n\t    try {\n\t      var cfg = JSON.parse(localStorage.getItem('__GO_DAISY_SIDEBAR__') || '{}');\n\t      cfg.denseExpanded = el.classList.contains('expanded');\n\t      localStorage.setItem('__GO_DAISY_SIDEBAR__', JSON.stringify(cfg));\n\t    } catch(e) {}\n\t  };\n\n\t  (function() {\n\t    var el = document.getElementById('_layout-sidebar-dense');\n\t    if (!el) return;\n\t    try {\n\t      var cfg = JSON.parse(localStorage.getItem('__GO_DAISY_SIDEBAR__') || '{}');\n\t      if (cfg.denseExpanded) el.classList.add('expanded');\n\t    } catch(e) {}\n\t  })();\n\t})();\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = sidebarDenseOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

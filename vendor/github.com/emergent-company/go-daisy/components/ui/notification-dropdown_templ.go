@@ -14,6 +14,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var notificationDropdownScriptOnce = templ.NewOnceHandle()
+
 // NotificationDropdownProps configures a dropdown notification panel.
 type NotificationDropdownProps struct {
 	ID          string
@@ -73,7 +75,7 @@ func NotificationDropdown(props NotificationDropdownProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.UnreadCount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 29, Col: 121}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 31, Col: 121}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -99,7 +101,7 @@ func NotificationDropdown(props NotificationDropdownProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.ID + "-list")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 42, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 44, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -133,7 +135,7 @@ func NotificationDropdown(props NotificationDropdownProps) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.ViewAllHref))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 53, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 55, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -203,7 +205,7 @@ func dropdownNotificationRow(dropdownID string, item NotificationItem) templ.Com
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 64, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 66, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -216,7 +218,7 @@ func dropdownNotificationRow(dropdownID string, item NotificationItem) templ.Com
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(item.Unread, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 65, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 67, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -295,7 +297,7 @@ func dropdownNotificationRow(dropdownID string, item NotificationItem) templ.Com
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 70, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 72, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -313,7 +315,7 @@ func dropdownNotificationRow(dropdownID string, item NotificationItem) templ.Com
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(item.Body)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 72, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 74, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -331,7 +333,7 @@ func dropdownNotificationRow(dropdownID string, item NotificationItem) templ.Com
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(item.Time)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 74, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/notification-dropdown.templ`, Line: 76, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -384,7 +386,25 @@ func notificationDropdownScript(id string) templ.Component {
 			templ_7745c5c3_Var19 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<script>\n\tif (!window._notifDropdownInit) {\n\t  window._notifDropdownInit = true;\n\n\t  window.markNotifRead = function(btn, dropdownId) {\n\t    var row = btn.closest('[data-notification-id]');\n\t    if (!row) return;\n\t    row.dataset.unread = 'false';\n\t    row.classList.remove('bg-base-200/50');\n\t    var title = row.querySelector('.font-semibold');\n\t    if (title) title.classList.remove('font-semibold');\n\t    btn.remove();\n\t    updateUnreadBadge(dropdownId);\n\t  };\n\n\t  window.markAllRead = function(dropdownId) {\n\t    var container = document.getElementById(dropdownId + '-list');\n\t    if (!container) return;\n\t    container.querySelectorAll('[data-unread=\"true\"]').forEach(function(row) {\n\t      row.dataset.unread = 'false';\n\t      row.classList.remove('bg-base-200/50');\n\t      var title = row.querySelector('.font-semibold');\n\t      if (title) title.classList.remove('font-semibold');\n\t      var markBtn = row.querySelector('button');\n\t      if (markBtn) markBtn.remove();\n\t    });\n\t    updateUnreadBadge(dropdownId);\n\t  };\n\n\t  function updateUnreadBadge(dropdownId) {\n\t    var container = document.getElementById(dropdownId + '-list');\n\t    if (!container) return;\n\t    var unread = container.querySelectorAll('[data-unread=\"true\"]').length;\n\t    var dropdown = container.closest('[data-notification-dropdown]');\n\t    if (!dropdown) return;\n\t    var badge = dropdown.querySelector('.badge-error');\n\t    var btn = dropdown.querySelector('.btn-circle');\n\t    if (btn) {\n\t      var existing = btn.querySelector('.badge');\n\t      if (existing) existing.remove();\n\t      if (unread > 0) {\n\t        var newBadge = document.createElement('span');\n\t        newBadge.className = 'badge badge-error badge-xs badge-outline absolute -top-0.5 -right-0.5';\n\t        newBadge.textContent = unread;\n\t        btn.appendChild(newBadge);\n\t      }\n\t    }\n\t  }\n\t}\n\t</script>")
+		templ_7745c5c3_Var20 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<script>\n\tif (!window._notifDropdownInit) {\n\t  window._notifDropdownInit = true;\n\n\t  window.markNotifRead = function(btn, dropdownId) {\n\t    var row = btn.closest('[data-notification-id]');\n\t    if (!row) return;\n\t    row.dataset.unread = 'false';\n\t    row.classList.remove('bg-base-200/50');\n\t    var title = row.querySelector('.font-semibold');\n\t    if (title) title.classList.remove('font-semibold');\n\t    btn.remove();\n\t    updateUnreadBadge(dropdownId);\n\t  };\n\n\t  window.markAllRead = function(dropdownId) {\n\t    var container = document.getElementById(dropdownId + '-list');\n\t    if (!container) return;\n\t    container.querySelectorAll('[data-unread=\"true\"]').forEach(function(row) {\n\t      row.dataset.unread = 'false';\n\t      row.classList.remove('bg-base-200/50');\n\t      var title = row.querySelector('.font-semibold');\n\t      if (title) title.classList.remove('font-semibold');\n\t      var markBtn = row.querySelector('button');\n\t      if (markBtn) markBtn.remove();\n\t    });\n\t    updateUnreadBadge(dropdownId);\n\t  };\n\n\t  function updateUnreadBadge(dropdownId) {\n\t    var container = document.getElementById(dropdownId + '-list');\n\t    if (!container) return;\n\t    var unread = container.querySelectorAll('[data-unread=\"true\"]').length;\n\t    var dropdown = container.closest('[data-notification-dropdown]');\n\t    if (!dropdown) return;\n\t    var badge = dropdown.querySelector('.badge-error');\n\t    var btn = dropdown.querySelector('.btn-circle');\n\t    if (btn) {\n\t      var existing = btn.querySelector('.badge');\n\t      if (existing) existing.remove();\n\t      if (unread > 0) {\n\t        var newBadge = document.createElement('span');\n\t        newBadge.className = 'badge badge-error badge-xs badge-outline absolute -top-0.5 -right-0.5';\n\t        newBadge.textContent = unread;\n\t        btn.appendChild(newBadge);\n\t      }\n\t    }\n\t  }\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = notificationDropdownScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var20), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

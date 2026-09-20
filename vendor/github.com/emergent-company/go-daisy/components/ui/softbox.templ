@@ -1,0 +1,26 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// SoftBoxProps configures a SoftBox.
+type SoftBoxProps struct {
+	// Class is extra CSS classes appended to the panel's class list.
+	Class string
+	// Padding is the padding class. Default "p-3".
+	Padding string
+}
+
+// SoftBox renders a muted rounded panel wrapping its children.
+//
+//	@ui.SoftBox(ui.SoftBoxProps{Padding: "p-5"}) {
+//		<p>Content</p>
+//	}
+templ SoftBox(props ...SoftBoxProps) {
+	{{ var p SoftBoxProps
+	if len(props) > 0 { p = props[0] }
+	pad := p.Padding
+	if pad == "" { pad = "p-3" } }}
+	<div class={ "rounded-box border border-base-content/10 bg-base-200/40", pad, p.Class } { devmode.Attrs(ctx, "ui/SoftBox")... }>
+		{ children... }
+	</div>
+}

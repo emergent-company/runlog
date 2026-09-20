@@ -23,7 +23,7 @@ type SearchDropdownSection struct {
 templ SearchDropdown(placeholder string, sections []SearchDropdownSection) {
 	<div class="dropdown dropdown-bottom w-full max-w-sm" { devmode.Attrs(ctx, "ui/SearchDropdown")... }>
 		<label tabindex="0" class="input input-sm input-bordered flex items-center gap-2 px-2 w-full">
-			<span class="iconify lucide--search size-4 text-base-content/50" aria-hidden="true"></span>
+			@IconSpanColored("lucide--search", "size-4", "text-base-content/50")
 			<input placeholder={ placeholder } class="grow bg-transparent text-sm focus:outline-none" type="text"/>
 		</label>
 		<div tabindex="0" class="dropdown-content bg-base-100 rounded-box mt-1 w-full shadow-lg border border-base-200 z-50">

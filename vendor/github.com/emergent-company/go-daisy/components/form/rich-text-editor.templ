@@ -44,77 +44,13 @@ templ RichTextEditor(props RichTextEditorProps) {
 			{ props.Attrs... }
 		></div>
 	</div>
-	@quillScript()
-}
-
-templ quillScript() {
-	<script>
-	if (!window._quillInit) {
-	  window._quillInit = true;
-
-	  window.initQuill = function(el) {
-	    if (typeof Quill === 'undefined') {
-	      var s = document.createElement('script');
-	      s.src = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js';
-	      s.onload = function() { initQuillElement(el); };
-	      document.head.appendChild(s);
-	      var l = document.createElement('link');
-	      l.rel = 'stylesheet';
-	      l.href = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.' + (el.dataset.theme || 'snow') + '.css';
-	      document.head.appendChild(l);
-	    } else {
-	      initQuillElement(el);
-	    }
-	  };
-
-	  function initQuillElement(el) {
-	    if (el._quill) return;
-	    try {
-	      var theme = el.dataset.theme || 'snow';
-	      var placeholder = el.dataset.placeholder || 'Write something...';
-	      el._quill = new Quill(el, {
-	        theme: theme,
-	        placeholder: placeholder,
-	        readOnly: el.dataset.readonly === 'true',
-	        modules: theme === 'snow' ? {
-	          toolbar: [
-	            [{ 'header': [1,2,3,false] }],
-	            ['bold','italic','underline','strike'],
-	            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-	            ['link','image','code-block'],
-	            ['clean']
-	          ]
-	        } : undefined
-	      });
-	      // Set initial content
-	      var val = el.dataset.value;
-	      if (val) {
-	        try { el._quill.clipboard.dangerouslyPasteHTML(val); } catch(e) {}
-	      }
-	      // Sync to hidden input on change
-	      var hidden = document.getElementById(el.id + '-hidden');
-	      if (!hidden) {
-	        hidden = document.createElement('input');
-	        hidden.type = 'hidden';
-	        hidden.name = el.id;
-	        hidden.id = el.id + '-hidden';
-	        el.parentNode.appendChild(hidden);
-	      }
-	      el._quill.on('text-change', function() {
-	        hidden.value = el._quill.root.innerHTML;
-	      });
-	    } catch(e) { console.warn('Quill init failed:', e); }
-	  }
-
-	  document.addEventListener('DOMContentLoaded', function() {
-	    document.querySelectorAll('[data-quill]').forEach(initQuillElement);
-	  });
-	  document.addEventListener('htmx:after:settle', function() {
-	    document.querySelectorAll('[data-quill]:not(._ql-initialized)').forEach(function(el) {
-	      el.classList.add('_ql-initialized');
-	      initQuillElement(el);
-	    });
-	  });
-	}
-	</script>
+	@LazyLoadScript(LazyLoadConfig{
+		GuardName:  "_quill",
+		LibVarName: "Quill",
+		ScriptURL:  "https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js",
+		StyleURL:   "'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.' + (el.dataset.theme || 'snow') + '.css'",
+		Selector:   "[data-quill]",
+		InitFunc:   "var theme = el.dataset.theme || 'snow'; var placeholder = el.dataset.placeholder || 'Write something...'; var q = new Quill(el, {theme: theme, placeholder: placeholder, readOnly: el.dataset.readonly === 'true', modules: theme === 'snow' ? { toolbar: [[{ 'header': [1,2,3,false] }], ['bold','italic','underline','strike'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['link','image','code-block'], ['clean']] } : undefined}); var val = el.dataset.value; if (val) try { q.clipboard.dangerouslyPasteHTML(val); } catch(e) {} var hidden = document.getElementById(el.id + '-hidden'); if (!hidden) { hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = el.id; hidden.id = el.id + '-hidden'; el.parentNode.appendChild(hidden); } q.on('text-change', function() { hidden.value = q.root.innerHTML; })",
+		FnSuffix:   "Quill",
+	})
 }

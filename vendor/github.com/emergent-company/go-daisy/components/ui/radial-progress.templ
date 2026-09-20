@@ -36,7 +36,7 @@ func radialProgressStyle(value int, size string, thickness string) string {
 templ RadialProgress(color ProgressColor, value int, size string, thickness string) {
 	{{ clamped := clampRadialValue(value) }}
 	<div
-		class={ "radial-progress", string(color) }
+		class={ "radial-progress", templ.KV(string(color), color != "") }
 		style={ radialProgressStyle(clamped, size, thickness) }
 		role="progressbar"
 		aria-valuenow={ strconv.Itoa(clamped) }

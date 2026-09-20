@@ -1,50 +1,58 @@
 package ui
 
-import "github.com/emergent-company/go-daisy/devmode"
+import (
+	"strconv"
 
-// ToastType maps to a DaisyUI alert class.
-type ToastType string
-
-const (
-	ToastSuccess ToastType = "alert-success"
-	ToastError   ToastType = "alert-error"
-	ToastWarning ToastType = "alert-warning"
-	ToastInfo    ToastType = "alert-info"
+	"github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
 )
+
+var toastScriptOnceHandle = templ.NewOnceHandle()
 
 // ToastScript renders a single global script that auto-dismisses any element
 // with the "toast-auto-dismiss" class. Include once in the page layout.
 templ ToastScript() {
-	<script>
-		(function(){
-			function dismissToast(el){
-				var d = parseInt(el.dataset.duration)||4000;
-				setTimeout(function(){
-					el.style.opacity='0';
-					el.style.transition='opacity 0.3s';
-					setTimeout(function(){ el.remove(); }, 300);
-				}, d);
-			}
-			document.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);
-			var obs = new MutationObserver(function(mutations){
-				mutations.forEach(function(m){
-					m.addedNodes.forEach(function(n){
-						if(n.nodeType===1){
-							if(n.classList && n.classList.contains('toast-auto-dismiss')) dismissToast(n);
-							n.querySelectorAll && n.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);
-						}
+	@toastScriptOnceHandle.Once() {
+			<script>
+			(function(){
+				function dismissToast(el){
+					var d = parseInt(el.dataset.duration)||4000;
+					setTimeout(function(){
+						el.style.opacity='0';
+						el.style.transition='opacity 0.3s';
+						setTimeout(function(){ el.remove(); }, 300);
+					}, d);
+				}
+				document.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);
+				var obs = new MutationObserver(function(mutations){
+					mutations.forEach(function(m){
+						m.addedNodes.forEach(function(n){
+							if(n.nodeType===1){
+								if(n.classList && n.classList.contains('toast-auto-dismiss')) dismissToast(n);
+								n.querySelectorAll && n.querySelectorAll('.toast-auto-dismiss').forEach(dismissToast);
+							}
+						});
 					});
 				});
-			});
-			obs.observe(document.body, {childList:true, subtree:true});
-		})();
-	</script>
+				obs.observe(document.body, {childList:true, subtree:true});
+			})();
+		</script>
+	}
 }
 
-// Toast renders a single auto-dismissing toast notification.
-templ Toast(typ ToastType, message string) {
+// ToastProps configures a Toast notification.
+type ToastProps struct {
+	Type       ToastType
+	Message    string
+	OutOfBand  bool
+	Driver     string // "" = vanilla, "alpine" = AlpineJS
+	DurationMs int    // only used for Alpine driver (default: 4000)
+}
+
+// toastAlert renders the inner toast alert div.
+templ toastAlert(typ ToastType, message string) {
 	<div
-		class={ "alert text-sm shadow-md toast-auto-dismiss", string(typ) }
+		class={ "alert text-sm shadow-md toast-auto-dismiss", templ.KV(string(typ), typ != "") }
 		role="alert"
 		data-duration="4000"
 		{ devmode.Attrs(ctx, "ui/Toast")... }
@@ -53,9 +61,57 @@ templ Toast(typ ToastType, message string) {
 	</div>
 }
 
-// ToastOOB renders a toast using HTMX out-of-band swap to append to #toast-container.
-templ ToastOOB(typ ToastType, message string) {
-	<div hx-swap-oob="beforeend:#toast-container" { devmode.Attrs(ctx, "ui/ToastOOB")... }>
-		@Toast(typ, message)
+// Toast renders a single auto-dismissing toast notification.
+// Set OutOfBand=true to emit an HTMX out-of-band swap targeting #toast-container.
+// Set Driver="alpine" for Alpine.js animated toast with enter/leave transitions.
+templ Toast(props ToastProps) {
+	if props.Driver == "alpine" {
+		@alpineToast(props.Message, string(props.Type), props.DurationMs)
+	} else if props.OutOfBand {
+		<div hx-swap-oob="beforeend:#toast-container" { devmode.Attrs(ctx, "ui/ToastOOB")... }>
+			@toastAlert(props.Type, props.Message)
+		</div>
+	} else {
+		@toastAlert(props.Type, props.Message)
+	}
+}
+
+// toastVariantCSS maps a toast type string to the corresponding alert CSS class.
+func toastVariantCSS(t string) string {
+	switch t {
+	case "alert-success":
+		return "alert-success"
+	case "alert-error":
+		return "alert-error"
+	case "alert-warning":
+		return "alert-warning"
+	default:
+		return "alert-info"
+	}
+}
+
+// alpineToast renders a single self-dismissing toast with enter/leave transitions.
+// Merged from the former AlpineToast component.
+templ alpineToast(message string, toastType string, durationMs int) {
+	{{
+		if durationMs <= 0 {
+			durationMs = 4000
+		}
+		variant := toastVariantCSS(toastType)
+	}}
+	<div
+		{ alpine.XData(alpine.Toggle(true))... }
+		x-init={ "setTimeout(function() { open = false }, " + strconv.Itoa(durationMs) + ")" }
+		x-show="open"
+		x-transition:enter="transition ease-out duration-300"
+		x-transition:enter-start="opacity-0 translate-x-4"
+		x-transition:enter-end="opacity-100 translate-x-0"
+		x-transition:leave="transition ease-in duration-200"
+		x-transition:leave-start="opacity-100 translate-x-0"
+		x-transition:leave-end="opacity-0 translate-x-4"
+		class={ "alert shadow-lg", variant }
+		{ devmode.Attrs(ctx, "ui/Toast")... }
+	>
+		<span>{ message }</span>
 	</div>
 }

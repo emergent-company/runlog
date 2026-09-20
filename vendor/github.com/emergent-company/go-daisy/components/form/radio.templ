@@ -2,28 +2,26 @@ package form
 
 import "github.com/emergent-company/go-daisy/devmode"
 
+// radioInput renders a radio button with label.
+// The inputClass parameter controls daisyUI styling.
+templ radioInput(name string, value string, checked bool, label string, inputClass string, attrs templ.Attributes, componentName string) {
+	<label class="cursor-pointer label justify-start gap-4" { devmode.Attrs(ctx, componentName)... }>
+		<input type="radio" name={ name } value={ value } class={ inputClass } checked?={ checked } { attrs... }/>
+		<span class="label-text">{ label }</span>
+	</label>
+}
+
 // RadioGroup renders a group of radio buttons.
-// options: list of (value, label) pairs
-templ RadioGroup(name string, selected string, options [][2]string, color string) {
+// options: list of SelectOption{Value, Label} pairs
+templ RadioGroup(name string, selected string, options []SelectOption, color string) {
 	@Field("", name, "") {
 		for _, opt := range options {
-			@RadioButton(name, opt[0], opt[1], opt[0] == selected, color)
+			@RadioButton(name, opt.Value, opt.Label, opt.Value == selected, color)
 		}
 	}
 }
 
 // RadioButton renders a single labeled radio input.
 templ RadioButton(name string, value string, label string, checked bool, color string) {
-	<label class="label cursor-pointer justify-start gap-4" { devmode.Attrs(ctx, "form/RadioButton")... }>
-		<input
-			type="radio"
-			name={ name }
-			value={ value }
-			class={ "radio", color }
-			if checked {
-				checked
-			}
-		/>
-		<span class="label-text">{ label }</span>
-	</label>
+	@radioInput(name, value, checked, label, "radio " + color, nil, "form/RadioButton")
 }

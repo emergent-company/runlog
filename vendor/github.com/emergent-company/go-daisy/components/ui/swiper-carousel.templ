@@ -6,6 +6,12 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+// SwiperCarousel is a SwiperJS-powered carousel with navigation, pagination, autoplay,
+// loop, multi-slide views, and transition effects. Lazy-loads SwiperJS ~200KB from CDN.
+// For a lightweight CSS scroll-snap alternative with zero JS dependencies, see Carousel in carousel.templ.
+
+var swiperScriptOnce = templ.NewOnceHandle()
+
 // SwiperEffect represents a Swiper transition effect.
 type SwiperEffect string
 
@@ -75,7 +81,8 @@ templ SwiperCarousel(props SwiperCarouselProps) {
 }
 
 templ swiperScript() {
-	<script>
+	@swiperScriptOnce.Once() {
+		<script>
 	if (!window._swiperInit) {
 	  window._swiperInit = true;
 
@@ -120,4 +127,5 @@ templ swiperScript() {
 	  });
 	}
 	</script>
+	}
 }

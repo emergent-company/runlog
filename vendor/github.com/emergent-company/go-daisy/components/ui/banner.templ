@@ -1,0 +1,130 @@
+package ui
+
+import (
+	alpine "github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// BannerVariant controls the semantic color.
+type BannerVariant string
+
+const (
+	BannerDefault BannerVariant = ""
+	BannerInfo    BannerVariant = "alert-info"
+	BannerSuccess BannerVariant = "alert-success"
+	BannerWarning BannerVariant = "alert-warning"
+	BannerDanger  BannerVariant = "alert-error"
+)
+
+var BannerPrimary = BannerInfo
+var BannerError = BannerDanger
+
+// BannerPosition controls layout.
+type BannerPosition string
+
+const (
+	BannerRelative BannerPosition = "relative"
+	BannerFixed    BannerPosition = "fixed top-0 left-0 right-0 z-50"
+)
+
+// BannerCTAProps configures a call-to-action button in the banner.
+type BannerCTAProps struct {
+	Label  string
+	Href   string
+	OnClick string
+}
+
+// BannerProps configures a dismissable announcement banner.
+type BannerProps struct {
+	Description string
+	Variant     BannerVariant
+	Position    BannerPosition
+	Persistent  bool
+	CTA         *BannerCTAProps
+	CookieBanner bool
+	CookieTitle  string
+	AcceptLabel  string
+	RejectLabel  string
+	Class       string
+	Attrs       templ.Attributes
+}
+
+// toastVariantCSS maps banner variant to alert class.
+func bannerVariantClass(v BannerVariant) string {
+	switch v {
+	case BannerSuccess:
+		return "alert-success"
+	case BannerWarning:
+		return "alert-warning"
+	case BannerDanger:
+		return "alert-error"
+	case BannerInfo:
+		return "alert-info"
+	default:
+		return ""
+	}
+}
+
+templ Banner(props BannerProps) {
+	{{
+		variant := bannerVariantClass(props.Variant)
+		pos := string(props.Position)
+		if pos == "" {
+			pos = string(BannerRelative)
+		}
+	}}
+	if props.CookieBanner {
+		<div
+			{ alpine.XData(alpine.Toggle(true))... }
+			class={ "card bg-base-100 shadow-lg border border-base-200 max-w-sm p-6 space-y-4", pos, templ.KV(props.Class, props.Class != "") }
+			x-show="show"
+			x-transition
+			{ devmode.Attrs(ctx, "ui/Banner")... }
+			{ props.Attrs... }
+		>
+			<h3 class="text-lg font-semibold">{ props.CookieTitle }</h3>
+			<p class="text-sm text-base-content/60">{ props.Description }</p>
+			<div class="flex gap-2 justify-end">
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost"
+					@click="show = false"
+				>{ props.RejectLabel }</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-primary"
+					@click="show = false"
+				>{ props.AcceptLabel }</button>
+			</div>
+		</div>
+	} else {
+		<div
+			{ alpine.XData(alpine.Toggle(true))... }
+			class={ "alert rounded-none", variant, pos, templ.KV(props.Class, props.Class != "") }
+			x-show="show"
+			x-transition
+			role="alert"
+			{ devmode.Attrs(ctx, "ui/Banner")... }
+			{ props.Attrs... }
+		>
+			<span>{ props.Description }</span>
+			<div class="flex gap-2 items-center">
+				if props.CTA != nil {
+					if props.CTA.Href != "" {
+						<a href={ props.CTA.Href } class="btn btn-sm">{ props.CTA.Label }</a>
+					} else {
+						<button type="button" class="btn btn-sm" @click={ props.CTA.OnClick }>{ props.CTA.Label }</button>
+					}
+				}
+				if !props.Persistent {
+					<button
+						type="button"
+						class="btn btn-sm btn-ghost btn-square"
+						@click="show = false"
+						aria-label="Dismiss"
+					>&times;</button>
+				}
+			</div>
+		</div>
+	}
+}

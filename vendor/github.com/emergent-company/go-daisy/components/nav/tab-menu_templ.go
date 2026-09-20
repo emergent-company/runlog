@@ -27,7 +27,8 @@ type Tab struct {
 // hx-get to swap content into target and pushes the URL; when false it renders
 // a lightweight DaisyUI tabs-lifted strip suitable for in-panel use (no HTMX).
 // attrs is optional extra HTML attributes on the outer wrapper; pass nil when not needed.
-func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Component {
+// target is the HTMX swap target selector; pass "-" to disable HTMX entirely, "" for default "#tab-content".
+func TabMenu(tabs []Tab, attrs templ.Attributes, target string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,8 +50,8 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 		}
 		ctx = templ.ClearChildren(ctx)
 		swapTarget := "#tab-content"
-		if len(target) > 0 && target[0] != "" {
-			swapTarget = target[0]
+		if target != "" {
+			swapTarget = target
 		}
 		htmx := swapTarget != "-"
 		if htmx {
@@ -85,7 +86,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 				var templ_7745c5c3_Var3 templ.SafeURL
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(tab.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 35, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 36, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -98,7 +99,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(tab.Href)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 36, Col: 23}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 37, Col: 23}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -111,7 +112,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(swapTarget)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 37, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 38, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 				if templ_7745c5c3_Err != nil {
@@ -142,7 +143,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 					return ""
 				}())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 47, Col: 9}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 48, Col: 9}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -163,7 +164,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(tab.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 50, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 51, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -181,7 +182,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(tab.Count))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 52, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 53, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -232,7 +233,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 				var templ_7745c5c3_Var11 templ.SafeURL
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.URL(tab.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 63, Col: 31}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 64, Col: 31}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -266,7 +267,7 @@ func TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) templ.Compone
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(tab.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 68, Col: 16}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/nav/tab-menu.templ`, Line: 69, Col: 16}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {

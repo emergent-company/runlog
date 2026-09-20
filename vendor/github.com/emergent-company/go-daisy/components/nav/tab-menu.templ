@@ -19,11 +19,12 @@ type Tab struct {
 // hx-get to swap content into target and pushes the URL; when false it renders
 // a lightweight DaisyUI tabs-lifted strip suitable for in-panel use (no HTMX).
 // attrs is optional extra HTML attributes on the outer wrapper; pass nil when not needed.
-templ TabMenu(tabs []Tab, attrs templ.Attributes, target ...string) {
+// target is the HTMX swap target selector; pass "-" to disable HTMX entirely, "" for default "#tab-content".
+templ TabMenu(tabs []Tab, attrs templ.Attributes, target string) {
 	{{
 		swapTarget := "#tab-content"
-		if len(target) > 0 && target[0] != "" {
-			swapTarget = target[0]
+		if target != "" {
+			swapTarget = target
 		}
 		htmx := swapTarget != "-"
 	}}

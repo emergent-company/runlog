@@ -1,0 +1,195 @@
+package ui
+
+import (
+	"strconv"
+
+	"github.com/emergent-company/go-daisy/components/alpine"
+	"github.com/emergent-company/go-daisy/components/stimulus"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+templ Tabs(props TabsProps) {
+	if props.Driver == "stimulus" {
+		@tabsStimulus(props)
+	} else if props.Mode == ClientTab {
+		@tabsClient(props)
+	} else {
+		@tabsServer(props)
+	}
+}
+
+templ tabsServer(props TabsProps) {
+	{{
+		name := props.Name
+		if name == "" {
+			name = "tabs"
+		}
+	}}
+	<div
+		role="tablist"
+		class={
+			"tabs",
+			templ.KV(string(props.Style), props.Style != ""),
+			templ.KV(string(props.Size), props.Size != ""),
+			templ.KV("tabs-bottom", props.Bottom),
+			templ.KV(props.ExtraClass, props.ExtraClass != ""),
+		}
+		{ devmode.Attrs(ctx, "ui/Tabs")... }
+	>
+		for _, item := range props.Items {
+			if item.Icon != "" {
+				<label
+					role="tab"
+					aria-selected={ ternary(item.Active, "true", "false") }
+					class={
+					"tab gap-2",
+					templ.KV("tab-active", item.Active),
+					templ.KV("tab-disabled", item.Disabled),
+					templ.KV(item.ColorCSS, item.ColorCSS != ""),
+				}>
+					<input type="radio" name={ name } checked?={ item.Active } disabled?={ item.Disabled }/>
+					@IconSpan(item.Icon, "size-4")
+					{ item.Label }
+				</label>
+			} else {
+				<input
+					type="radio"
+					role="tab"
+					name={ name }
+					aria-selected={ ternary(item.Active, "true", "false") }
+					class={
+						"tab",
+						templ.KV("tab-active", item.Active),
+						templ.KV("tab-disabled", item.Disabled),
+						templ.KV(item.ColorCSS, item.ColorCSS != ""),
+					}
+					aria-label={ item.Label }
+					checked?={ item.Active }
+					disabled?={ item.Disabled }
+				/>
+			}
+			if item.Content != nil {
+				<div role="tabpanel" class="tab-content border-base-300 bg-base-100 p-6">
+					@item.Content
+				</div>
+			}
+		}
+	</div>
+}
+
+templ tabsClient(props TabsProps) {
+	{{
+		defaultTab := ""
+		for _, item := range props.Items {
+			if item.Active { defaultTab = item.Label; break }
+		}
+		if defaultTab == "" && len(props.Items) > 0 {
+			defaultTab = props.Items[0].Label
+		}
+	}}
+	<div
+		{ alpine.XData(alpine.TabState(defaultTab))... }
+		{ devmode.Attrs(ctx, "ui/Tabs")... }
+	>
+		<div
+			role="tablist"
+			class={
+				"tabs",
+				templ.KV(string(props.Style), props.Style != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV("tabs-bottom", props.Bottom),
+				templ.KV(props.ExtraClass, props.ExtraClass != ""),
+			}
+		>
+			for _, item := range props.Items {
+				<button
+					type="button"
+					role="tab"
+					{ alpine.On("click", "tab = '"+item.Label+"'")... }
+					{ alpine.ClassBinding("{ 'tab-active': tab === '"+item.Label+"', 'tab-disabled': "+strconv.FormatBool(item.Disabled)+" }")... }
+					class={
+						"tab",
+						templ.KV("gap-2", item.Icon != ""),
+						templ.KV(item.ColorCSS, item.ColorCSS != ""),
+					}
+					disabled?={ item.Disabled }
+					aria-selected={ strconv.FormatBool(item.Active) }
+				>
+					if item.Icon != "" {
+						@IconSpan(item.Icon, "size-4")
+					}
+					{ item.Label }
+				</button>
+			}
+		</div>
+		for _, item := range props.Items {
+			if item.Content != nil {
+				<div x-show={ "tab === '"+item.Label+"'" } role="tabpanel" class="tab-content border-base-300 bg-base-100 p-6">
+					@item.Content
+				</div>
+			}
+		}
+	</div>
+}
+
+// tabsStimulus renders tab panels with Stimulus controller — instant
+// client-side switching without server roundtrips.
+templ tabsStimulus(props TabsProps) {
+	{{
+		defaultTab := ""
+		for _, item := range props.Items {
+			if item.Active { defaultTab = item.Label; break }
+		}
+		if defaultTab == "" && len(props.Items) > 0 {
+			defaultTab = props.Items[0].Label
+		}
+	}}
+	<div
+		{ stimulus.Controller("tabs")... }
+		{ stimulus.Value("tabs", "active", defaultTab)... }
+		{ devmode.Attrs(ctx, "ui/Tabs")... }
+	>
+		<div
+			role="tablist"
+			class={
+				"tabs",
+				templ.KV(string(props.Style), props.Style != ""),
+				templ.KV(string(props.Size), props.Size != ""),
+				templ.KV("tabs-bottom", props.Bottom),
+				templ.KV(props.ExtraClass, props.ExtraClass != ""),
+			}
+		>
+			for _, item := range props.Items {
+				<button
+					type="button"
+					role="tab"
+					data-tabs-target="tab"
+					data-tab={ item.Label }
+					{ stimulus.Action("click", "tabs", "select")... }
+					class={
+						"tab",
+						templ.KV("gap-2", item.Icon != ""),
+						templ.KV("tab-active", item.Active),
+						templ.KV(item.ColorCSS, item.ColorCSS != ""),
+					}
+					disabled?={ item.Disabled }
+					aria-selected={ strconv.FormatBool(item.Active) }
+				>
+					if item.Icon != "" {
+						@IconSpan(item.Icon, "size-4")
+					}
+					{ item.Label }
+				</button>
+			}
+		</div>
+		for _, item := range props.Items {
+			if item.Content != nil {
+				<div data-tabs-target="panel" data-tab={ item.Label } role="tabpanel"
+				     class="tab-content border-base-300 bg-base-100 p-6"
+				     style={ templ.KV("display:none", !item.Active) }>
+					@item.Content
+				</div>
+			}
+		}
+	</div>
+}

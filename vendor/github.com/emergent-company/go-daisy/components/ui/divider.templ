@@ -17,7 +17,7 @@ const (
 
 // Divider renders a horizontal (or vertical) divider with optional label content.
 templ Divider(color DividerColor, vertical bool) {
-	<div class={ "divider", string(color), templ.KV("divider-horizontal", vertical) } { devmode.Attrs(ctx, "ui/Divider")... }>
+	<div class={ "divider", templ.KV(string(color), color != ""), templ.KV("divider-horizontal", vertical), templ.KV("min-h-12", vertical) } { devmode.Attrs(ctx, "ui/Divider")... }>
 		{ children... }
 	</div>
 }

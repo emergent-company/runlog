@@ -1,0 +1,65 @@
+package ui
+
+import (
+	"encoding/json"
+
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+type CalendarWidgetProps struct {
+	Value  string
+	Min    string
+	Max    string
+	Locale string
+	Attrs  templ.Attributes
+}
+
+// CalendarWidget renders a <go-daisy-calendar> custom element.
+templ CalendarWidget(props CalendarWidgetProps) {
+	<go-daisy-calendar
+		if props.Value != "" {
+			value={ props.Value }
+		}
+		if props.Min != "" {
+			min={ props.Min }
+		}
+		if props.Max != "" {
+			max={ props.Max }
+		}
+		if props.Locale != "" {
+			locale={ props.Locale }
+		}
+		{ devmode.Attrs(ctx, "ui/CalendarWidget")... }
+		{ props.Attrs... }
+	></go-daisy-calendar>
+}
+
+type GanttWidgetProps struct {
+	Tasks    []GanttTask
+	ViewMode string
+	Attrs    templ.Attributes
+}
+
+type GanttTask struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Start        string `json:"start"`
+	End          string `json:"end"`
+	Progress     int    `json:"progress,omitempty"`
+	Dependencies string `json:"dependencies,omitempty"`
+}
+
+// GanttWidget renders a <go-daisy-gantt> custom element.
+templ GanttWidget(props GanttWidgetProps) {
+	{{
+		tasksJSON, _ := json.Marshal(props.Tasks)
+	}}
+	<go-daisy-gantt
+		data-tasks={ string(tasksJSON) }
+		if props.ViewMode != "" {
+			data-view-mode={ props.ViewMode }
+		}
+		{ devmode.Attrs(ctx, "ui/GanttWidget")... }
+		{ props.Attrs... }
+	></go-daisy-gantt>
+}

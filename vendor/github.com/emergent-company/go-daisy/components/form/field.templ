@@ -29,6 +29,7 @@ type FormFieldProps struct {
 	Placeholder string
 	Required    bool
 	Disabled    bool
+	Checked     bool // for checkbox — overrides Value string comparison
 	Error       string
 	Options     []SelectOption
 	Rows        int
@@ -37,6 +38,9 @@ type FormFieldProps struct {
 }
 
 // Field wraps a label + input + error message into a form group.
+//
+// Deprecated: use FormControl instead. FormControl supports label positioning,
+// hints, and is the canonical form wrapper for all input types.
 templ Field(label string, name string, errMsg string) {
 	<div class="form-control mb-3" { devmode.Attrs(ctx, "form/Field")... }>
 		if label != "" {
@@ -46,9 +50,7 @@ templ Field(label string, name string, errMsg string) {
 		}
 		{ children... }
 		if errMsg != "" {
-			<div class="label pt-1">
-				<span class="label-text-alt text-error">{ errMsg }</span>
-			</div>
+			@FieldError(errMsg)
 		}
 	</div>
 }
@@ -59,26 +61,8 @@ templ FormField(props FormFieldProps) {
 		<input type="hidden" name={ props.Name } value={ props.Value } { devmode.Attrs(ctx, "form/FormField")... } { props.Attrs... }/>
 	} else if props.Type == FieldCheckbox {
 		<div class="form-control mb-3" { devmode.Attrs(ctx, "form/FormField")... }>
-			<label class="label cursor-pointer justify-start gap-3">
-			<input
-				id={ props.Name }
-				name={ props.Name }
-				type="checkbox"
-				checked?={ props.Value == "true" || props.Value == "1" || props.Value == "on" }
-				required?={ props.Required }
-				disabled?={ props.Disabled }
-				class={ "checkbox checkbox-sm", props.Class }
-				{ props.Attrs... }
-			/>
-				if props.Label != "" {
-					<span class="label-text">{ props.Label }</span>
-				}
-			</label>
-			if props.Error != "" {
-				<div class="label pt-1">
-					<span class="label-text-alt text-error">{ props.Error }</span>
-				</div>
-			}
+			@checkableInput(props.Name, props.Checked || props.Value == "true" || props.Value == "1" || props.Value == "on", props.Label, "checkbox checkbox-sm " + props.Class, props.Required, props.Disabled, props.Attrs, "")
+			@FieldError(props.Error)
 		</div>
 	} else if props.Type == FieldTextarea {
 		@Field(props.Label, props.Name, props.Error) {
@@ -93,7 +77,7 @@ templ FormField(props FormFieldProps) {
 				disabled?={ props.Disabled }
 				class={ "textarea textarea-bordered w-full",
 					templ.KV("textarea-error", props.Error != ""),
-					props.Class }
+					templ.KV(props.Class, props.Class != "") }
 				{ props.Attrs... }
 			>{ props.Value }</textarea>
 		}
@@ -106,7 +90,7 @@ templ FormField(props FormFieldProps) {
 				disabled?={ props.Disabled }
 				class={ "select select-bordered w-full",
 					templ.KV("select-error", props.Error != ""),
-					props.Class }
+					templ.KV(props.Class, props.Class != "") }
 				{ props.Attrs... }
 			>
 				for _, opt := range props.Options {
@@ -128,7 +112,7 @@ templ FormField(props FormFieldProps) {
 				disabled?={ props.Disabled }
 				class={ "input input-bordered w-full",
 					templ.KV("input-error", props.Error != ""),
-					props.Class }
+					templ.KV(props.Class, props.Class != "") }
 				{ props.Attrs... }
 			/>
 		}

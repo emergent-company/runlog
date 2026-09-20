@@ -21,10 +21,10 @@ const (
 // attrs is optional; pass nil when not needed.
 templ Progress(color ProgressColor, value int, max int, attrs templ.Attributes) {
 	if value < 0 {
-		<progress class={ "progress", string(color), "w-full" } { devmode.Attrs(ctx, "ui/Progress")... } { attrs... }></progress>
+		<progress class={ "progress", templ.KV(string(color), color != ""), "w-full" } { devmode.Attrs(ctx, "ui/Progress")... } { attrs... }></progress>
 	} else {
 		<progress
-			class={ "progress", string(color), "w-full" }
+			class={ "progress", templ.KV(string(color), color != ""), "w-full" }
 			value={ strconv.Itoa(value) }
 			max={ strconv.Itoa(max) }
 			{ devmode.Attrs(ctx, "ui/Progress")... }

@@ -1,0 +1,3 @@
+package staticfs
+
+const staticFilesHash = "86d5cd6eb93d0455ef1408ec54f1ee9a261f036883e3bd3474b66f780355984c"

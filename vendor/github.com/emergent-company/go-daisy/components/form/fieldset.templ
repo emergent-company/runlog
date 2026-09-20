@@ -1,0 +1,25 @@
+package form
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// FieldsetProps configures a DaisyUI fieldset wrapper.
+type FieldsetProps struct {
+	Legend  string
+	Class   string
+	Attrs   templ.Attributes
+}
+
+// Fieldset renders a <fieldset> with DaisyUI fieldset classes.
+// Use for grouping related form controls.
+templ Fieldset(props FieldsetProps) {
+	<fieldset
+		class={ "fieldset", templ.KV(props.Class, props.Class != "") }
+		{ devmode.Attrs(ctx, "form/Fieldset")... }
+		{ props.Attrs... }
+	>
+		if props.Legend != "" {
+			<legend class="fieldset-legend">{ props.Legend }</legend>
+		}
+		{ children... }
+	</fieldset>
+}

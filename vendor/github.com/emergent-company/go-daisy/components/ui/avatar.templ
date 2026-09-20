@@ -2,6 +2,7 @@ package ui
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/emergent-company/go-daisy/devmode"
 )
@@ -14,17 +15,25 @@ const (
 	AvatarSM AvatarSize = "avatar-sm"
 	AvatarMD AvatarSize = "avatar-md"
 	AvatarLG AvatarSize = "avatar-lg"
+
+	// Explicit numeric size variants (Tailwind size-* classes). These map
+	// directly to the diameters used by the app's hand-rolled avatars.
+	AvatarSize6  AvatarSize = "size-6"
+	AvatarSize7  AvatarSize = "size-7"
+	AvatarSize14 AvatarSize = "size-14"
 )
 
 // avatarSizeClass maps an AvatarSize to a Tailwind size-* utility for the inner div.
 // DaisyUI v5 does not ship avatar-xs/sm/md/lg CSS rules; sizing must be explicit.
 func avatarSizeClass(size AvatarSize) string {
 	switch size {
-	case AvatarXS:
+	case AvatarXS, AvatarSize6:
 		return "size-6"
+	case AvatarSize7:
+		return "size-7"
 	case AvatarSM:
 		return "size-8"
-	case AvatarLG:
+	case AvatarLG, AvatarSize14:
 		return "size-14"
 	default: // AvatarMD and zero-value
 		return "size-10"
@@ -46,33 +55,139 @@ func avatarInitials(name string) string {
 	return strings.ToUpper(string(parts[0][0])) + strings.ToUpper(string(parts[len(parts)-1][0]))
 }
 
-// Avatar renders a circular avatar.
-// Priority: src (image) > icon (icon placeholder) > name initials.
-// Set icon to a Lucide icon suffix, e.g. "lucide--building-2" for a company avatar.
-// attrs is optional; pass nil when not needed.
-templ Avatar(name string, src string, icon string, size AvatarSize, attrs templ.Attributes) {
-	{{ sc := avatarSizeClass(size) }}
-	<div class="avatar" { devmode.Attrs(ctx, "ui/Avatar")... } { attrs... }>
-		if src != "" {
-			<div class={ sc + " rounded-full overflow-hidden" }>
-				<img src={ src } alt={ name } class="object-cover w-full h-full"/>
+// avatarInitialsRunes returns the first rune of up to two space-separated name
+// parts, uppercased, or "" for an empty name. Rune-safe and second-word based
+// to match the app's initials() helper ("Ada Lovelace" -> "AL", "ada" -> "A",
+// "" -> ""). Used by the initials-first fallback mode.
+func avatarInitialsRunes(name string) string {
+	fields := strings.Fields(name)
+	if len(fields) == 0 {
+		return ""
+	}
+	first, _ := utf8.DecodeRuneInString(fields[0])
+	out := strings.ToUpper(string(first))
+	if len(fields) > 1 {
+		second, _ := utf8.DecodeRuneInString(fields[1])
+		out += strings.ToUpper(string(second))
+	}
+	return out
+}
+
+// AvatarTone selects the color treatment of the initials/fallback badge.
+type AvatarTone string
+
+const (
+	// AvatarTonePrimary is the zero-value default: primary background with
+	// primary-content text.
+	AvatarTonePrimary AvatarTone = ""
+	// AvatarToneMuted renders a muted base-300 background with subdued text.
+	AvatarToneMuted AvatarTone = "muted"
+)
+
+// AvatarFallback selects the fallback priority when src is empty.
+type AvatarFallback string
+
+const (
+	// AvatarFallbackIcon is the zero-value default: icon > initials (current behavior).
+	AvatarFallbackIcon AvatarFallback = ""
+	// AvatarFallbackInitials prefers initials over the icon, falling back to the
+	// icon (default "lucide--user") when the name is empty.
+	AvatarFallbackInitials AvatarFallback = "initials"
+)
+
+// avatarFallbackIconName returns the icon shown when initials are unavailable,
+// defaulting to the Lucide user glyph.
+func avatarFallbackIconName(icon string) string {
+	if icon == "" {
+		return "lucide--user"
+	}
+	return icon
+}
+
+// avatarToneClasses returns the background/text/flex classes for an initials
+// or fallback-icon badge. The primary variant matches the original Avatar
+// initials classes so the zero-value renders identically.
+func avatarToneClasses(tone AvatarTone) string {
+	if tone == AvatarToneMuted {
+		return "bg-base-300 flex items-center justify-center font-semibold text-base-content/70"
+	}
+	return "bg-primary flex items-center justify-center font-semibold text-primary-content"
+}
+
+// AvatarProps configures an Avatar.
+type AvatarProps struct {
+	Name string
+	Src  string
+	Icon string
+	Size AvatarSize
+	Mask string
+	// Tone selects the initials badge color: AvatarTonePrimary (default) or
+	// AvatarToneMuted.
+	Tone AvatarTone
+	// Fallback selects the fallback priority when Src is empty:
+	// AvatarFallbackIcon (default, icon-first) or AvatarFallbackInitials
+	// (initials-first, falling back to Icon when the name is empty).
+	Fallback AvatarFallback
+	// Attrs is optional; pass nil when not needed.
+	Attrs templ.Attributes
+}
+
+// AvatarFull renders a circular avatar.
+// Priority: src (image) > fallback badge, where the fallback badge honors
+// Fallback: AvatarFallbackIcon (icon > initials) or AvatarFallbackInitials
+// (initials > icon). When initials are unavailable the icon defaults to the
+// Lucide user glyph unless Icon is set.
+// Set Mask to a DaisyUI mask class (e.g. "mask mask-squircle") to override the
+// default rounded shape.
+templ AvatarFull(props AvatarProps) {
+	{{ sc := avatarSizeClass(props.Size)
+		shape := "rounded-full" }}
+	if props.Mask != "" {
+		{{ shape = props.Mask }}
+	}
+	<div class="avatar" { devmode.Attrs(ctx, "ui/Avatar")... } { props.Attrs... }>
+		if props.Src != "" {
+			<div class={ sc, shape, "overflow-hidden" }>
+				<img src={ props.Src } alt={ props.Name } class="object-cover w-full h-full"/>
 			</div>
-		} else if icon != "" {
-			<div class={ sc + " avatar-placeholder rounded-full bg-base-300 flex items-center justify-center text-base-content/60" }>
-				<span class={ "iconify size-[55%] " + icon }></span>
+		} else if props.Fallback == AvatarFallbackInitials {
+			{{ init := avatarInitialsRunes(props.Name) }}
+			if init != "" {
+				<div class={ sc, "avatar-placeholder", shape, avatarToneClasses(props.Tone) }>
+					{ init }
+				</div>
+			} else {
+				<div class={ sc, "avatar-placeholder", shape, avatarToneClasses(props.Tone) }>
+					<span class={ "iconify size-[55%] " + avatarFallbackIconName(props.Icon) }></span>
+				</div>
+			}
+		} else if props.Icon != "" {
+			<div class={ sc, "avatar-placeholder", shape, "bg-base-300 flex items-center justify-center text-base-content/60" }>
+				<span class={ "iconify size-[55%] " + props.Icon }></span>
 			</div>
 		} else {
-			<div class={ sc + " avatar-placeholder rounded-full bg-primary flex items-center justify-center font-semibold text-primary-content" }>
-				{ avatarInitials(name) }
+			<div class={ sc, "avatar-placeholder", shape, avatarToneClasses(props.Tone) }>
+				{ avatarInitials(props.Name) }
 			</div>
 		}
 	</div>
 }
 
+// Avatar renders a circular avatar.
+// Priority: src (image) > icon (icon placeholder) > name initials.
+// Set icon to a Lucide icon suffix, e.g. "lucide--building-2" for a company avatar.
+// Set mask to a DaisyUI mask class (e.g. "mask mask-squircle") to override the default rounded shape.
+// attrs is optional; pass nil when not needed.
+//
+// Deprecated: use AvatarFull(AvatarProps{...}) to set tone and fallback priority.
+templ Avatar(name string, src string, icon string, size AvatarSize, mask string, attrs templ.Attributes) {
+	@AvatarFull(AvatarProps{Name: name, Src: src, Icon: icon, Size: size, Mask: mask, Attrs: attrs})
+}
+
 // PlaceholderAvatar is a backwards-compatible alias for Avatar with an icon.
-// Deprecated: use Avatar("", "", icon, size, nil) directly.
+// Deprecated: use AvatarFull(AvatarProps{Icon: icon, Size: size}) directly.
 templ PlaceholderAvatar(icon string, size AvatarSize) {
-	@Avatar("", "", icon, size, nil)
+	@AvatarFull(AvatarProps{Icon: icon, Size: size})
 }
 
 // PersonChipContact holds optional contact details shown in the PersonChip hover card.
@@ -87,69 +202,23 @@ type PersonChipContact struct {
 	ProfileHref string
 }
 
+// Deprecated: use PersonCell with Compact=true instead.
 // PersonChip renders an inline avatar+name chip with a CSS-only hover card revealing contact details.
 // avatarColor: a Tailwind bg-* class for the initials avatar (e.g. "bg-primary").
 // textColor: a Tailwind text-* class for the initials contrast (e.g. "text-primary-content").
 // gradientFrom/To: Tailwind from-*/to-* classes for the card header gradient (e.g. "from-primary/20 to-primary/5").
 templ PersonChip(name string, avatarColor string, textColor string, gradientFrom string, gradientTo string, contact PersonChipContact) {
-	<style>
-		.person-chip .person-card {
-			opacity: 0;
-			pointer-events: none;
-			transform: translateY(4px) scale(0.98);
-			transition: opacity 120ms ease, transform 120ms ease;
-		}
-		.person-chip .person-card::before {
-			content: '';
-			display: block;
-			position: absolute;
-			top: -8px;
-			left: 0;
-			right: 0;
-			height: 8px;
-		}
-		.person-chip:hover .person-card,
-		.person-chip:focus-within .person-card {
-			opacity: 1;
-			pointer-events: auto;
-			transform: translateY(0) scale(1);
-		}
-	</style>
-	<div class="relative person-chip inline-flex items-center gap-1.5 rounded-full px-2 py-1 cursor-default select-none hover:bg-base-200 transition-colors" { devmode.Attrs(ctx, "ui/PersonChip")... }>
-		<div class={ "size-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0", avatarColor, textColor }>{ avatarInitials(name) }</div>
-		<span class="text-sm font-medium text-base-content leading-none">{ name }</span>
-		<div class="person-card absolute left-[-8px] top-full z-50 w-64 rounded-2xl border border-base-200 bg-base-100 shadow-xl overflow-hidden">
-			<div class={ "h-10 bg-gradient-to-r", gradientFrom, gradientTo }></div>
-			<div class="px-4 pb-3 -mt-5 flex items-end gap-3">
-				<div class={ "size-10 rounded-full flex items-center justify-center text-sm font-bold ring-2 ring-base-100 shrink-0", avatarColor, textColor }>{ avatarInitials(name) }</div>
-				<div class="pb-0.5 min-w-0">
-					<p class="text-sm font-semibold text-base-content leading-tight truncate">{ name }</p>
-					if contact.Role != "" {
-						<p class="text-xs text-base-content/50 leading-tight">{ contact.Role }</p>
-					}
-				</div>
-			</div>
-			<div class="px-4 pb-4 space-y-2">
-				if contact.Email != "" {
-					<div class="flex items-center gap-2 text-xs text-base-content/60">
-						<svg class="size-3.5 shrink-0 text-base-content/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-						<span class="truncate">{ contact.Email }</span>
-					</div>
-				}
-				if contact.BadgeLabel != "" || contact.ProfileHref != "" {
-					<div class="flex items-center justify-between pt-1">
-						if contact.BadgeLabel != "" {
-							<span class={ "badge badge-sm", contact.BadgeClass }>{ contact.BadgeLabel }</span>
-						}
-						if contact.ProfileHref != "" {
-							@Button(ButtonProps{Type: ButtonTypeLink, Href: contact.ProfileHref, Variant: ButtonGhost, Size: ButtonXS, ExtraClass: "text-primary gap-1 px-2"}) {
-								View profile
-								<svg class="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-							}
-						}
-					</div>
-				}
-			</div>
-		</div>
-	</div>
+	@PersonCell(PersonCellProps{
+		Name:         name,
+		Subtitle:     contact.Role,
+		Compact:      true,
+		AvatarColor:  avatarColor,
+		TextColor:    textColor,
+		GradientFrom: gradientFrom,
+		GradientTo:   gradientTo,
+		Email:        contact.Email,
+		BadgeLabel:   contact.BadgeLabel,
+		BadgeClass:   contact.BadgeClass,
+		ProfileHref:  contact.ProfileHref,
+	})
 }

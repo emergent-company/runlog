@@ -41,7 +41,7 @@ templ EnhancedSelect(props EnhancedSelectProps) {
 			name={ props.Name }
 			class={ "select select-bordered w-full",
 				templ.KV("select-error", props.Error != ""),
-				props.Class }
+				templ.KV(props.Class, props.Class != "") }
 			required?={ props.Required }
 			multiple?={ props.Multiple }
 			data-choices data-placeholder={ props.Placeholder }
@@ -66,54 +66,15 @@ templ EnhancedSelect(props EnhancedSelectProps) {
 			<span class="text-error text-xs mt-1">{ props.Error }</span>
 		}
 	</div>
-	@choicesScript()
-}
-
-templ choicesScript() {
-	<script>
-	if (!window._choicesInit) {
-	  window._choicesInit = true;
-
-	  window.initChoices = function(el) {
-	    if (typeof Choices === 'undefined') {
-	      var s = document.createElement('script');
-	      s.src = 'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js';
-	      s.onload = function() { initChoicesElement(el); };
-	      document.head.appendChild(s);
-	      var l = document.createElement('link');
-	      l.rel = 'stylesheet';
-	      l.href = 'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css';
-	      document.head.appendChild(l);
-	    } else {
-	      initChoicesElement(el);
-	    }
-	  };
-
-	  function initChoicesElement(el) {
-	    if (el._choicesInstance) return;
-	    try {
-	      el._choicesInstance = new Choices(el, {
-	        allowHTML: false,
-	        searchEnabled: el.dataset.search !== 'false',
-	        removeItemButton: el.dataset.removeItems === 'true',
-	        itemSelectText: '',
-	        placeholderValue: el.dataset.placeholder || '',
-	        shouldSort: false,
-	      });
-	    } catch(e) { console.warn('Choices init failed:', e); }
-	  }
-
-	  document.addEventListener('DOMContentLoaded', function() {
-	    document.querySelectorAll('select[data-choices]').forEach(initChoicesElement);
-	  });
-	  document.addEventListener('htmx:after:settle', function() {
-	    document.querySelectorAll('select[data-choices]:not(._choices-initialized)').forEach(function(el) {
-	      el.classList.add('_choices-initialized');
-	      initChoicesElement(el);
-	    });
-	  });
-	}
-	</script>
+	@LazyLoadScript(LazyLoadConfig{
+		GuardName:  "_choices",
+		LibVarName: "Choices",
+		ScriptURL:  "https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/scripts/choices.min.js",
+		StyleURL:   "'https://cdn.jsdelivr.net/npm/choices.js@11.0.2/public/assets/styles/choices.min.css'",
+		Selector:   "select[data-choices]",
+		InitFunc:   "new Choices(el, {allowHTML: false, searchEnabled: el.dataset.search !== 'false', removeItemButton: el.dataset.removeItems === 'true', itemSelectText: '', placeholderValue: el.dataset.placeholder || '', shouldSort: false})",
+		FnSuffix:   "Choices",
+	})
 }
 
 

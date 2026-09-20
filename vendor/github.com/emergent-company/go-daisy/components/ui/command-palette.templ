@@ -4,6 +4,9 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var commandPaletteTriggerOnce = templ.NewOnceHandle()
+var commandPaletteScriptOnce = templ.NewOnceHandle()
+
 // CommandPaletteItem represents a single action in the command palette.
 type CommandPaletteItem struct {
 	ID          string
@@ -13,6 +16,9 @@ type CommandPaletteItem struct {
 	Shortcut    string
 	Href        string
 	Group       string
+	// Attrs are optional extra HTML attributes on the item's <a>, e.g.
+	// htmx navigation attributes or an onclick to close the palette.
+	Attrs templ.Attributes
 }
 
 // CommandPaletteProps configures a ⌘K command palette modal.
@@ -20,6 +26,7 @@ type CommandPaletteProps struct {
 	ID          string
 	Placeholder string
 	Items       []CommandPaletteItem
+	ItemsURL    string // JSON endpoint for remote results (fetched client-side)
 	Groups      []string
 	Open        bool
 	Attrs       templ.Attributes
@@ -27,7 +34,7 @@ type CommandPaletteProps struct {
 
 // CommandPalette renders a ⌘K-style command palette modal.
 templ CommandPalette(props CommandPaletteProps) {
-	<input type="checkbox" id={ props.ID + "-toggle" } class="modal-toggle" checked?={ props.Open } />
+	<input type="checkbox" id={ props.ID + "-toggle" } data-command-palette="true" class="modal-toggle" checked?={ props.Open } />
 	<div class="modal" role="dialog" { devmode.Attrs(ctx, "ui/CommandPalette")... } { props.Attrs... }>
 		<div class="modal-box p-0 max-w-lg">
 			<div class="flex items-center gap-3 px-4 py-3 border-b border-base-200">
@@ -46,7 +53,11 @@ templ CommandPalette(props CommandPaletteProps) {
 				/>
 				<label for={ props.ID + "-toggle" } class="btn btn-ghost btn-xs">Esc</label>
 			</div>
-			<div class="max-h-80 overflow-y-auto p-2" id={ props.ID + "-results" }>
+			<div class="max-h-80 overflow-y-auto p-2" id={ props.ID + "-results" }
+			if props.ItemsURL != "" {
+				data-items-url={ props.ItemsURL }
+			}
+		>
 				for _, group := range props.Groups {
 					@paletteGroup(props.ID, group, props.Items)
 				}
@@ -57,7 +68,7 @@ templ CommandPalette(props CommandPaletteProps) {
 		</div>
 		<label class="modal-backdrop" for={ props.ID + "-toggle" }></label>
 	</div>
-	@commandPaletteTrigger(props.ID)
+	@commandPaletteTrigger()
 	@commandPaletteScript()
 }
 
@@ -86,6 +97,7 @@ templ paletteGroup(paletteID, group string, items []CommandPaletteItem) {
 					class="flex items-center gap-3 px-3 py-2.5 rounded-box hover:bg-base-200 cursor-pointer transition-colors"
 					data-label={ item.Label }
 					data-group={ item.Group }
+					{ item.Attrs... }
 				>
 					if item.Icon != "" {
 						<span class={ "iconify size-4 shrink-0 text-base-content/50 " + item.Icon }></span>
@@ -105,38 +117,117 @@ templ paletteGroup(paletteID, group string, items []CommandPaletteItem) {
 	</div>
 }
 
-templ commandPaletteTrigger(paletteID string) {
-	<script>
+templ commandPaletteTrigger() {
+	@commandPaletteTriggerOnce.Once() {
+		<script>
 	if (!window._paletteTriggerInit) {
 	  window._paletteTriggerInit = true;
 
+	  // Templ does not interpolate Go expressions inside <script>, so palette
+	  // ids cannot be baked into this handler. Palette toggles are instead
+	  // marked with data-command-palette and resolved at runtime: ⌘K opens the
+	  // first command palette on the page, Escape closes any open one. This
+	  // keeps a single global listener while supporting any palette id.
 	  document.addEventListener('keydown', function(e) {
-	    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+	    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
 	      e.preventDefault();
-	      var cb = document.getElementById('{ paletteID }-toggle');
-	      if (cb) cb.checked = !cb.checked;
-	    }
-	  });
-
-	  document.addEventListener('htmx:after:settle', function() {
-	    // Re-bind keyboard shortcut after HTMX swaps
-	    if (!window._paletteKeydownBound) {
-	      window._paletteKeydownBound = true;
+	      var cb = document.querySelector('input.modal-toggle[data-command-palette]');
+	      if (cb) {
+	        cb.checked = !cb.checked;
+	        if (cb.checked) {
+	          var modal = cb.nextElementSibling;
+	          var input = modal ? modal.querySelector('input[type="text"]') : null;
+	          if (input) input.focus();
+	        }
+	      }
+	    } else if (e.key === 'Escape') {
+	      var toggles = document.querySelectorAll('input.modal-toggle[data-command-palette]');
+	      for (var i = 0; i < toggles.length; i++) {
+	        if (toggles[i].checked) toggles[i].checked = false;
+	      }
 	    }
 	  });
 	}
-	</script>
+		</script>
+	}
 }
 
 templ commandPaletteScript() {
-	<script>
+	@commandPaletteScriptOnce.Once() {
+		<script>
 	if (!window._paletteFilterInit) {
 	  window._paletteFilterInit = true;
 
 	  window.filterPaletteItems = function(input) {
 	    var q = input.value.toLowerCase().trim();
-	    var results = document.getElementById(input.id.replace('-input', '-results'));
+	    var modal = input.closest('.modal');
+	    var results = modal ? modal.querySelector('[id$="-results"]') : document.getElementById(input.id.replace('-input', '-results'));
 	    if (!results) return;
+
+	    if (results.dataset.itemsUrl && !window['_paletteFetched' + results.id]) {
+	      window['_paletteFetched' + results.id] = true;
+	      var xhr = new XMLHttpRequest();
+	      xhr.open('GET', results.dataset.itemsUrl);
+	      xhr.onload = function() {
+	        if (xhr.status === 200) {
+	          try {
+	            var data = JSON.parse(xhr.responseText);
+	            window['_paletteRemote' + results.id] = data;
+	          } catch(e) {}
+	        }
+	        filterResults(q, results);
+	      };
+	      xhr.send();
+	      return;
+	    }
+	    filterResults(q, results);
+	  };
+
+	  function filterResults(q, results) {
+	    var remote = window['_paletteRemote' + results.id] || [];
+	    if (remote.length) {
+	      var existing = results.querySelector('[data-remote-results]');
+	      if (existing) existing.remove();
+	      var div = document.createElement('div');
+	      div.setAttribute('data-remote-results', '');
+	      var found = 0;
+	      remote.forEach(function(item) {
+	        var label = (item.label || item.title || '').toLowerCase();
+	        var desc = (item.description || '').toLowerCase();
+	        var section = (item.section || item.group || '').toLowerCase();
+	        if (q && !label.includes(q) && !desc.includes(q) && !section.includes(q)) return;
+	        found++;
+	        var a = document.createElement('a');
+	        a.className = 'flex items-center gap-3 px-3 py-2.5 rounded-box hover:bg-base-200 cursor-pointer transition-colors';
+	        a.href = item.href || '#';
+	        if (item.icon) {
+	          var icon = document.createElement('span');
+	          icon.className = 'iconify size-4 shrink-0 text-base-content/50 ' + item.icon;
+	          a.appendChild(icon);
+	        }
+	        var body = document.createElement('div');
+	        body.className = 'flex-1 min-w-0';
+	        var title = document.createElement('p');
+	        title.className = 'text-sm font-medium text-base-content truncate';
+	        title.textContent = item.label || item.title;
+	        body.appendChild(title);
+	        if (item.description) {
+	          var d = document.createElement('p');
+	          d.className = 'text-xs text-base-content/40 truncate';
+	          d.textContent = item.description;
+	          body.appendChild(d);
+	        }
+	        a.appendChild(body);
+	        div.appendChild(a);
+	      });
+	      if (found === 0 && q) {
+	        var empty = document.createElement('p');
+	        empty.className = 'text-sm text-base-content/40 text-center py-4';
+	        empty.textContent = 'No results found.';
+	        div.appendChild(empty);
+	      }
+	      results.appendChild(div);
+	    }
 	    results.querySelectorAll('[data-palette-group]').forEach(function(group) {
 	      var items = group.querySelectorAll('[data-label]');
 	      var hasVisible = false;
@@ -149,7 +240,8 @@ templ commandPaletteScript() {
 	      var header = group.querySelector('p');
 	      if (header) header.style.display = hasVisible ? '' : 'none';
 	    });
-	  };
+	  }
 	}
 	</script>
+	}
 }

@@ -9,7 +9,6 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	ui "github.com/emergent-company/go-daisy/components/ui"
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
@@ -61,7 +60,7 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"join w-full\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"relative w-full\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -73,9 +72,9 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var3 = []any{"input input-bordered join-item flex-1",
+			var templ_7745c5c3_Var3 = []any{"input w-full pe-10",
 				templ.KV("input-error", props.Error != ""),
-				props.Class}
+				templ.KV(props.Class, props.Class != "")}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var3...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -87,7 +86,7 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 27, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 26, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -100,7 +99,7 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 28, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 27, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -113,7 +112,7 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 30, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 29, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -126,7 +125,7 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Placeholder)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 31, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/form/password-field.templ`, Line: 30, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -174,20 +173,12 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if props.ShowToggle {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<button type=\"button\" class=\"btn btn-outline join-item btn-square\" onclick=\"togglePasswordVisibility(this)\" aria-label=\"Toggle password visibility\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = ui.IconSpan("lucide--eye", "size-4").Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</button>")
+				templ_7745c5c3_Err = passwordToggleButton().Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -197,36 +188,7 @@ func PasswordField(props PasswordFieldProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = passwordFieldScript().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-func passwordFieldScript() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var9 == nil {
-			templ_7745c5c3_Var9 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<script>\n\tif (!window._pwFieldInit) {\n\t  window._pwFieldInit = true;\n\t  window.togglePasswordVisibility = function(btn) {\n\t    var input = btn.closest('.join').querySelector('input');\n\t    if (!input) return;\n\t    if (input.type === 'password') {\n\t      input.type = 'text';\n\t      btn.querySelector('.iconify').classList.remove('lucide--eye');\n\t      btn.querySelector('.iconify').classList.add('lucide--eye-off');\n\t    } else {\n\t      input.type = 'password';\n\t      btn.querySelector('.iconify').classList.remove('lucide--eye-off');\n\t      btn.querySelector('.iconify').classList.add('lucide--eye');\n\t    }\n\t  };\n\t}\n\t</script>")
+		templ_7745c5c3_Err = passwordToggleScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

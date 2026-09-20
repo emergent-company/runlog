@@ -1,0 +1,28 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// IconTileProps configures an IconTile.
+type IconTileProps struct {
+	// Tone is the daisyUI color token used for the tile's background, text
+	// and border, e.g. "primary", "secondary" or "error". Default "primary".
+	Tone string
+	// Size is the tile size class, e.g. "size-9". Default "size-9".
+	Size string
+}
+
+// IconTile renders a colored rounded-square icon tile: a bordered, tinted
+// square holding an IconSpan at "size-4.5".
+//
+//	@ui.IconTile("lucide--box", ui.IconTileProps{Tone: "secondary", Size: "size-8"})
+templ IconTile(name string, props ...IconTileProps) {
+	{{ var p IconTileProps
+	if len(props) > 0 { p = props[0] }
+	tone := p.Tone
+	if tone == "" { tone = "primary" }
+	size := p.Size
+	if size == "" { size = "size-9" } }}
+	<div class={ "grid shrink-0 place-items-center rounded-lg border bg-"+tone+"/10 text-"+tone+" border-"+tone+"/15", size } { devmode.Attrs(ctx, "ui/IconTile")... }>
+		@IconSpan(name, "size-4.5")
+	</div>
+}

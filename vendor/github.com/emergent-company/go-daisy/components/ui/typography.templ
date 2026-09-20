@@ -1,0 +1,88 @@
+package ui
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+templ TypographyType() {
+	<div class="space-y-6" { devmode.Attrs(ctx, "ui/TypographyType")... }>
+		<div class="space-y-3">
+			<h1 class="text-3xl font-bold text-base-content">Heading 1</h1>
+			<h2 class="text-2xl font-semibold text-base-content">Heading 2</h2>
+			<h3 class="text-xl font-semibold text-base-content">Heading 3</h3>
+			<h4 class="text-base font-semibold text-base-content">Heading 4</h4>
+			<p class="text-base text-base-content/80">Body text — regular paragraph content used in cards and detail views.</p>
+			<p class="text-sm text-base-content/60">Small / muted text — used for labels, hints, and secondary information.</p>
+			<p class="text-xs text-base-content/50 uppercase tracking-wide font-semibold">Overline / label text</p>
+			<a href="#" class="link link-primary text-sm">Link text</a>
+		</div>
+
+		<div class="card card-border">
+			<div class="bg-base-200/30 rounded-t-box px-5 py-3 font-medium">Sizes</div>
+			<div class="flex flex-col gap-3 p-6">
+				<p class="text-xs">The quick brown fox jumps… <span class="text-base-content/40">text-xs</span></p>
+				<p class="text-sm">The quick brown fox jumps… <span class="text-base-content/40">text-sm</span></p>
+				<p class="text-base">The quick brown fox jumps… <span class="text-base-content/40">text-base</span></p>
+				<p class="text-lg">The quick brown fox jumps… <span class="text-base-content/40">text-lg</span></p>
+				<p class="text-xl">The quick brown fox jumps… <span class="text-base-content/40">text-xl</span></p>
+				<p class="text-2xl">The quick brown fox jumps… <span class="text-base-content/40">text-2xl</span></p>
+				<p class="text-3xl">The quick brown fox jumps… <span class="text-base-content/40">text-3xl</span></p>
+				<p class="text-4xl">The quick brown fox jumps…  <span class="text-base-content/40">text-4xl</span></p>
+			</div>
+		</div>
+
+		<div class="card card-border">
+			<div class="bg-base-200/30 rounded-t-box px-5 py-3 font-medium">Weights</div>
+			<div class="flex flex-col gap-3 p-6">
+				<p class="font-thin">The quick brown fox jumps… <span class="text-base-content/40 font-normal">font-thin</span></p>
+				<p class="font-light">The quick brown fox jumps… <span class="text-base-content/40 font-normal">font-light</span></p>
+				<p class="font-normal">The quick brown fox jumps… <span class="text-base-content/40">font-normal</span></p>
+				<p class="font-medium">The quick brown fox jumps… <span class="text-base-content/40">font-medium</span></p>
+				<p class="font-semibold">The quick brown fox jumps… <span class="text-base-content/40">font-semibold</span></p>
+				<p class="font-bold">The quick brown fox jumps… <span class="text-base-content/40">font-bold</span></p>
+				<p class="font-extrabold">The quick brown fox jumps… <span class="text-base-content/40">font-extrabold</span></p>
+				<p class="font-black">The quick brown fox jumps… <span class="text-base-content/40">font-black</span></p>
+			</div>
+		</div>
+	</div>
+}
+
+templ TypographyLayoutExample() {
+	<div class="max-w-prose space-y-6" { devmode.Attrs(ctx, "ui/TypographyLayoutExample")... }>
+		<h1 class="text-3xl font-bold text-base-content leading-tight tracking-tight">The Art of Typography</h1>
+		<p class="text-lg text-base-content/70 leading-relaxed">Typography is the craft of arranging type to make written language legible, readable, and appealing.</p>
+
+		<h2 class="text-2xl font-semibold text-base-content leading-tight tracking-tight">Hierarchy</h2>
+		<p class="text-base text-base-content/80 leading-relaxed">A clear typographic hierarchy guides readers through content. Headings create visual anchors; body text provides the substance. <a href="#" class="link link-primary">Links guide the eye</a> to related information.</p>
+
+		<h3 class="text-xl font-semibold text-base-content leading-tight tracking-tight">Contrast</h3>
+		<p class="text-base text-base-content/80 leading-relaxed">Contrast in size, weight, and color separates content layers. Primary content demands attention; secondary notes recede into the background.</p>
+
+		<blockquote class="border-l-4 border-base-300 pl-4 py-1 my-6 space-y-2">
+			<p class="text-base text-base-content/70 italic leading-relaxed">Good typography is invisible. Bad typography is everywhere.</p>
+			<footer class="text-sm text-base-content/50">— Oliver Reichenstein</footer>
+		</blockquote>
+
+		<h2 class="text-2xl font-semibold text-base-content leading-tight tracking-tight">Readability</h2>
+		<ul class="list-disc pl-6 space-y-2">
+			<li class="text-base text-base-content/80 leading-relaxed">Line height of 1.5–1.75 improves tracking across long lines</li>
+			<li class="text-base text-base-content/80 leading-relaxed">Maximum line length of 65–75 characters prevents eye fatigue</li>
+			<li class="text-base text-base-content/80 leading-relaxed">Adequate contrast ratios ensure accessibility for all readers</li>
+			<li class="text-base text-base-content/80 leading-relaxed">Consistent spacing creates rhythm and predictability</li>
+		</ul>
+
+		<h2 class="text-2xl font-semibold text-base-content leading-tight tracking-tight">Scale</h2>
+		<p class="text-base text-base-content/80 leading-relaxed">A modular type scale ensures proportional relationships between text sizes. The default Tailwind scale uses a 1.125 ratio (major second), providing subtle but clear distinction between levels:</p>
+		<ol class="list-decimal pl-6 space-y-1">
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">xs (12px)</strong> — captions, labels, fine print</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">sm (14px)</strong> — secondary text, hints, metadata</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">base (16px)</strong> — body copy, the foundation</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">lg (18px)</strong> — lead paragraphs, emphasized text</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">xl (20px)</strong> — subheadings, card titles</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">2xl (24px)</strong> — section headings</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">3xl (30px)</strong> — page headings</li>
+			<li class="text-base text-base-content/80 leading-relaxed"><strong class="font-semibold">4xl (36px)</strong> — hero titles</li>
+		</ol>
+
+		<hr class="border-base-200 my-8"/>
+		<p class="text-sm text-base-content/60">Last updated: July 2026 · <a href="#" class="link link-primary">Typography guidelines</a></p>
+	</div>
+}

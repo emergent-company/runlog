@@ -14,6 +14,12 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+// SwiperCarousel is a SwiperJS-powered carousel with navigation, pagination, autoplay,
+// loop, multi-slide views, and transition effects. Lazy-loads SwiperJS ~200KB from CDN.
+// For a lightweight CSS scroll-snap alternative with zero JS dependencies, see Carousel in carousel.templ.
+
+var swiperScriptOnce = templ.NewOnceHandle()
+
 // SwiperEffect represents a Swiper transition effect.
 type SwiperEffect string
 
@@ -75,7 +81,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 44, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 50, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -88,7 +94,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("height:" + props.Height)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 46, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 52, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -101,7 +107,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(props.Effect))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 48, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 54, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -114,7 +120,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Navigation, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 49, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 55, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -127,7 +133,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Pagination, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 50, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 56, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -140,7 +146,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Autoplay, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 51, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 57, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -153,7 +159,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(props.AutoplayDelay))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 52, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 58, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -166,7 +172,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(ternary(props.Loop, "true", "false"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 53, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 59, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
@@ -179,7 +185,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(max(props.SlidesPerView, 1)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 54, Col: 66}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 60, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -192,7 +198,7 @@ func SwiperCarousel(props SwiperCarouselProps) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(strconv.Itoa(props.SpaceBetween))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 55, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/ui/swiper-carousel.templ`, Line: 61, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -295,7 +301,25 @@ func swiperScript() templ.Component {
 			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<script>\n\tif (!window._swiperInit) {\n\t  window._swiperInit = true;\n\n\t  window.initSwiper = function(el) {\n\t    if (typeof Swiper === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/swiper@11.2.6/swiper-bundle.min.js';\n\t      s.onload = function() { initSwiperElement(el); };\n\t      document.head.appendChild(s);\n\t      var l = document.createElement('link');\n\t      l.rel = 'stylesheet';\n\t      l.href = 'https://cdn.jsdelivr.net/npm/swiper@11.2.6/swiper-bundle.min.css';\n\t      document.head.appendChild(l);\n\t    } else {\n\t      initSwiperElement(el);\n\t    }\n\t  };\n\n\t  function initSwiperElement(el) {\n\t    if (el._swiperInstance) return;\n\t    try {\n\t      el._swiperInstance = new Swiper(el, {\n\t        effect: el.dataset.effect || 'slide',\n\t        navigation: el.dataset.navigation === 'true' ? { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' } : false,\n\t        pagination: el.dataset.pagination === 'true' ? { el: '.swiper-pagination', clickable: true } : false,\n\t        autoplay: el.dataset.autoplay === 'true' ? { delay: parseInt(el.dataset.autoplayDelay) || 3000 } : false,\n\t        loop: el.dataset.loop === 'true',\n\t        slidesPerView: parseInt(el.dataset.slidesPerView) || 1,\n\t        spaceBetween: parseInt(el.dataset.spaceBetween) || 0,\n\t      });\n\t    } catch(e) { console.warn('Swiper init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-swiper]').forEach(initSwiperElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-swiper]:not(._swiper-initialized)').forEach(function(el) {\n\t      el.classList.add('_swiper-initialized');\n\t      initSwiperElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+		templ_7745c5c3_Var15 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<script>\n\tif (!window._swiperInit) {\n\t  window._swiperInit = true;\n\n\t  window.initSwiper = function(el) {\n\t    if (typeof Swiper === 'undefined') {\n\t      var s = document.createElement('script');\n\t      s.src = 'https://cdn.jsdelivr.net/npm/swiper@11.2.6/swiper-bundle.min.js';\n\t      s.onload = function() { initSwiperElement(el); };\n\t      document.head.appendChild(s);\n\t      var l = document.createElement('link');\n\t      l.rel = 'stylesheet';\n\t      l.href = 'https://cdn.jsdelivr.net/npm/swiper@11.2.6/swiper-bundle.min.css';\n\t      document.head.appendChild(l);\n\t    } else {\n\t      initSwiperElement(el);\n\t    }\n\t  };\n\n\t  function initSwiperElement(el) {\n\t    if (el._swiperInstance) return;\n\t    try {\n\t      el._swiperInstance = new Swiper(el, {\n\t        effect: el.dataset.effect || 'slide',\n\t        navigation: el.dataset.navigation === 'true' ? { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' } : false,\n\t        pagination: el.dataset.pagination === 'true' ? { el: '.swiper-pagination', clickable: true } : false,\n\t        autoplay: el.dataset.autoplay === 'true' ? { delay: parseInt(el.dataset.autoplayDelay) || 3000 } : false,\n\t        loop: el.dataset.loop === 'true',\n\t        slidesPerView: parseInt(el.dataset.slidesPerView) || 1,\n\t        spaceBetween: parseInt(el.dataset.spaceBetween) || 0,\n\t      });\n\t    } catch(e) { console.warn('Swiper init failed:', e); }\n\t  }\n\n\t  document.addEventListener('DOMContentLoaded', function() {\n\t    document.querySelectorAll('[data-swiper]').forEach(initSwiperElement);\n\t  });\n\t  document.addEventListener('htmx:after:settle', function() {\n\t    document.querySelectorAll('[data-swiper]:not(._swiper-initialized)').forEach(function(el) {\n\t      el.classList.add('_swiper-initialized');\n\t      initSwiperElement(el);\n\t    });\n\t  });\n\t}\n\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = swiperScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var15), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

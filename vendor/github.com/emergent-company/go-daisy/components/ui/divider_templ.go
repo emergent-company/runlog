@@ -45,7 +45,7 @@ func Divider(color DividerColor, vertical bool) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		var templ_7745c5c3_Var2 = []any{"divider", string(color), templ.KV("divider-horizontal", vertical)}
+		var templ_7745c5c3_Var2 = []any{"divider", templ.KV(string(color), color != ""), templ.KV("divider-horizontal", vertical), templ.KV("min-h-12", vertical)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

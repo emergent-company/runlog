@@ -7,58 +7,26 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
-// PageTitleStep is a single breadcrumb step used in page title components.
-// A step with an empty Href renders as plain text.
-type PageTitleStep struct {
-	Label string
-	// Href is the link target. If empty the step is rendered as plain text.
-	Href string
-	// Icon is an optional Iconify icon identifier shown before the label.
-	Icon string
-}
-
 // PageTitleMinimal renders a compact title bar with an inline breadcrumb trail
 // on the right and a primary title on the left.
-templ PageTitleMinimal(title string, steps []PageTitleStep) {
+templ PageTitleMinimal(title string, steps []BreadcrumbItem) {
 	<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3" { devmode.Attrs(ctx, "nav/PageTitleMinimal")... }>
 		<div class="flex w-full items-center justify-between gap-3">
 			<p class="font-semibold text-base-content">{ title }</p>
-			<nav class="text-base-content/80 flex items-center gap-2 text-sm" aria-label="Breadcrumb">
-				for i, step := range steps {
-					if i > 0 {
-						<span aria-hidden="true">/</span>
-					}
-					if step.Href != "" {
-						<a class="inline-flex items-center gap-1 hover:text-primary" href={ templ.SafeURL(step.Href) }>
-							if step.Icon != "" {
-								@ui.IconSpan(step.Icon, "size-4")
-							}
-							{ step.Label }
-						</a>
-					} else {
-						<span class="text-base-content font-medium">{ step.Label }</span>
-					}
-				}
-			</nav>
+			@Breadcrumbs(steps, BreadcrumbsDividerSlash)
 		</div>
 	</div>
 }
 
 // PageTitleEditorAction is a single action button rendered in PageTitleEditor.
 type PageTitleEditorAction struct {
-	// Label is the button text. Leave empty for icon-only buttons.
-	Label string
-	// Icon is an optional Iconify icon identifier.
-	Icon string
-	// Href is the link target (renders an <a> instead of <button>).
-	Href string
-	// Class is extra DaisyUI button classes (e.g. "btn-primary btn-sm").
-	Class string
-	// AriaLabel is used for icon-only buttons.
+	Label     string
+	Icon     string
+	Href     string
+	Class    string
 	AriaLabel string
 }
 
-// pageTitleActionType picks the Link type when an action has an href, otherwise Button.
 func pageTitleActionType(href string) ui.ButtonType {
 	if href != "" {
 		return ui.ButtonTypeLink
@@ -66,8 +34,6 @@ func pageTitleActionType(href string) ui.ButtonType {
 	return ui.ButtonTypeButton
 }
 
-// pageTitleActionAttrs builds an aria-label attribute map only when set, to
-// avoid rendering an empty aria-label (which is worse for a11y than omitting it).
 func pageTitleActionAttrs(ariaLabel string) templ.Attributes {
 	if ariaLabel == "" {
 		return nil
@@ -77,20 +43,10 @@ func pageTitleActionAttrs(ariaLabel string) templ.Attributes {
 
 // PageTitleEditor renders a full page title with DaisyUI breadcrumbs,
 // a subtitle meta line, and a row of action buttons.
-templ PageTitleEditor(steps []BreadcrumbStep, title, subtitle string, actions []PageTitleEditorAction) {
+templ PageTitleEditor(steps []BreadcrumbItem, title, subtitle string, actions []PageTitleEditorAction) {
 	<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3" { devmode.Attrs(ctx, "nav/PageTitleEditor")... }>
-		<div class="breadcrumbs text-sm mb-1">
-			<ul>
-				for _, step := range steps {
-					<li>
-						if step.URL != "" {
-							<a href={ templ.SafeURL(step.URL) }>{ step.Label }</a>
-						} else {
-							{ step.Label }
-						}
-					</li>
-				}
-			</ul>
+		<div class="mb-1">
+			@Breadcrumbs(steps, BreadcrumbsDividerDefault)
 		</div>
 		<div class="flex items-end justify-between gap-3">
 			<div>
@@ -120,7 +76,7 @@ templ PageTitleEditor(steps []BreadcrumbStep, title, subtitle string, actions []
 type PageTitleVariantOpts struct {
 	Title    string
 	Subtitle string
-	Steps    []BreadcrumbStep
+	Steps    []BreadcrumbItem
 
 	OrderID  string
 	Date     string
@@ -143,21 +99,7 @@ templ PageTitleVariant(style string, opts PageTitleVariantOpts) {
 		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
 			<div class="flex w-full items-center justify-between gap-3">
 				<p class="font-medium">{ opts.Title }</p>
-				<nav class="text-base-content/80 flex items-center gap-3 text-sm" aria-label="Breadcrumb">
-					for i, step := range opts.Steps {
-						if i > 0 {
-							<span aria-hidden="true">/</span>
-						}
-						if step.URL != "" {
-							<a class="inline-flex items-center gap-1 hover:text-primary" href={ templ.SafeURL(step.URL) }>
-								@ui.IconSpan("lucide--package", "size-4")
-								<span class="max-sm:hidden">{ step.Label }</span>
-							</a>
-						} else {
-							<span class="text-base-content font-medium">{ step.Label }</span>
-						}
-					}
-				</nav>
+				@Breadcrumbs(opts.Steps, BreadcrumbsDividerSlash)
 			</div>
 		</div>
 
@@ -200,22 +142,7 @@ templ PageTitleVariant(style string, opts PageTitleVariantOpts) {
 	case "editor":
 		<div class="bg-base-100 rounded-lg border border-base-200 px-4 py-3 shadow" { devmode.Attrs(ctx, "nav/PageTitleVariant")... }>
 			<div class="w-full">
-				<div class="breadcrumbs text-sm">
-					<ul>
-						for _, step := range opts.Steps {
-							<li>
-								if step.URL != "" {
-									<a href={ templ.SafeURL(step.URL) }>
-										@ui.IconSpan("lucide--layout-dashboard", "mr-1 size-4")
-										{ step.Label }
-									</a>
-								} else {
-									{ step.Label }
-								}
-							</li>
-						}
-					</ul>
-				</div>
+				@Breadcrumbs(opts.Steps, BreadcrumbsDividerDefault)
 				<div class="mt-1 flex items-end justify-between gap-3">
 					<div>
 						<p class="font-medium sm:text-lg">{ opts.Title }</p>
@@ -293,18 +220,7 @@ templ PageTitleVariant(style string, opts PageTitleVariantOpts) {
 			<div class="flex w-full items-center justify-between gap-3">
 				<div>
 					<p class="font-medium sm:text-lg">{ opts.Title }</p>
-					<nav class="text-base-content/80 flex items-center gap-3 text-sm" aria-label="Breadcrumb">
-						for i, step := range opts.Steps {
-							if i > 0 {
-								<span aria-hidden="true">/</span>
-							}
-							if step.URL != "" {
-								<a class="hover:text-primary" href={ templ.SafeURL(step.URL) }>{ step.Label }</a>
-							} else {
-								<span class="text-base-content font-medium">{ step.Label }</span>
-							}
-						}
-					</nav>
+					@Breadcrumbs(opts.Steps, BreadcrumbsDividerSlash)
 				</div>
 				<div class="flex items-center gap-3">
 					<div class="dropdown dropdown-end">

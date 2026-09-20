@@ -24,7 +24,11 @@ type NotificationItem struct {
 	Unread bool
 }
 
-// NotificationRow renders a single notification list item.
+// NotificationRow renders a single notification list item (<li>).
+// It is designed as a child of NotificationPanel, which provides the
+// surrounding <ul>. Use NotificationPanelWithBoundary in boundary.go
+// for the ready-to-use composition (items slice → panel with rows).
+// For a dropdown-style layout, see NotificationDropdown.
 templ NotificationRow(item NotificationItem) {
 	<li class={ "flex gap-3 px-4 py-3", templ.KV("bg-primary/5", item.Unread) } { devmode.Attrs(ctx, "ui/NotificationRow")... }>
 		<div class={ "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", item.IconClass }>
@@ -41,8 +45,11 @@ templ NotificationRow(item NotificationItem) {
 	</li>
 }
 
-// NotificationPanel renders a tab-based notification center with All / Unread tabs
-// and a children slot for notification items.
+// NotificationPanel renders a tab-based notification center with All / Unread tabs,
+// a children slot (typically filled with NotificationRow items), and a footer link.
+// For convenience, use NotificationPanelWithBoundary in boundary.go — it accepts
+// a []NotificationItem slice and composes NotificationRow children automatically.
+// For a dropdown-style variant, see NotificationDropdown.
 templ NotificationPanel(unreadCount int, viewAllHref string) {
 	<div class="bg-base-100 border border-base-200 rounded-box shadow-lg w-80" { devmode.Attrs(ctx, "ui/NotificationPanel")... }>
 		<div class="flex items-center justify-between px-4 pt-4 pb-2">

@@ -1,102 +1,91 @@
 // Package staticfs embeds the static/ directory so that it can be served from
 // the binary without a runtime filesystem dependency.
+//
+// When static files change, run:  go generate ./staticfs/
+// This updates staticfs_hash.go so the Go compiler recompiles the package.
+//go:generate sh -c "find static -type f -exec sha256sum {} + | sha256sum | cut -d' ' -f1 | xargs -I{} printf 'package staticfs\n\nconst staticFilesHash = \"%s\"\n' {} > staticfs_hash.go"
 package staticfs
 
 import (
-	"bytes"
-	"io"
+	"embed"
+	"fmt"
+	"html"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
-	"time"
 )
 
-// Static files embedded as Go byte slices.
-var staticFiles = map[string]struct {
-	data    []byte
-	modTime time.Time
-}{}
+//go:embed all:static
+var files embed.FS
 
-func init() {
-	staticFiles["css/app.css"] = struct {
-		data    []byte
-		modTime time.Time
-	}{data: cssAppCSS, modTime: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)}
-	staticFiles["css/frappe-gantt.css"] = struct {
-		data    []byte
-		modTime time.Time
-	}{data: cssFrappeGanttCSS, modTime: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)}
-	staticFiles["js/frappe-gantt.js"] = struct {
-		data    []byte
-		modTime time.Time
-	}{data: jsFrappeGanttJS, modTime: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)}
-	staticFiles["js/htmx.js"] = struct {
-		data    []byte
-		modTime time.Time
-	}{data: jsHtmxJS, modTime: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)}
-	staticFiles["js/hx-head.js"] = struct {
-		data    []byte
-		modTime time.Time
-	}{data: jsHxHeadJS, modTime: time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC)}
+// UseUnminified controls whether Script() serves unminified variants of
+// go-daisy-owned JS files. When true, the ".min" suffix is stripped from
+// the path when an unminified variant exists in the embedded FS.
+//
+// Default false — always serves minified production files.
+var UseUnminified bool
 
-	// Force linker to retain all data by storing a copy of each
-	_ = append([]byte{}, cssAppCSS...)
-	_ = append([]byte{}, cssFrappeGanttCSS...)
-	_ = append([]byte{}, jsFrappeGanttJS...)
-	_ = append([]byte{}, jsHtmxJS...)
-	_ = append([]byte{}, jsHxHeadJS...)
+// Hash returns the current content hash of all static files.
+// Use for cache-busting query params: /static/js/htmx.js?v=abc123
+func Hash() string {
+	return staticFilesHash[:12]
 }
 
-// FS returns a read-only filesystem view of the embedded static files.
+// Stylesheet returns a <link> tag for a CSS file with cache-busting hash.
+// path is relative to static/, e.g. "/css/app.css"
+func Stylesheet(p string) string {
+	return fmt.Sprintf(`<link rel="stylesheet" href="/static%s?v=%s" data-asset-track="reload">`,
+		html.EscapeString(p), staticFilesHash[:12])
+}
+
+// Script returns a <script> tag for a JS file with cache-busting hash.
+// path is relative to static/, e.g. "/js/htmx.js"
+//
+// When UseUnminified is true and path contains ".min.js", the ".min" suffix
+// is stripped to serve the unminified variant (e.g. "file.min.js" → "file.js").
+// Falls back to the original path if the unminified variant doesn't exist.
+func Script(p string) string {
+	resolved := p
+	if UseUnminified {
+		unmin := strings.Replace(p, ".min.js", ".js", 1)
+		if unmin != p {
+			if _, err := fs.Stat(FS(), unmin[1:]); err == nil {
+				resolved = unmin
+			}
+		}
+	}
+	return fmt.Sprintf(`<script src="/static%s?v=%s" data-asset-track="reload"></script>`,
+		html.EscapeString(resolved), staticFilesHash[:12])
+}
+
+// AssetPath returns the full URL path for a static file with cache-busting hash.
+// When UseUnminified is true, strips ".min" suffix same as Script().
+func AssetPath(p string) string {
+	resolved := p
+	if UseUnminified {
+		unmin := strings.Replace(p, ".min.js", ".js", 1)
+		if unmin != p {
+			if _, err := fs.Stat(FS(), unmin[1:]); err == nil {
+				resolved = unmin
+			}
+		}
+	}
+	return fmt.Sprintf("/static%s?v=%s", resolved, staticFilesHash[:12])
+}
+
+// FS returns the embedded static file system, rooted at "static/".
 func FS() fs.FS {
-	return &mapFS{files: staticFiles}
-}
-
-type mapFS struct {
-	files map[string]struct{ data []byte; modTime time.Time }
-}
-
-func (m *mapFS) Open(name string) (fs.File, error) {
-	if !fs.ValidPath(name) {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	sub, err := fs.Sub(files, "static")
+	if err != nil {
+		panic("staticfs: " + err.Error())
 	}
-	f, ok := m.files[name]
-	if !ok {
-		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
-	}
-	return &mapFile{name: name, data: f.data, modTime: f.modTime}, nil
-}
-
-type mapFile struct {
-	name    string
-	data    []byte
-	modTime time.Time
-	reader  *bytes.Reader
-}
-
-func (f *mapFile) Stat() (fs.FileInfo, error) { return f, nil }
-func (f *mapFile) Read(b []byte) (int, error) {
-	if f.reader == nil {
-		f.reader = bytes.NewReader(f.data)
-	}
-	return f.reader.Read(b)
-}
-func (f *mapFile) Close() error { return nil }
-func (f *mapFile) Name() string { return f.name }
-func (f *mapFile) Size() int64  { return int64(len(f.data)) }
-func (f *mapFile) Mode() fs.FileMode  { return 0644 }
-func (f *mapFile) ModTime() time.Time { return f.modTime }
-func (f *mapFile) IsDir() bool        { return false }
-func (f *mapFile) Sys() interface{}   { return nil }
-func (f *mapFile) Seek(offset int64, whence int) (int64, error) {
-	if f.reader == nil {
-		f.reader = bytes.NewReader(f.data)
-	}
-	return f.reader.Seek(offset, whence)
+	return sub
 }
 
 // MIME extensions that override the OS mime.types database.
+// Arch Linux and some containers map .js to text/plain, which breaks
+// script execution in browsers (CORB/MIME type checking).
 var mimeExtensions = map[string]string{
 	".js":   "application/javascript",
 	".css":  "text/css; charset=utf-8",
@@ -106,44 +95,50 @@ var mimeExtensions = map[string]string{
 	".mjs":  "application/javascript",
 }
 
-func mimeTypeByExtension(path string) string {
-	idx := strings.LastIndexByte(path, '.')
+func mimeTypeByExtension(p string) string {
+	idx := strings.LastIndexByte(p, '.')
 	if idx < 0 {
 		return ""
 	}
-	return mimeExtensions[path[idx:]]
+	return mimeExtensions[p[idx:]]
 }
 
-// Handler returns an http.Handler that serves the embedded static files.
+// Handler returns an http.Handler that serves the embedded static files,
+// stripping the given prefix (e.g. "/static/").
+// Content-Type is set explicitly for known extensions to override buggy
+// OS-level MIME databases (e.g. Arch Linux maps .js → text/plain).
 func Handler(prefix string) http.Handler {
-	root := FS()
+	fileServer := http.FileServer(http.FS(FS()))
 	return http.StripPrefix(prefix, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		ct := mimeTypeByExtension(path.Clean(r.URL.Path))
+		if ct == "" {
+			fileServer.ServeHTTP(w, r)
 			return
 		}
-		filePath := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if filePath == "" {
-			filePath = "index.html"
-		}
-
-		f, err := root.Open(filePath)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		defer f.Close()
-
-		stat, err := f.Stat()
-		if err != nil || stat.IsDir() {
-			http.NotFound(w, r)
-			return
-		}
-
-		if ct := mimeTypeByExtension(filePath); ct != "" {
-			w.Header().Set("Content-Type", ct)
-		}
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeContent(w, r, filePath, stat.ModTime(), f.(io.ReadSeeker))
+		lw := &mimeWriter{ResponseWriter: w, ct: ct}
+		fileServer.ServeHTTP(lw, r)
 	}))
+}
+
+// mimeWriter forces Content-Type before Go's http.FileServer can set it
+// based on the OS mime.types (which may be wrong for .js on some systems).
+type mimeWriter struct {
+	http.ResponseWriter
+	ct    string
+	wrote bool
+}
+
+func (w *mimeWriter) WriteHeader(code int) {
+	if !w.wrote {
+		w.Header().Set("Content-Type", w.ct)
+		w.wrote = true
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *mimeWriter) Write(b []byte) (int, error) {
+	if !w.wrote {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
 }

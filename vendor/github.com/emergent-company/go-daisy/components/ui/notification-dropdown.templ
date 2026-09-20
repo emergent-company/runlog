@@ -6,6 +6,8 @@ import (
 	"github.com/emergent-company/go-daisy/devmode"
 )
 
+var notificationDropdownScriptOnce = templ.NewOnceHandle()
+
 // NotificationDropdownProps configures a dropdown notification panel.
 type NotificationDropdownProps struct {
 	ID          string
@@ -82,7 +84,8 @@ templ dropdownNotificationRow(dropdownID string, item NotificationItem) {
 }
 
 templ notificationDropdownScript(id string) {
-	<script>
+	@notificationDropdownScriptOnce.Once() {
+		<script>
 	if (!window._notifDropdownInit) {
 	  window._notifDropdownInit = true;
 
@@ -132,4 +135,5 @@ templ notificationDropdownScript(id string) {
 	  }
 	}
 	</script>
+	}
 }

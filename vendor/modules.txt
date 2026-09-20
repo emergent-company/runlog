@@ -22,11 +22,23 @@ cloud.google.com/go/auth/internal/trustboundary
 # cloud.google.com/go/compute/metadata v0.9.0
 ## explicit; go 1.24.0
 cloud.google.com/go/compute/metadata
+# github.com/Oudwins/tailwind-merge-go v0.2.2
+## explicit; go 1.21.5
+github.com/Oudwins/tailwind-merge-go
+github.com/Oudwins/tailwind-merge-go/pkg/cache
+github.com/Oudwins/tailwind-merge-go/pkg/lru
+github.com/Oudwins/tailwind-merge-go/pkg/twmerge
 # github.com/a-h/templ v0.3.1020
 ## explicit; go 1.25.0
 github.com/a-h/templ
 github.com/a-h/templ/runtime
 github.com/a-h/templ/safehtml
+# github.com/alecthomas/chroma/v2 v2.27.0
+## explicit; go 1.25
+github.com/alecthomas/chroma/v2
+github.com/alecthomas/chroma/v2/formatters/html
+github.com/alecthomas/chroma/v2/lexers
+github.com/alecthomas/chroma/v2/styles
 # github.com/aymanbagabas/go-osc52/v2 v2.0.1
 ## explicit; go 1.16
 github.com/aymanbagabas/go-osc52/v2
@@ -52,18 +64,26 @@ github.com/charmbracelet/x/cellbuf
 # github.com/charmbracelet/x/term v0.2.1
 ## explicit; go 1.18
 github.com/charmbracelet/x/term
+# github.com/dlclark/regexp2/v2 v2.2.1
+## explicit; go 1.25
+github.com/dlclark/regexp2/v2
+github.com/dlclark/regexp2/v2/helpers
+github.com/dlclark/regexp2/v2/syntax
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
-# github.com/emergent-company/go-daisy v0.5.0 => /root/go-daisy
+# github.com/emergent-company/go-daisy v0.12.0
 ## explicit; go 1.25.6
+github.com/emergent-company/go-daisy/components/alpine
 github.com/emergent-company/go-daisy/components/form
 github.com/emergent-company/go-daisy/components/layout
 github.com/emergent-company/go-daisy/components/nav
+github.com/emergent-company/go-daisy/components/stimulus
 github.com/emergent-company/go-daisy/components/table
 github.com/emergent-company/go-daisy/components/ui
 github.com/emergent-company/go-daisy/devmode
 github.com/emergent-company/go-daisy/render
+github.com/emergent-company/go-daisy/shared
 github.com/emergent-company/go-daisy/staticfs
 # github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f
 ## explicit; go 1.16
@@ -440,4 +460,3 @@ rsc.io/omap
 # rsc.io/ordered v1.1.1
 ## explicit; go 1.22.0
 rsc.io/ordered
-# github.com/emergent-company/go-daisy => /root/go-daisy

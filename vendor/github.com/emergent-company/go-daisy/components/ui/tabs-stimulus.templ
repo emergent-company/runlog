@@ -1,0 +1,17 @@
+package ui
+
+// StimulusTabs renders tab panels with Stimulus controller.
+//
+// Deprecated: use Tabs(TabsProps{Driver: "stimulus", ...}) instead.
+templ StimulusTabs(props TabsProps) {
+	@Tabs(TabsProps{
+		Style:      props.Style,
+		Size:       props.Size,
+		Bottom:     props.Bottom,
+		Items:      props.Items,
+		Name:       props.Name,
+		ExtraClass: props.ExtraClass,
+		Mode:       props.Mode,
+		Driver:     "stimulus",
+	})
+}

@@ -1,0 +1,15 @@
+package layout
+
+import "github.com/emergent-company/go-daisy/devmode"
+
+// Rail renders a two-column settings layout: a sticky left navigation rail and
+// a main content column fed from children. On small screens the columns stack
+// vertically; on large screens the rail is sticky below the top edge.
+templ Rail(nav templ.Component, attrs templ.Attributes) {
+	<div class="grid grid-cols-1 gap-6 lg:grid-cols-[11rem_minmax(0,1fr)]"
+		{ devmode.Attrs(ctx, "layout/Rail")... }
+		{ attrs... }>
+		<aside class="lg:sticky lg:top-6 lg:self-start">@nav</aside>
+		<div class="min-w-0">{ children... }</div>
+	</div>
+}

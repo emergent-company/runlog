@@ -1,0 +1,252 @@
+package table
+
+import (
+	"strconv"
+
+	ui "github.com/emergent-company/go-daisy/components/ui"
+	"github.com/emergent-company/go-daisy/devmode"
+)
+
+// DataGridColumn defines a single column in a data grid.
+type DataGridColumn struct {
+	Key      string // data key, used for sort param
+	Label    string // header text
+	Sortable bool   // show sort chevron
+	Width    string // optional CSS width class (e.g. "w-32"), empty = auto
+}
+
+// BatchAction defines a batch operation shown in the selection toolbar.
+type BatchAction struct {
+	Label   string // button text
+	Icon    string // iconify icon name (e.g. "lucide:trash")
+	Method  string // "post", "put", "patch", "delete"
+	Href    string // action URL, selected IDs appended as ?ids=1,2,3
+	Confirm string // confirmation message, empty = no confirm
+	Danger  bool   // red styling
+}
+
+// DataGridRow represents a single row in a data grid.
+type DataGridRow struct {
+	ID    string
+	Cells []templ.Component // one per column
+}
+
+// DataGridProps configures a DataGrid composite component.
+type DataGridProps struct {
+	ID               string            // unique ID for DOM ids and Alpine scope
+	Columns          []DataGridColumn
+	Rows             []DataGridRow
+	CurrentPage      int
+	TotalPages       int
+	TotalItems       int
+	PageSize         int
+	BaseURL          string            // base URL for sort/filter/page links
+
+	// Toolbar
+	SearchName        string            // query param name for search, empty = no search
+	SearchValue       string            // current search query
+	SearchPlaceholder string            // defaults to "Search..."
+	FilterChildren    templ.Component   // slot for additional filter controls (nil = none)
+
+	// Selection
+	Selectable   bool           // show checkbox column
+	RowIDField   string         // form field name for row IDs (e.g. "ids")
+	BatchActions []BatchAction
+
+	// Styling
+	Striped  bool
+	Bordered bool
+	Compact  bool
+	Class    string
+	Attrs    templ.Attributes
+}
+
+// DataGrid renders a composite card-wrapped table with search, filter,
+// checkbox row selection, batch actions, and pagination.
+templ DataGrid(props DataGridProps) {
+	<div
+		id={ "datagrid-" + props.ID }
+		class={ "card bg-base-100 shadow-sm border border-base-200", props.Class }
+		x-data="dataGridStore()"
+		x-init="init()"
+		hx-on::after:settle="initTree()"
+		{ devmode.Attrs(ctx, "table/DataGrid")... }
+		{ props.Attrs... }
+	>
+		<!-- Toolbar -->
+		<div class="px-5 pt-5">
+			<div class="flex items-center justify-between gap-3">
+				<div class="flex items-center gap-3 flex-1">
+					if props.SearchName != "" {
+						<label
+							class="input input-sm w-full max-w-xs flex items-center gap-2"
+							{ devmode.Attrs(ctx, "form/SearchInput")... }
+						>
+							@ui.IconSpan("lucide--search", "size-4 opacity-50 shrink-0")
+							<input
+								type="search"
+								name={ props.SearchName }
+								value={ props.SearchValue }
+								placeholder={ ternary(props.SearchPlaceholder != "", props.SearchPlaceholder, "Search...") }
+								class="grow"
+								if props.BaseURL != "" {
+									hx-get={ props.BaseURL }
+									hx-target={ "#datagrid-" + props.ID + "-body" }
+									hx-trigger="input delay:300ms, search"
+									hx-include="closest form"
+								}
+							/>
+						</label>
+					}
+					if props.FilterChildren != nil {
+						@props.FilterChildren
+					}
+				</div>
+
+				if props.Selectable && len(props.BatchActions) > 0 {
+					<div x-show="selected.length > 0" x-cloak class="flex items-center gap-2">
+						<span class="text-sm text-base-content/70" x-text="selected.length + ' selected'"></span>
+						for _, action := range props.BatchActions {
+							<form
+								method="post"
+								action={ action.Href }
+								class="inline"
+								x-on:submit={ "selected.length === 0 ? $event.preventDefault() : submitBatchAction($event, " + strconv.Quote(action.Confirm) + ")" }
+							>
+								<input
+									type="hidden"
+									name={ props.RowIDField }
+									x-bind:value="selected.join(',')"
+								/>
+								@ui.Button(ui.ButtonProps{
+									Icon: action.Icon,
+									Size: ui.ButtonSM,
+									Variant: ternaryVariant(action.Danger),
+								}) {
+									{ action.Label }
+								}
+							</form>
+						}
+					</div>
+				}
+			</div>
+		</div>
+
+		<!-- Table body (swapped via HTMX for sort/filter/page) -->
+		<div class="card-body p-0 mt-3" id={ "datagrid-" + props.ID + "-body" }>
+			<div class="overflow-x-auto">
+				@TableWithProps(TableProps{
+					Striped: props.Striped,
+					Bordered: props.Bordered,
+					Size: ternary(props.Compact, "sm", ""),
+				}) {
+					@TableHead() {
+						@TableHeadRow() {
+							if props.Selectable {
+								<th class="w-10">
+									<input
+										type="checkbox"
+										class="checkbox checkbox-sm"
+										x-model="selectAll"
+										x-on:change="toggleAll()"
+									/>
+								</th>
+							}
+							for _, col := range props.Columns {
+								<th class={ "text-xs font-semibold text-base-content/60 uppercase", col.Width }>
+									{ col.Label }
+								</th>
+							}
+						}
+					}
+					@TableBody() {
+						if len(props.Rows) == 0 {
+							@TableEmpty(len(props.Columns)+ternaryInt(props.Selectable, 1, 0), "No results found")
+						} else {
+							for _, row := range props.Rows {
+								@TableRow(row.ID, false, nil) {
+									if props.Selectable {
+										@TableCell("", nil) {
+											<input
+												type="checkbox"
+												class="checkbox checkbox-sm"
+												value={ row.ID }
+												x-model="selected"
+											/>
+										}
+									}
+									for _, cell := range row.Cells {
+										@TableCell("", nil) {
+											@cell
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			</div>
+		</div>
+
+		<!-- Footer: pagination + count -->
+		if props.TotalPages > 1 {
+			<div class="px-5 pb-5 pt-3 border-t border-base-200">
+				@ui.PaginationWithProps(ui.PaginationProps{
+					CurrentPage: props.CurrentPage,
+					TotalPages:  props.TotalPages,
+					TotalItems:  int64(props.TotalItems),
+					PageSize:    props.PageSize,
+					BaseURL:     props.BaseURL,
+					TargetID:    "datagrid-" + props.ID + "-body",
+				})
+			</div>
+		}
+	</div>
+
+	@dataGridAlpineScript()
+}
+
+// dataGridAlpineScript injects the Alpine.js store factory for DataGrid instances.
+templ dataGridAlpineScript() {
+	<script type="text/javascript">
+		if (!window.__dataGridStore) {
+			window.__dataGridStore = true;
+			window.dataGridStore = function() {
+				return {
+					selected: [],
+					selectAll: false,
+
+					init() {
+						// Nothing needed on init
+					},
+
+					initTree() {
+						var id = this.$el.id;
+						var body = document.getElementById(id + '-body');
+						if (body && window.Alpine) {
+							window.Alpine.initTree(body);
+						}
+					},
+
+					toggleAll() {
+						var id = this.$el.id;
+						var body = document.getElementById(id + '-body');
+						if (!body) return;
+						var checkboxes = body.querySelectorAll('input[type="checkbox"][value]');
+						if (this.selectAll) {
+							this.selected = Array.from(checkboxes).map(function(cb) { return cb.value; });
+						} else {
+							this.selected = [];
+						}
+					},
+
+					submitBatchAction: function(event, confirmMsg) {
+						if (confirmMsg && !confirm(confirmMsg)) {
+							event.preventDefault();
+						}
+					}
+				}
+			};
+		}
+	</script>
+}
